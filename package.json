@@ -1,0 +1,38 @@
+{
+  "name": "arena-sync-obsidian",
+  "version": "1.0.0",
+  "description": "Two-way sync between Are.na channels and your Obsidian vault.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "release": "bash scripts/release.sh"
+  },
+  "keywords": [
+    "obsidian",
+    "arena",
+    "are.na",
+    "sync",
+    "plugin"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "obsidian": "latest",
+    "ts-jest": "^29.1.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {}
+}

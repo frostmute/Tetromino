@@ -1,0 +1,51 @@
+name: 💡 Feature Request
+description: Suggest an idea for a new feature or improvement
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Please describe the problem you'd like solved and, if you have one, the solution you'd like to see.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: "What problem does this feature solve? Why is it needed?"
+      placeholder: "I often find myself needing to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: "Describe the ideal outcome. How would it work from a user's perspective?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: "Have you tried any workarounds? Are there other approaches?"
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: "How much of the plugin does this touch?"
+      options:
+        - Small (settings tweak, UI label, etc.)
+        - Medium (new option, new command, API change)
+        - Large (new sync mode, architectural change)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: "Would you be willing to help implement this?"
+      options:
+        - label: I'd be happy to submit a PR for this feature

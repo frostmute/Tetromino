@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" fill="none">
+  <!-- Background -->
+  <rect width="1200" height="1200" rx="32" fill="#1a1a2e"/>
+  
+  <!-- Subtle grid pattern -->
+  <defs>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#ffffff08" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#grid)"/>
+  
+  <!-- Glow effect -->
+  <defs>
+    <radialGradient id="glow" cx="600" cy="520" r="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="1200" fill="url(#glow)"/>
+  
+  <!-- Are.na logo (left) — four connected blocks -->
+  <g transform="translate(300, 380)">
+    <rect x="0" y="0" width="80" height="80" rx="12" fill="#e8524a" opacity="0.9"/>
+    <rect x="100" y="0" width="80" height="80" rx="12" fill="#e8524a" opacity="0.7"/>
+    <rect x="0" y="100" width="80" height="80" rx="12" fill="#e8524a" opacity="0.7"/>
+    <rect x="100" y="100" width="80" height="80" rx="12" fill="#e8524a" opacity="0.5"/>
+    <!-- Connection lines -->
+    <line x1="80" y1="40" x2="100" y2="40" stroke="#e8524a" stroke-width="3" opacity="0.6"/>
+    <line x1="40" y1="80" x2="40" y2="100" stroke="#e8524a" stroke-width="3" opacity="0.6"/>
+    <line x1="140" y1="80" x2="140" y2="100" stroke="#e8524a" stroke-width="3" opacity="0.6"/>
+    <line x1="80" y1="140" x2="100" y2="140" stroke="#e8524a" stroke-width="3" opacity="0.6"/>
+  </g>
+  
+  <!-- Sync arrows (center) -->
+  <g transform="translate(540, 440)">
+    <path d="M 0 30 L 50 0 L 50 20 L 120 20 L 120 40 L 50 40 L 50 60 Z" fill="#7c3aed" opacity="0.8"/>
+    <path d="M 120 90 L 70 120 L 70 100 L 0 100 L 0 80 L 70 80 L 70 60 Z" fill="#7c3aed" opacity="0.6"/>
+  </g>
+  
+  <!-- Obsidian logo (right) — gem shape -->
+  <g transform="translate(720, 380)">
+    <path d="M 90 0 L 180 70 L 140 180 L 40 180 L 0 70 Z" fill="#7c3aed" opacity="0.9"/>
+    <path d="M 90 0 L 180 70 L 90 50 Z" fill="#9f67ff" opacity="0.7"/>
+    <path d="M 90 0 L 0 70 L 90 50 Z" fill="#6d28d9" opacity="0.7"/>
+    <path d="M 90 50 L 180 70 L 140 180 Z" fill="#8b5cf6" opacity="0.6"/>
+    <path d="M 90 50 L 0 70 L 40 180 Z" fill="#5b21b6" opacity="0.6"/>
+    <path d="M 90 50 L 140 180 L 40 180 Z" fill="#7c3aed" opacity="0.5"/>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="720" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#ffffff" letter-spacing="-2">
+    Are.na Sync
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="780" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="#a0a0b8" letter-spacing="0.5">
+    for Obsidian
+  </text>
+  
+  <!-- Tagline -->
+  <text x="600" y="860" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#7c7c94" letter-spacing="1">
+    Bridge your digital garden
+  </text>
+</svg>

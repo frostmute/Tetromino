@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 640" fill="none">
+  <!-- Background -->
+  <rect width="1920" height="640" fill="#1a1a2e"/>
+  
+  <!-- Grid pattern -->
+  <defs>
+    <pattern id="bgrid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#ffffff08" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="bglow" cx="960" cy="320" r="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1920" y2="0">
+      <stop offset="0%" stop-color="#e8524a"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="640" fill="url(#bgrid)"/>
+  <rect width="1920" height="640" fill="url(#bglow)"/>
+  
+  <!-- Top accent bar -->
+  <rect width="1920" height="4" fill="url(#accent)"/>
+  
+  <!-- Are.na blocks (left) -->
+  <g transform="translate(240, 200)">
+    <rect x="0" y="0" width="70" height="70" rx="10" fill="#e8524a" opacity="0.9"/>
+    <rect x="85" y="0" width="70" height="70" rx="10" fill="#e8524a" opacity="0.7"/>
+    <rect x="0" y="85" width="70" height="70" rx="10" fill="#e8524a" opacity="0.7"/>
+    <rect x="85" y="85" width="70" height="70" rx="10" fill="#e8524a" opacity="0.5"/>
+    <line x1="70" y1="35" x2="85" y2="35" stroke="#e8524a" stroke-width="2.5" opacity="0.6"/>
+    <line x1="35" y1="70" x2="35" y2="85" stroke="#e8524a" stroke-width="2.5" opacity="0.6"/>
+    <line x1="120" y1="70" x2="120" y2="85" stroke="#e8524a" stroke-width="2.5" opacity="0.6"/>
+    <line x1="70" y1="120" x2="85" y2="120" stroke="#e8524a" stroke-width="2.5" opacity="0.6"/>
+  </g>
+  
+  <!-- Sync arrows -->
+  <g transform="translate(460, 260)">
+    <path d="M 0 25 L 40 0 L 40 15 L 100 15 L 100 35 L 40 35 L 40 50 Z" fill="#7c3aed" opacity="0.8"/>
+    <path d="M 100 75 L 60 100 L 60 85 L 0 85 L 0 65 L 60 65 L 60 50 Z" fill="#7c3aed" opacity="0.55"/>
+  </g>
+  
+  <!-- Obsidian gem -->
+  <g transform="translate(610, 200)">
+    <path d="M 78 0 L 155 60 L 120 155 L 35 155 L 0 60 Z" fill="#7c3aed" opacity="0.9"/>
+    <path d="M 78 0 L 155 60 L 78 44 Z" fill="#9f67ff" opacity="0.7"/>
+    <path d="M 78 0 L 0 60 L 78 44 Z" fill="#6d28d9" opacity="0.7"/>
+    <path d="M 78 44 L 155 60 L 120 155 Z" fill="#8b5cf6" opacity="0.6"/>
+    <path d="M 78 44 L 0 60 L 35 155 Z" fill="#5b21b6" opacity="0.6"/>
+    <path d="M 78 44 L 120 155 L 35 155 Z" fill="#7c3aed" opacity="0.5"/>
+  </g>
+  
+  <!-- Text group (right) -->
+  <text x="960" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="80" font-weight="700" fill="#ffffff" letter-spacing="-2">
+    Are.na Sync
+  </text>
+  <text x="960" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="36" fill="#a0a0b8" letter-spacing="0.5">
+    for Obsidian
+  </text>
+  <text x="960" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#7c7c94" letter-spacing="1.5">
+    Two-way sync between your Are.na channels
+  </text>
+  <text x="960" y="435" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#7c7c94" letter-spacing="1.5">
+    and your Obsidian vault. Bridge your digital garden.
+  </text>
+  
+  <!-- Version badge -->
+  <g transform="translate(960, 470)">
+    <rect width="80" height="28" rx="14" fill="#7c3aed" opacity="0.25"/>
+    <text x="40" y="19" text-anchor="middle" font-family="system-ui, monospace" font-size="14" fill="#c4b5fd">v1.0.0</text>
+  </g>
+  
+  <!-- Bottom accent bar -->
+  <rect y="636" width="1920" height="4" fill="url(#accent)"/>
+</svg>

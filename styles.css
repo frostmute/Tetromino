@@ -1,0 +1,136 @@
+/* ================================================================
+   Are.na Sync for Obsidian — Plugin Styles
+   ================================================================ */
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+
+.arena-sync-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.arena-sync-status .sync-icon {
+	width: 12px;
+	height: 12px;
+}
+
+.arena-sync-status.is-syncing {
+	color: var(--text-accent);
+}
+
+.arena-sync-status.is-syncing .sync-icon {
+	animation: arena-spin 1s linear infinite;
+}
+
+.arena-sync-status.has-errors {
+	color: var(--text-error);
+}
+
+@keyframes arena-spin {
+	from { transform: rotate(0deg); }
+	to   { transform: rotate(360deg); }
+}
+
+/* ── Settings tab ────────────────────────────────────────────────── */
+
+.arena-sync-settings h1 {
+	margin-bottom: 0.25em;
+}
+
+.arena-sync-settings h2 {
+	margin-top: 1.5em;
+	padding-bottom: 0.3em;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Channel mapping cards */
+.arena-sync-mapping {
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 12px 16px;
+	margin-bottom: 8px;
+}
+
+.arena-sync-mapping .mapping-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.arena-sync-mapping .mapping-header .mapping-title {
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+.arena-sync-mapping .mapping-header .mapping-badge {
+	font-size: var(--font-ui-smaller);
+	padding: 2px 8px;
+	border-radius: 12px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.arena-sync-mapping .mapping-details {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 4px 12px;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.arena-sync-mapping .mapping-details .label {
+	font-weight: var(--font-medium);
+	color: var(--text-faint);
+}
+
+/* Disabled mapping */
+.arena-sync-mapping.is-disabled {
+	opacity: 0.5;
+}
+
+/* ── Conflict modal ──────────────────────────────────────────────── */
+
+.arena-sync-conflict-modal .conflict-file {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-small);
+	background: var(--background-secondary);
+	padding: 4px 8px;
+	border-radius: 4px;
+}
+
+.arena-sync-conflict-modal .conflict-timestamps {
+	display: flex;
+	justify-content: space-between;
+	margin: 12px 0;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.arena-sync-conflict-modal .conflict-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+/* ── Sync result notice ──────────────────────────────────────────── */
+
+.arena-sync-notice {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.arena-sync-notice .notice-title {
+	font-weight: var(--font-semibold);
+}
+
+.arena-sync-notice .notice-stats {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}

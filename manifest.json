@@ -1,0 +1,10 @@
+{
+  "id": "arena-sync",
+  "name": "Are.na Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Two-way sync between Are.na channels and your Obsidian vault. Pull blocks as notes, push notes as blocks, and keep your digital garden connected.",
+  "author": "Arena Sync Contributors",
+  "authorUrl": "https://github.com/arena-sync",
+  "isDesktopOnly": false
+}
