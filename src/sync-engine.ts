@@ -10,7 +10,12 @@ import type {
 	SyncRecord,
 	SyncResult,
 } from "./types";
-import {blockToMarkdown, computeHash, sanitiseFilename} from "./utils";
+import {
+	blockFileName as utilsBlockFileName,
+	blockToMarkdown,
+	computeHash,
+	sanitiseFilename,
+} from "./utils";
 
 type ProgressHandler = (progress: ImportProgress) => void;
 
