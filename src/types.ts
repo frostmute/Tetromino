@@ -34,7 +34,7 @@ export interface ArenaBlock {
 		content_type: string;
 		extension: string;
 	} | null;
-	class: "Image" | "Text" | "Link" | "Media" | "Attachment";
+	class: string;
 	base_class: "Block";
 	created_at: string;
 	updated_at: string;

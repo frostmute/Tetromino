@@ -371,9 +371,13 @@ export class SyncEngine {
 
 	private async ensureFolder(path: string): Promise<void> {
 		const normalized = normalizePath(path);
-		const exists = this.vault.getAbstractFileByPath(normalized);
-		if (!exists) {
-			await this.vault.createFolder(normalized);
+		const parts = normalized.split("/").filter(Boolean);
+		let current = "";
+		for (const part of parts) {
+			current = current ? `${current}/${part}` : part;
+			if (!this.vault.getAbstractFileByPath(current)) {
+				await this.vault.createFolder(current);
+			}
 		}
 	}
 }

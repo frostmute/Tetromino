@@ -117,14 +117,23 @@ export class ArenaApi {
 		slug: string,
 		onPage: (currentPage: number, totalPages: number) => void
 	): Promise<ArenaBlock[]> {
-		const first = await this.getChannelContents(slug, 1);
-		onPage(1, first.total_pages);
-		const blocks: ArenaBlock[] = [...first.contents];
+		const blocks: ArenaBlock[] = [];
+		let pageNumber = 1;
+		let hasMore = true;
 
-		for (let p = 2; p <= first.total_pages; p++) {
-			const page = await this.getChannelContents(slug, p);
+		while (hasMore) {
+			const page = await this.getChannelContents(slug, pageNumber);
+			const totalPages = Math.max(
+				1,
+				Number(page.total_pages || 1)
+			);
 			blocks.push(...page.contents);
-			onPage(p, first.total_pages);
+			onPage(pageNumber, totalPages);
+
+			const reachedLastPageByCount = page.contents.length < PER_PAGE;
+			const reachedLastPageByTotal = pageNumber >= totalPages;
+			hasMore = !(reachedLastPageByCount || reachedLastPageByTotal);
+			if (hasMore) pageNumber++;
 		}
 
 		return blocks.sort((a, b) => a.position - b.position);

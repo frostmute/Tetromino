@@ -11,6 +11,24 @@ function yamlQuote(value: string): string {
 	return `"${value.replace(/"/g, '\\"')}"`;
 }
 
+export function normalizeArenaUrl(url: string): string {
+	if (!url) return url;
+	try {
+		const parsed = new URL(url);
+		if (parsed.hostname === "api.are.na") {
+			const path = parsed.pathname.replace(/^\/v2/, "");
+			const converted = path
+				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+				.replace(/^\/users\/([^/]+).*$/, "/user/$1");
+			return `https://www.are.na${converted}`;
+		}
+		return url;
+	} catch {
+		return url;
+	}
+}
+
 /**
  * Convert an Are.na block into a Markdown string suitable for Obsidian.
  */
@@ -35,7 +53,7 @@ export function blockToMarkdown(
 			parts.push(`arena_channel_title: ${yamlQuote(context.channelTitle)}`);
 		}
 		if (block.source?.url) {
-			parts.push(`arena_source_url: ${yamlQuote(block.source.url)}`);
+			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
 		}
 		parts.push("---");
 		parts.push("");
@@ -61,7 +79,8 @@ export function blockToMarkdown(
 			break;
 		case "Link":
 			if (block.source?.url) {
-				parts.push(`[${block.source.title || block.source.url}](${block.source.url})`);
+				const source = normalizeArenaUrl(block.source.url);
+				parts.push(`[${block.source.title || source}](${source})`);
 			}
 			if (block.description) {
 				parts.push("");
@@ -70,7 +89,7 @@ export function blockToMarkdown(
 			break;
 		case "Media":
 			if (block.source?.url) {
-				parts.push(`<${block.source.url}>`);
+				parts.push(`<${normalizeArenaUrl(block.source.url)}>`);
 			}
 			break;
 		case "Attachment":

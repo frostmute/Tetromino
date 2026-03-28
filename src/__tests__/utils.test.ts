@@ -1,4 +1,11 @@
-import {blockFileName, blockToMarkdown, computeHash, markdownToBlockContent, sanitiseFilename,} from "../utils";
+import {
+	blockFileName,
+	blockToMarkdown,
+	computeHash,
+	markdownToBlockContent,
+	normalizeArenaUrl,
+	sanitiseFilename,
+} from "../utils";
 import type {ArenaBlock, ArenaSyncSettings} from "../types";
 import {DEFAULT_SETTINGS} from "../types";
 
@@ -189,5 +196,17 @@ describe("blockFileName", () => {
 
 	it("title-id scheme", () => {
 		expect(blockFileName(block, "title-id")).toBe("Test Block (12345).md");
+	});
+});
+
+describe("normalizeArenaUrl", () => {
+	it("converts api block URLs to web URLs", () => {
+		expect(normalizeArenaUrl("https://api.are.na/v2/blocks/12345")).toBe(
+			"https://www.are.na/block/12345"
+		);
+	});
+
+	it("leaves external URLs unchanged", () => {
+		expect(normalizeArenaUrl("https://example.com")).toBe("https://example.com");
 	});
 });
