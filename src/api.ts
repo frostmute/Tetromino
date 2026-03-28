@@ -138,10 +138,11 @@ export class ArenaApi {
 				1,
 				Number(page.total_pages || 1)
 			);
-			blocks.push(...page.contents);
+			const contents = Array.isArray(page.contents) ? page.contents : [];
+			blocks.push(...contents);
 			onPage(pageNumber, totalPages);
 
-			const reachedLastPageByCount = page.contents.length < PER_PAGE;
+			const reachedLastPageByCount = contents.length < PER_PAGE;
 			const reachedLastPageByTotal = pageNumber >= totalPages;
 			hasMore = !(reachedLastPageByCount || reachedLastPageByTotal);
 			if (hasMore) pageNumber++;
@@ -181,3 +182,5 @@ export class ArenaApi {
 		return res.arrayBuffer;
 	}
 }
+
+
