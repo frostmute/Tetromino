@@ -326,17 +326,7 @@ export class SyncEngine {
 	}
 
 	private blockFileName(block: ArenaBlock): string {
-		const sanitize = (s: string) =>
-			s.replace(/[\\/:*?"<>|]/g, "-").substring(0, 200);
-
-		switch (this.settings.blockNaming) {
-			case "title":
-				return `${sanitize(block.title || `block-${block.id}`)}.md`;
-			case "id":
-				return `${block.id}.md`;
-			case "title-id":
-				return `${sanitize(block.title || "untitled")}-${block.id}.md`;
-		}
+		return utilsBlockFileName(block, this.settings.blockNaming);
 	}
 
 	private shouldExclude(block: ArenaBlock): boolean {
