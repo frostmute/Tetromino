@@ -1,5 +1,5 @@
 import {requestUrl, RequestUrlParam} from "obsidian";
-import type {ArenaBlock, ArenaChannel, ArenaChannelListItem, ArenaPaginatedResponse,} from "./types";
+import type {ArenaBlock, ArenaChannel, ArenaChannelListItem, ArenaPaginatedResponse} from "./types";
 
 const BASE_URL = "https://api.are.na/v2";
 const PER_PAGE = 100;
@@ -11,15 +11,16 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Adds a random jitter to a base delay.
+ *
+ * @param baseDelay - The base delay in milliseconds
+ * @returns The resulting delay in milliseconds: `baseDelay` plus a random value in the range `0` to `JITTER`
+ */
 function withJitter(baseDelay: number): number {
 	return baseDelay + Math.random() * JITTER;
 }
 
-/**
- * Lightweight Are.na REST client.
- * Uses Obsidian's built-in `requestUrl` so that requests work on
- * both desktop and mobile without CORS issues.
- */
 export class ArenaApi {
 	private token: string;
 	private debug: boolean;
@@ -28,10 +29,6 @@ export class ArenaApi {
 		this.token = token;
 		this.debug = debug;
 	}
-
-	/* ------------------------------------------------------------------ */
-	/*  Internals                                                         */
-	/* ------------------------------------------------------------------ */
 
 	private headers(): Record<string, string> {
 		const h: Record<string, string> = {
@@ -71,11 +68,6 @@ export class ArenaApi {
 		return res.json as T;
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Public helpers                                                    */
-	/* ------------------------------------------------------------------ */
-
-	/** Verify that the stored token is valid. */
 	async verifyToken(): Promise<boolean> {
 		try {
 			await this.request("GET", "/me");
@@ -85,11 +77,6 @@ export class ArenaApi {
 		}
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Channels                                                          */
-	/* ------------------------------------------------------------------ */
-
-	/** Return a single channel with its first page of contents. */
 	async getChannel(slug: string): Promise<ArenaChannel> {
 		return this.request<ArenaChannel>(
 			"GET",
@@ -97,7 +84,6 @@ export class ArenaApi {
 		);
 	}
 
-	/** Return a page of contents for a channel. */
 	async getChannelContents(
 		slug: string,
 		page = 1
@@ -108,20 +94,8 @@ export class ArenaApi {
 		);
 	}
 
-	/**
-	 * Retrieve **all** blocks in a channel, transparently paginating.
-	 * Returns blocks sorted by `position` (ascending).
-	 */
 	async getAllChannelBlocks(slug: string): Promise<ArenaBlock[]> {
-		const first = await this.getChannelContents(slug, 1);
-		const blocks: ArenaBlock[] = [...first.contents];
-
-		for (let p = 2; p <= first.total_pages; p++) {
-			const page = await this.getChannelContents(slug, p);
-			blocks.push(...page.contents);
-		}
-
-		return blocks.sort((a, b) => a.position - b.position);
+		return this.getAllChannelBlocksWithProgress(slug, () => {});
 	}
 
 	async getAllChannelBlocksWithProgress(
@@ -129,28 +103,92 @@ export class ArenaApi {
 		onPage: (currentPage: number, totalPages: number) => void
 	): Promise<ArenaBlock[]> {
 		const blocks: ArenaBlock[] = [];
+		const seenBlockIds = new Set<number>();
 		let pageNumber = 1;
 		let hasMore = true;
+		let totalPagesEstimate = 1;
+		let consecutiveErrors = 0;
+		const MAX_CONSECUTIVE_ERRORS = 3;
 
 		while (hasMore) {
-			const page = await this.getChannelContents(slug, pageNumber);
-			const totalPages = Math.max(
-				1,
-				Number(page.total_pages || 1)
-			);
-			blocks.push(...page.contents);
-			onPage(pageNumber, totalPages);
+			try {
+				if (pageNumber > 1) {
+					await delay(withJitter(REQUEST_DELAY));
+				}
 
-			const reachedLastPageByCount = page.contents.length < PER_PAGE;
-			const reachedLastPageByTotal = pageNumber >= totalPages;
-			hasMore = !(reachedLastPageByCount || reachedLastPageByTotal);
-			if (hasMore) pageNumber++;
+				const page = await this.getChannelContents(slug, pageNumber);
+				consecutiveErrors = 0;
+
+				if (page.total_pages && page.total_pages > totalPagesEstimate) {
+					totalPagesEstimate = page.total_pages;
+				}
+
+				if (page.length && page.length > 0) {
+					totalPagesEstimate = Math.max(
+						totalPagesEstimate,
+						Math.ceil(page.length / PER_PAGE)
+					);
+				}
+
+				let newBlocksCount = 0;
+				for (const block of page.contents) {
+					if (!seenBlockIds.has(block.id)) {
+						seenBlockIds.add(block.id);
+						blocks.push(block);
+						newBlocksCount++;
+					}
+				}
+
+				onPage(pageNumber, totalPagesEstimate);
+
+				const emptyPage = page.contents.length === 0;
+				const lastPageByCount = page.contents.length < PER_PAGE;
+				const lastPageByTotal = pageNumber >= totalPagesEstimate;
+				const duplicatePage = newBlocksCount === 0 && page.contents.length > 0;
+
+				if (emptyPage || lastPageByCount || lastPageByTotal || duplicatePage) {
+					hasMore = false;
+					if (this.debug) {
+						console.log(
+							`[arena-sync] Stopping pagination for ${slug}: ` +
+							`page=${pageNumber}, totalPages=${totalPagesEstimate}, ` +
+							`blocksOnPage=${page.contents.length}, ` +
+							`newBlocks=${newBlocksCount}, ` +
+							`reason=${emptyPage ? 'empty' : lastPageByCount ? 'partial' : lastPageByTotal ? 'total' : 'duplicates'}`
+						);
+					}
+				} else {
+					pageNumber++;
+				}
+			} catch (error) {
+				consecutiveErrors++;
+				console.error(
+					`[arena-sync] Error fetching page ${pageNumber} for ${slug} ` +
+					`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
+					error
+				);
+
+				if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+					throw new Error(
+						`Failed to fetch channel ${slug} after ${MAX_CONSECUTIVE_ERRORS} consecutive errors. ` +
+						`Last error: ${(error as Error).message}`
+					);
+				}
+
+				await delay(REQUEST_DELAY * consecutiveErrors + withJitter(JITTER));
+			}
+		}
+
+		if (this.debug) {
+			console.log(
+				`[arena-sync] Fetched ${blocks.length} unique blocks from ${slug} ` +
+				`across ${pageNumber} page(s)`
+			);
 		}
 
 		return blocks.sort((a, b) => a.position - b.position);
 	}
 
-	/** List channels for the authenticated user. */
 	async listMyChannels(
 		page = 1
 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
@@ -160,11 +198,6 @@ export class ArenaApi {
 		);
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Blocks                                                            */
-	/* ------------------------------------------------------------------ */
-
-	/** Fetch a single block by ID. */
 	async getBlock(id: number): Promise<ArenaBlock> {
 		return this.request<ArenaBlock>("GET", `/blocks/${id}`);
 	}
