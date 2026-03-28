@@ -44,20 +44,28 @@ jobs:
             echo "::error::manifest.json version ($MANIFEST_VERSION) does not match tag (v$TAG_VERSION)"
             exit 1
           fi
-          echo "Version verified: $TAG_VERSION ✓"
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Package plugin zip
+        id: package
+        run: |
+          mkdir -p dist
+          PLUGIN_ID=$(jq -r '.id' manifest.json)
+          VERSION=$(jq -r '.version' manifest.json)
+          ZIP_NAME="${PLUGIN_ID}-${VERSION}.zip"
+          zip -j "dist/${ZIP_NAME}" main.js manifest.json styles.css
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes from CHANGELOG
         id: changelog
         run: |
-          # Extract the section for this version from CHANGELOG.md
           VERSION="${{ steps.version.outputs.version }}"
           NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
           if [ -z "$NOTES" ]; then
             NOTES="Release v${VERSION}. See [CHANGELOG.md](CHANGELOG.md) for details."
           fi
-          # Write to file to avoid escaping issues
           echo "$NOTES" > release-notes.md
-          echo "Generated release notes for v${VERSION} ✓"
+          echo "Generated release notes for v${VERSION}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -69,5 +77,6 @@ jobs:
             main.js
             manifest.json
             styles.css
+            dist/${{ steps.package.outputs.zip_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

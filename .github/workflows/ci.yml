@@ -80,7 +80,18 @@ jobs:
         run: |
           test -f main.js || (echo "main.js not found" && exit 1)
           test -f manifest.json || (echo "manifest.json not found" && exit 1)
-          echo "Build artifacts verified ✓"
+          test -f styles.css || (echo "styles.css not found" && exit 1)
+          echo "Build artifacts verified"
+
+      - name: Package plugin zip
+        id: package
+        run: |
+          mkdir -p dist
+          PLUGIN_ID=$(jq -r '.id' manifest.json)
+          VERSION=$(jq -r '.version' manifest.json)
+          ZIP_NAME="${PLUGIN_ID}-${VERSION}.zip"
+          zip -j "dist/${ZIP_NAME}" main.js manifest.json styles.css
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -90,4 +101,11 @@ jobs:
             main.js
             manifest.json
             styles.css
+          retention-days: 30
+
+      - name: Upload packaged zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: dist/${{ steps.package.outputs.zip_name }}
           retention-days: 30
