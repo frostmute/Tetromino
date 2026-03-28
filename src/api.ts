@@ -11,6 +11,12 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Adds a random jitter to a base delay.
+ *
+ * @param baseDelay - The base delay in milliseconds
+ * @returns The resulting delay in milliseconds: `baseDelay` plus a random value in the range `0` to `JITTER`
+ */
 function withJitter(baseDelay: number): number {
 	return baseDelay + Math.random() * JITTER;
 }
