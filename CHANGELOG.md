@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Refactored plugin behavior to one-way import only (Are.na -> Obsidian).
+- Removed documentation references to push sync, two-way conflict flows, migration tooling, and preview mode.
+- Aligned command, settings, and feature docs with current runtime behavior.
+
+### Added
+
+- Dry-run preview commands for full import and current-channel import.
+- Attachment handling controls for link/download behavior.
+- Downloaded attachment rendering controls (embed or link).
+- Attachment storage location controls (channel-local, global folder, custom folder).
+- Binary asset downloading for images and non-image attachments (including PDFs).
+- Pagination and block-level progress updates in status bar for large channels.
+- Channel index note generation with links to imported notes.
+- Import action history logging (`Are.na/import-history.md`) for transparency.
+
 ### Planned
 - Dataview-compatible front-matter presets
 - Drag-and-drop channel mapping UI

@@ -1,13 +1,10 @@
-import { Notice, Plugin, addIcon } from "obsidian";
-import { ArenaApi } from "./api";
-import { SyncEngine } from "./sync-engine";
-import { ArenaSyncSettingTab } from "./settings-tab";
-import type { ArenaSyncSettings, SyncResult } from "./types";
-import { DEFAULT_SETTINGS } from "./types";
+import {addIcon, normalizePath, Notice, Plugin, TFile} from "obsidian";
+import {ArenaApi} from "./api";
+import {SyncEngine} from "./sync-engine";
+import {ArenaSyncSettingTab} from "./settings-tab";
+import type {ArenaSyncSettings, ImportProgress, SyncResult} from "./types";
+import {DEFAULT_SETTINGS} from "./types";
 
-/* ------------------------------------------------------------------ */
-/*  Custom ribbon icon (Are.na logo simplified)                       */
-/* ------------------------------------------------------------------ */
 const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
 
 export default class ArenaSyncPlugin extends Plugin {
@@ -18,38 +15,40 @@ export default class ArenaSyncPlugin extends Plugin {
 	private isSyncing = false;
 	private statusBarItem: HTMLElement | null = null;
 
-	/* ---------------------------------------------------------------- */
-	/*  Lifecycle                                                       */
-	/* ---------------------------------------------------------------- */
-
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
 		this.api = new ArenaApi(this.settings.apiToken, this.settings.debugLogging);
-		this.engine = new SyncEngine(this.app, this.api, this.settings);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress)
+		);
 
-		// Register custom icon
 		addIcon("arena-sync", ARENA_ICON);
-
-		// Ribbon button
-		this.addRibbonIcon("arena-sync", "Sync with Are.na", async () => {
-			await this.runSync();
+		this.addRibbonIcon("arena-sync", "Import from Are.na", async () => {
+			await this.runSync(false);
 		});
 
-		// Status bar
 		this.statusBarItem = this.addStatusBarItem();
 		this.updateStatusBar("idle");
 
-		// Commands
 		this.addCommand({
 			id: "arena-sync-now",
-			name: "Sync all channels now",
-			callback: async () => await this.runSync(),
+			name: "Import all channels now",
+			callback: async () => await this.runSync(false),
+		});
+
+		this.addCommand({
+			id: "arena-sync-preview",
+			name: "Preview import (dry-run)",
+			callback: async () => await this.runSync(true),
 		});
 
 		this.addCommand({
 			id: "arena-sync-channel",
-			name: "Sync current channel",
+			name: "Import current channel",
 			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
@@ -58,19 +57,23 @@ export default class ArenaSyncPlugin extends Plugin {
 				);
 				if (!mapping) return false;
 				if (checking) return true;
-				this.runChannelSync(mapping.channelSlug);
+				this.runChannelSync(mapping.channelSlug, false);
 				return true;
 			},
 		});
 
 		this.addCommand({
-			id: "arena-sync-push-note",
-			name: "Push current note to Are.na",
+			id: "arena-sync-channel-preview",
+			name: "Preview current channel import (dry-run)",
 			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(m.localFolder)
+				);
+				if (!mapping) return false;
 				if (checking) return true;
-				this.pushCurrentNote(file);
+				this.runChannelSync(mapping.channelSlug, true);
 				return true;
 			},
 		});
@@ -94,29 +97,17 @@ export default class ArenaSyncPlugin extends Plugin {
 			},
 		});
 
-		// Settings tab
 		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
-
-		// Auto-sync timer
 		this.resetSyncTimer();
 
-		// Startup sync
 		if (this.settings.syncOnStartup && this.settings.apiToken) {
-			// Small delay so vault is fully loaded
-			setTimeout(() => this.runSync(), 3000);
+			setTimeout(() => this.runSync(false), 3000);
 		}
-
-		this.log("Are.na Sync plugin loaded");
 	}
 
 	onunload(): void {
 		this.clearSyncTimer();
-		this.log("Are.na Sync plugin unloaded");
 	}
-
-	/* ---------------------------------------------------------------- */
-	/*  Settings persistence                                            */
-	/* ---------------------------------------------------------------- */
 
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData();
@@ -125,26 +116,26 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		// Rebuild API client when token changes
 		this.api = new ArenaApi(this.settings.apiToken, this.settings.debugLogging);
-		this.engine = new SyncEngine(this.app, this.api, this.settings);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress)
+		);
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  Sync orchestration                                              */
-	/* ---------------------------------------------------------------- */
-
-	async runSync(): Promise<void> {
+	async runSync(dryRun = false): Promise<void> {
 		if (this.isSyncing) {
-			new Notice("Are.na Sync is already running…");
+			new Notice("Are.na Import is already running...");
 			return;
 		}
 		if (!this.settings.apiToken) {
-			new Notice("Are.na Sync: Please set your API token in settings.");
+			new Notice("Are.na Import: Please set your API token in settings.");
 			return;
 		}
 		if (this.settings.channelMappings.length === 0) {
-			new Notice("Are.na Sync: No channels configured. Open settings to add one.");
+			new Notice("Are.na Import: No channels configured.");
 			return;
 		}
 
@@ -152,21 +143,26 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.updateStatusBar("syncing");
 
 		try {
-			const result = await this.engine.syncAll();
+			const result = await this.engine.syncAll({dryRun});
+			if (!dryRun) {
+				await this.saveSettings();
+				await this.writeImportReport(result, "all");
+			}
 			this.notifySyncResult(result);
 		} catch (err) {
-			new Notice(`Are.na Sync failed: ${(err as Error).message}`);
-			this.log(`Sync error: ${(err as Error).stack}`);
+			new Notice(`Are.na Import failed: ${(err as Error).message}`);
 		} finally {
 			this.isSyncing = false;
 			this.updateStatusBar("idle");
 		}
 	}
 
-	async runChannelSync(slug: string): Promise<void> {
-		const mapping = this.settings.channelMappings.find(
-			(m) => m.channelSlug === slug
-		);
+	async runChannelSync(slug: string, dryRun = false): Promise<void> {
+		if (this.isSyncing) {
+			new Notice("Are.na Import is already running...");
+			return;
+		}
+		const mapping = this.settings.channelMappings.find((m) => m.channelSlug === slug);
 		if (!mapping) {
 			new Notice(`Channel "${slug}" not found in settings.`);
 			return;
@@ -176,50 +172,26 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.updateStatusBar("syncing");
 
 		try {
-			const result = await this.engine.syncChannel(mapping);
-			await this.saveSettings();
+			const result = await this.engine.syncChannel(mapping, {dryRun});
+			if (!dryRun) {
+				await this.saveSettings();
+				await this.writeImportReport(result, slug);
+			}
 			this.notifySyncResult(result);
 		} catch (err) {
-			new Notice(`Sync failed for ${slug}: ${(err as Error).message}`);
+			new Notice(`Import failed for ${slug}: ${(err as Error).message}`);
 		} finally {
 			this.isSyncing = false;
 			this.updateStatusBar("idle");
 		}
 	}
 
-	private async pushCurrentNote(file: import("obsidian").TFile): Promise<void> {
-		const mapping = this.settings.channelMappings.find((m) =>
-			file.path.startsWith(m.localFolder)
-		);
-		if (!mapping) {
-			new Notice(
-				"This note isn't inside a synced channel folder. " +
-				"Map a channel to this folder in settings first."
-			);
-			return;
-		}
-
-		try {
-			const content = await this.app.vault.read(file);
-			const { markdownToBlockContent } = await import("./utils");
-			const { title, content: body } = markdownToBlockContent(content);
-			await this.api.createBlock(mapping.channelSlug, body, title);
-			new Notice(`Pushed "${title || file.basename}" to #${mapping.channelTitle}`);
-		} catch (err) {
-			new Notice(`Push failed: ${(err as Error).message}`);
-		}
-	}
-
-	/* ---------------------------------------------------------------- */
-	/*  Timer management                                                */
-	/* ---------------------------------------------------------------- */
-
 	resetSyncTimer(): void {
 		this.clearSyncTimer();
 		const mins = this.settings.syncInterval;
 		if (mins > 0) {
 			this.syncTimer = setInterval(
-				() => this.runSync(),
+				() => this.runSync(false),
 				mins * 60 * 1000
 			);
 		}
@@ -232,45 +204,72 @@ export default class ArenaSyncPlugin extends Plugin {
 		}
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  UI helpers                                                      */
-	/* ---------------------------------------------------------------- */
-
-	private updateStatusBar(state: "idle" | "syncing"): void {
+	private updateStatusBar(state: "idle" | "syncing", detail = ""): void {
 		if (!this.statusBarItem) return;
 		if (state === "syncing") {
-			this.statusBarItem.setText("⟳ Syncing Are.na…");
+			this.statusBarItem.setText(detail || "Importing from Are.na...");
 		} else {
 			this.statusBarItem.setText("");
 		}
 	}
 
+	private updateProgressStatus(progress: ImportProgress): void {
+		if (!this.isSyncing) return;
+		const percentage =
+			progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+		const barWidth = 10;
+		const filled = Math.max(0, Math.min(barWidth, Math.round((percentage / 100) * barWidth)));
+		const bar = `[${"#".repeat(filled)}${"-".repeat(barWidth - filled)}]`;
+		const label =
+			progress.phase === "pages"
+				? `pages ${progress.current}/${progress.total}`
+				: `blocks ${progress.current}/${progress.total}`;
+		this.updateStatusBar("syncing", `${bar} ${percentage}% ${progress.channelSlug} ${label}`);
+	}
+
 	private notifySyncResult(result: SyncResult): void {
 		if (!this.settings.notifyOnSync) return;
-
 		const parts: string[] = [];
 		if (result.created > 0) parts.push(`${result.created} created`);
 		if (result.updated > 0) parts.push(`${result.updated} updated`);
-		if (result.deleted > 0) parts.push(`${result.deleted} deleted`);
-		if (result.conflicts.length > 0)
-			parts.push(`${result.conflicts.length} conflicts`);
-		if (result.errors.length > 0)
-			parts.push(`${result.errors.length} errors`);
-
-		const summary =
-			parts.length > 0 ? parts.join(", ") : "Everything up to date";
+		if (result.downloaded > 0) parts.push(`${result.downloaded} assets downloaded`);
+		if (result.errors.length > 0) parts.push(`${result.errors.length} errors`);
+		if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+		const summary = parts.length > 0 ? parts.join(", ") : "no changes";
 		const seconds = (result.duration / 1000).toFixed(1);
-
-		new Notice(`Are.na Sync: ${summary} (${seconds}s)`);
+		const prefix = result.dryRun ? "Are.na Import preview" : "Are.na Import";
+		new Notice(`${prefix}: ${summary} (${seconds}s)`);
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  Logging                                                         */
-	/* ---------------------------------------------------------------- */
-
-	log(msg: string): void {
-		if (this.settings.debugLogging) {
-			console.log(`[arena-sync] ${msg}`);
+	private async writeImportReport(result: SyncResult, scope: string): Promise<void> {
+		const folder = normalizePath("Are.na");
+		const filePath = normalizePath("Are.na/import-history.md");
+		if (!this.app.vault.getAbstractFileByPath(folder)) {
+			await this.app.vault.createFolder(folder);
+		}
+		const timestamp = new Date().toISOString();
+		const lines: string[] = [
+			`## ${timestamp} (${scope})`,
+			"",
+			`- created: ${result.created}`,
+			`- updated: ${result.updated}`,
+			`- downloaded: ${result.downloaded}`,
+			`- skipped: ${result.skipped}`,
+			`- errors: ${result.errors.length}`,
+			`- duration_ms: ${result.duration}`,
+			"",
+			"### Actions",
+			...result.actions.map((a) => `- ${a}`),
+			"",
+		];
+		const existing = this.app.vault.getAbstractFileByPath(filePath);
+		if (!existing) {
+			await this.app.vault.create(filePath, lines.join("\n"));
+			return;
+		}
+		if (existing instanceof TFile) {
+			const current = await this.app.vault.read(existing);
+			await this.app.vault.modify(existing, `${current}\n${lines.join("\n")}`);
 		}
 	}
 }

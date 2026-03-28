@@ -1,13 +1,13 @@
 {
   "name": "arena-sync-obsidian",
   "version": "1.0.0",
-  "description": "Two-way sync between Are.na channels and your Obsidian vault.",
+	"description": "One-way import from Are.na channels into your Obsidian vault.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+	  "lint": "eslint \"src/**/*.ts\"",
+	  "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "version": "node version-bump.mjs && git add manifest.json versions.json",

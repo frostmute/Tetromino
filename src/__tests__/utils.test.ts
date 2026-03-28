@@ -1,12 +1,6 @@
-import {
-	blockToMarkdown,
-	markdownToBlockContent,
-	computeHash,
-	sanitiseFilename,
-	blockFileName,
-} from "../utils";
-import type { ArenaBlock, ArenaSyncSettings } from "../types";
-import { DEFAULT_SETTINGS } from "../types";
+import {blockFileName, blockToMarkdown, computeHash, markdownToBlockContent, sanitiseFilename,} from "../utils";
+import type {ArenaBlock, ArenaSyncSettings} from "../types";
+import {DEFAULT_SETTINGS} from "../types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -52,8 +46,8 @@ describe("blockToMarkdown", () => {
 	it("converts a text block with front-matter", () => {
 		const md = blockToMarkdown(makeBlock(), settings);
 		expect(md).toContain("---");
-		expect(md).toContain("arena-id: 12345");
-		expect(md).toContain("arena-class: Text");
+		expect(md).toContain("arena_id: 12345");
+		expect(md).toContain('arena_class: "Text"');
 		expect(md).toContain("# Test Block");
 		expect(md).toContain("Hello world");
 	});
@@ -61,7 +55,7 @@ describe("blockToMarkdown", () => {
 	it("omits front-matter when disabled", () => {
 		const s = { ...settings, frontmatterEnabled: false };
 		const md = blockToMarkdown(makeBlock(), s);
-		expect(md).not.toContain("---\narena-id");
+		expect(md).not.toContain("---\narena_id");
 		expect(md).toContain("# Test Block");
 	});
 

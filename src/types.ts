@@ -79,17 +79,17 @@ export interface ArenaPaginatedResponse<T> {
  * Plugin-specific types
  */
 
-export type SyncDirection = "pull" | "push" | "both";
-export type ConflictStrategy = "local-wins" | "remote-wins" | "newest-wins" | "ask";
 export type BlockNamingScheme = "title" | "id" | "title-id";
 export type ImageHandling = "embed" | "link" | "download";
+export type AttachmentHandling = "link" | "download";
+export type DownloadedAttachmentLinkStyle = "embed" | "link";
+export type AttachmentStorage = "channel" | "global" | "custom";
 
 export interface ChannelMapping {
 	channelSlug: string;
 	channelId: number;
 	channelTitle: string;
 	localFolder: string;
-	syncDirection: SyncDirection;
 	lastSyncedAt: string | null;
 	enabled: boolean;
 }
@@ -101,7 +101,6 @@ export interface SyncRecord {
 	lastSyncedAt: string;
 	localHash: string;
 	remoteHash: string;
-	syncDirection: SyncDirection;
 }
 
 export interface SyncResult {
@@ -109,17 +108,22 @@ export interface SyncResult {
 	updated: number;
 	deleted: number;
 	skipped: number;
-	conflicts: ConflictItem[];
+	downloaded: number;
+	dryRun: boolean;
+	actions: string[];
 	errors: SyncError[];
 	duration: number;
 }
 
-export interface ConflictItem {
-	blockId: number;
-	localPath: string;
-	localModified: string;
-	remoteModified: string;
-	strategy: ConflictStrategy;
+export interface SyncOptions {
+	dryRun?: boolean;
+}
+
+export interface ImportProgress {
+	channelSlug: string;
+	phase: "pages" | "blocks";
+	current: number;
+	total: number;
 }
 
 export interface SyncError {
@@ -133,10 +137,13 @@ export interface ArenaSyncSettings {
 	apiToken: string;
 	syncInterval: number;
 	syncOnStartup: boolean;
-	defaultSyncDirection: SyncDirection;
-	conflictStrategy: ConflictStrategy;
 	blockNaming: BlockNamingScheme;
 	imageHandling: ImageHandling;
+	attachmentHandling: AttachmentHandling;
+	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+	attachmentStorage: AttachmentStorage;
+	globalAttachmentFolder: string;
+	customAttachmentFolder: string;
 	channelMappings: ChannelMapping[];
 	syncRecords: SyncRecord[];
 	frontmatterEnabled: boolean;
@@ -150,10 +157,13 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	apiToken: "",
 	syncInterval: 30,
 	syncOnStartup: false,
-	defaultSyncDirection: "pull",
-	conflictStrategy: "newest-wins",
 	blockNaming: "title",
 	imageHandling: "download",
+	attachmentHandling: "download",
+	downloadedAttachmentLinkStyle: "link",
+	attachmentStorage: "global",
+	globalAttachmentFolder: "Are.na/Attachments",
+	customAttachmentFolder: "",
 	channelMappings: [],
 	syncRecords: [],
 	frontmatterEnabled: true,

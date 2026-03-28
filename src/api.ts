@@ -1,10 +1,5 @@
-import { requestUrl, RequestUrlParam } from "obsidian";
-import type {
-	ArenaBlock,
-	ArenaChannel,
-	ArenaChannelListItem,
-	ArenaPaginatedResponse,
-} from "./types";
+import {requestUrl, RequestUrlParam} from "obsidian";
+import type {ArenaBlock, ArenaChannel, ArenaChannelListItem, ArenaPaginatedResponse,} from "./types";
 
 const BASE_URL = "https://api.are.na/v2";
 const PER_PAGE = 100;
@@ -118,6 +113,23 @@ export class ArenaApi {
 		return blocks.sort((a, b) => a.position - b.position);
 	}
 
+	async getAllChannelBlocksWithProgress(
+		slug: string,
+		onPage: (currentPage: number, totalPages: number) => void
+	): Promise<ArenaBlock[]> {
+		const first = await this.getChannelContents(slug, 1);
+		onPage(1, first.total_pages);
+		const blocks: ArenaBlock[] = [...first.contents];
+
+		for (let p = 2; p <= first.total_pages; p++) {
+			const page = await this.getChannelContents(slug, p);
+			blocks.push(...page.contents);
+			onPage(p, first.total_pages);
+		}
+
+		return blocks.sort((a, b) => a.position - b.position);
+	}
+
 	/** List channels for the authenticated user. */
 	async listMyChannels(
 		page = 1
@@ -137,39 +149,15 @@ export class ArenaApi {
 		return this.request<ArenaBlock>("GET", `/blocks/${id}`);
 	}
 
-	/** Create a new text block inside a channel. */
-	async createBlock(
-		channelSlug: string,
-		content: string,
-		title?: string
-	): Promise<ArenaBlock> {
-		const body: Record<string, string> = { content };
-		if (title) body.title = title;
-		return this.request<ArenaBlock>(
-			"POST",
-			`/channels/${encodeURIComponent(channelSlug)}/blocks`,
-			body
-		);
-	}
-
-	/** Update an existing block's content/title. */
-	async updateBlock(
-		channelSlug: string,
-		blockId: number,
-		fields: { content?: string; title?: string; description?: string }
-	): Promise<ArenaBlock> {
-		return this.request<ArenaBlock>(
-			"PUT",
-			`/channels/${encodeURIComponent(channelSlug)}/blocks/${blockId}`,
-			fields
-		);
-	}
-
-	/** Remove a block from a channel (does not delete the block globally). */
-	async removeBlock(channelSlug: string, blockId: number): Promise<void> {
-		await this.request<void>(
-			"DELETE",
-			`/channels/${encodeURIComponent(channelSlug)}/blocks/${blockId}`
-		);
+	async downloadBinary(url: string): Promise<ArrayBuffer> {
+		const res = await requestUrl({
+			url,
+			method: "GET",
+			headers: this.headers(),
+		});
+		if (res.status < 200 || res.status >= 300) {
+			throw new Error(`Asset download failed (${res.status}) for ${url}`);
+		}
+		return res.arrayBuffer;
 	}
 }

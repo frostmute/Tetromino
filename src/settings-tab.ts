@@ -1,17 +1,10 @@
-import {
-	App,
-	Notice,
-	PluginSettingTab,
-	Setting,
-	TextComponent,
-	DropdownComponent,
-} from "obsidian";
+import {App, Notice, PluginSettingTab, Setting} from "obsidian";
 import type ArenaSyncPlugin from "./main";
 import type {
-	ChannelMapping,
-	ConflictStrategy,
-	SyncDirection,
+	AttachmentHandling,
+	AttachmentStorage,
 	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
 	ImageHandling,
 } from "./types";
 
@@ -27,21 +20,16 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		/* ---- Header -------------------------------------------------- */
-		containerEl.createEl("h1", { text: "Are.na Sync" });
+		containerEl.createEl("h1", {text: "Are.na Import"});
 		containerEl.createEl("p", {
-			text: "Connect your Are.na channels to folders in this vault.",
+			text: "One-way import from Are.na into this vault.",
 			cls: "setting-item-description",
 		});
 
-		/* ---- Authentication ------------------------------------------ */
 		containerEl.createEl("h2", { text: "Authentication" });
-
 		new Setting(containerEl)
 			.setName("API token")
-			.setDesc(
-				"Generate a personal access token at https://dev.are.na/oauth/applications"
-			)
+			.setDesc("Generate a token at https://dev.are.na/oauth/applications")
 			.addText((text) =>
 				text
 					.setPlaceholder("Enter your Are.na token")
@@ -54,16 +42,14 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.addButton((btn) =>
 				btn.setButtonText("Verify").onClick(async () => {
 					const ok = await this.plugin.api.verifyToken();
-					new Notice(ok ? "✓ Token is valid" : "✗ Invalid token");
+					new Notice(ok ? "Token is valid" : "Invalid token");
 				})
 			);
 
-		/* ---- Sync behaviour ------------------------------------------ */
-		containerEl.createEl("h2", { text: "Sync behaviour" });
-
+		containerEl.createEl("h2", {text: "Import behavior"});
 		new Setting(containerEl)
-			.setName("Sync interval")
-			.setDesc("Minutes between automatic syncs (0 = manual only)")
+			.setName("Import interval")
+			.setDesc("Minutes between automatic imports (0 = manual)")
 			.addText((text) =>
 				text
 					.setPlaceholder("30")
@@ -79,8 +65,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Sync on startup")
-			.setDesc("Run a full sync when Obsidian starts")
+			.setName("Import on startup")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.syncOnStartup)
@@ -90,44 +75,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
-			.setName("Default sync direction")
-			.addDropdown((dd) =>
-				dd
-					.addOptions({
-						pull: "Pull (Are.na → Obsidian)",
-						push: "Push (Obsidian → Are.na)",
-						both: "Two-way",
-					} as Record<SyncDirection, string>)
-					.setValue(this.plugin.settings.defaultSyncDirection)
-					.onChange(async (value) => {
-						this.plugin.settings.defaultSyncDirection =
-							value as SyncDirection;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		new Setting(containerEl)
-			.setName("Conflict strategy")
-			.addDropdown((dd) =>
-				dd
-					.addOptions({
-						"local-wins": "Local wins",
-						"remote-wins": "Remote wins",
-						"newest-wins": "Newest wins",
-						ask: "Ask each time",
-					} as Record<ConflictStrategy, string>)
-					.setValue(this.plugin.settings.conflictStrategy)
-					.onChange(async (value) => {
-						this.plugin.settings.conflictStrategy =
-							value as ConflictStrategy;
-						await this.plugin.saveSettings();
-					})
-			);
-
-		/* ---- Content ------------------------------------------------- */
-		containerEl.createEl("h2", { text: "Content" });
-
+		containerEl.createEl("h2", {text: "Content rendering"});
 		new Setting(containerEl)
 			.setName("Block file naming")
 			.addDropdown((dd) =>
@@ -139,32 +87,107 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					} as Record<BlockNamingScheme, string>)
 					.setValue(this.plugin.settings.blockNaming)
 					.onChange(async (value) => {
-						this.plugin.settings.blockNaming =
-							value as BlockNamingScheme;
+						this.plugin.settings.blockNaming = value as BlockNamingScheme;
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
 			.setName("Image handling")
+			.setDesc("How image blocks are rendered")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
 						download: "Download to vault",
-						embed: "Obsidian embed (local)",
+						embed: "Embed reference",
 						link: "External link",
 					} as Record<ImageHandling, string>)
 					.setValue(this.plugin.settings.imageHandling)
 					.onChange(async (value) => {
-						this.plugin.settings.imageHandling =
-							value as ImageHandling;
+						this.plugin.settings.imageHandling = value as ImageHandling;
 						await this.plugin.saveSettings();
 					})
 			);
 
 		new Setting(containerEl)
-			.setName("Add front-matter")
-			.setDesc("Include YAML front-matter with Are.na metadata")
+			.setName("Attachment handling")
+			.setDesc("For PDFs and other non-image attachments")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						download: "Download to vault",
+						link: "External link",
+					} as Record<AttachmentHandling, string>)
+					.setValue(this.plugin.settings.attachmentHandling)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentHandling =
+							value as AttachmentHandling;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Downloaded attachment render")
+			.setDesc("When attachments are downloaded locally")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						link: "Link",
+						embed: "Embed",
+					} as Record<DownloadedAttachmentLinkStyle, string>)
+					.setValue(this.plugin.settings.downloadedAttachmentLinkStyle)
+					.onChange(async (value) => {
+						this.plugin.settings.downloadedAttachmentLinkStyle =
+							value as DownloadedAttachmentLinkStyle;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Attachment storage location")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					} as Record<AttachmentStorage, string>)
+					.setValue(this.plugin.settings.attachmentStorage)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentStorage = value as AttachmentStorage;
+						await this.plugin.saveSettings();
+						this.display();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Global attachment folder")
+			.setDesc("Used when storage location is Global folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na/Attachments")
+					.setValue(this.plugin.settings.globalAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.globalAttachmentFolder = value.trim();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Custom attachment folder")
+			.setDesc("Used when storage location is Custom folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Path/In/Vault")
+					.setValue(this.plugin.settings.customAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.customAttachmentFolder = value.trim();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Add frontmatter")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.frontmatterEnabled)
@@ -174,11 +197,9 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					})
 			);
 
-		/* ---- Notifications ------------------------------------------- */
-		containerEl.createEl("h2", { text: "Notifications" });
-
+		containerEl.createEl("h2", {text: "Notifications and logging"});
 		new Setting(containerEl)
-			.setName("Show sync notifications")
+			.setName("Show notifications")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.notifyOnSync)
@@ -190,7 +211,6 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Debug logging")
-			.setDesc("Log API requests and sync details to the console")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.debugLogging)
@@ -200,24 +220,22 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					})
 			);
 
-		/* ---- Channel mappings ---------------------------------------- */
 		containerEl.createEl("h2", { text: "Channel mappings" });
-
 		new Setting(containerEl)
 			.setName("Add channel")
-			.setDesc("Map an Are.na channel to a local folder")
+			.setDesc("Map an Are.na channel slug to a local folder")
 			.addButton((btn) =>
-				btn.setButtonText("+ Add mapping").onClick(() => {
+				btn.setButtonText("+ Add mapping").onClick(async () => {
 					this.plugin.settings.channelMappings.push({
 						channelSlug: "",
 						channelId: 0,
 						channelTitle: "",
 						localFolder: "",
-						syncDirection: this.plugin.settings.defaultSyncDirection,
 						lastSyncedAt: null,
 						enabled: true,
 					});
-					this.display(); // re-render
+					await this.plugin.saveSettings();
+					this.display();
 				})
 			);
 
@@ -225,10 +243,6 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			this.renderMapping(containerEl, i);
 		}
 	}
-
-	/* ------------------------------------------------------------------ */
-	/*  Mapping row                                                       */
-	/* ------------------------------------------------------------------ */
 
 	private renderMapping(containerEl: HTMLElement, index: number): void {
 		const mapping = this.plugin.settings.channelMappings[index];
@@ -238,8 +252,8 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.setName(`Mapping #${index + 1}`)
 			.setDesc(
 				mapping.lastSyncedAt
-					? `Last synced ${new Date(mapping.lastSyncedAt).toLocaleString()}`
-					: "Never synced"
+					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}`
+					: "Never imported"
 			)
 			.addText((text) =>
 				text

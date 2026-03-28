@@ -1,49 +1,47 @@
-import { App, Notice, TFile, TFolder, normalizePath, Vault } from "obsidian";
-import { ArenaApi } from "./api";
+import {App, normalizePath, TFile, Vault} from "obsidian";
+import {ArenaApi} from "./api";
 import type {
 	ArenaBlock,
+	ArenaChannel,
 	ArenaSyncSettings,
 	ChannelMapping,
-	ConflictItem,
-	SyncError,
+	ImportProgress,
+	SyncOptions,
 	SyncRecord,
 	SyncResult,
 } from "./types";
-import { blockToMarkdown, markdownToBlockContent, computeHash } from "./utils";
+import {blockToMarkdown, computeHash, sanitiseFilename} from "./utils";
 
-/**
- * Core synchronisation engine.
- *
- * Responsibilities:
- *  1. Pull remote Are.na blocks → local Markdown files
- *  2. Push local Markdown files → remote Are.na blocks
- *  3. Detect & resolve conflicts according to the user's chosen strategy
- */
+type ProgressHandler = (progress: ImportProgress) => void;
+
 export class SyncEngine {
-	private app: App;
 	private api: ArenaApi;
-	private settings: ArenaSyncSettings;
+	private readonly settings: ArenaSyncSettings;
 	private vault: Vault;
+	private onProgress?: ProgressHandler;
 
-	constructor(app: App, api: ArenaApi, settings: ArenaSyncSettings) {
-		this.app = app;
+	constructor(
+		app: App,
+		api: ArenaApi,
+		settings: ArenaSyncSettings,
+		onProgress?: ProgressHandler
+	) {
 		this.api = api;
 		this.settings = settings;
 		this.vault = app.vault;
+		this.onProgress = onProgress;
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Public entry points                                               */
-	/* ------------------------------------------------------------------ */
-
-	/** Sync every enabled channel mapping. */
-	async syncAll(): Promise<SyncResult> {
+	async syncAll(options: SyncOptions = {}): Promise<SyncResult> {
+		const dryRun = options.dryRun === true;
 		const aggregate: SyncResult = {
 			created: 0,
 			updated: 0,
 			deleted: 0,
 			skipped: 0,
-			conflicts: [],
+			downloaded: 0,
+			dryRun,
+			actions: [],
 			errors: [],
 			duration: 0,
 		};
@@ -52,12 +50,13 @@ export class SyncEngine {
 		for (const mapping of this.settings.channelMappings) {
 			if (!mapping.enabled) continue;
 			try {
-				const result = await this.syncChannel(mapping);
+				const result = await this.syncChannel(mapping, options);
 				aggregate.created += result.created;
 				aggregate.updated += result.updated;
 				aggregate.deleted += result.deleted;
 				aggregate.skipped += result.skipped;
-				aggregate.conflicts.push(...result.conflicts);
+				aggregate.downloaded += result.downloaded;
+				aggregate.actions.push(...result.actions);
 				aggregate.errors.push(...result.errors);
 			} catch (err) {
 				aggregate.errors.push({
@@ -73,52 +72,86 @@ export class SyncEngine {
 		return aggregate;
 	}
 
-	/** Sync a single channel mapping. */
-	async syncChannel(mapping: ChannelMapping): Promise<SyncResult> {
+	async syncChannel(
+		mapping: ChannelMapping,
+		options: SyncOptions = {}
+	): Promise<SyncResult> {
+		const dryRun = options.dryRun === true;
 		const result: SyncResult = {
 			created: 0,
 			updated: 0,
 			deleted: 0,
 			skipped: 0,
-			conflicts: [],
+			downloaded: 0,
+			dryRun,
+			actions: [],
 			errors: [],
 			duration: 0,
 		};
 		const start = Date.now();
-		const direction = mapping.syncDirection;
+		const channel = await this.api.getChannel(mapping.channelSlug);
 
-		if (direction === "pull" || direction === "both") {
-			await this.pull(mapping, result);
+		if (!dryRun) {
+			mapping.channelId = channel.id;
+			mapping.channelTitle = channel.title;
 		}
 
-		if (direction === "push" || direction === "both") {
-			await this.push(mapping, result);
+		await this.pull(mapping, channel, result, dryRun);
+
+		if (!dryRun) {
+			mapping.lastSyncedAt = new Date().toISOString();
 		}
 
-		mapping.lastSyncedAt = new Date().toISOString();
 		result.duration = Date.now() - start;
 		return result;
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Pull: Remote → Local                                              */
-	/* ------------------------------------------------------------------ */
-
 	private async pull(
 		mapping: ChannelMapping,
-		result: SyncResult
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean
 	): Promise<void> {
-		const blocks = await this.api.getAllChannelBlocks(mapping.channelSlug);
-		await this.ensureFolder(mapping.localFolder);
+		const blocks = await this.api.getAllChannelBlocksWithProgress(
+			mapping.channelSlug,
+			(currentPage, totalPages) => {
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "pages",
+					current: currentPage,
+					total: totalPages,
+				});
+			}
+		);
 
-		for (const block of blocks) {
+		if (!dryRun) {
+			await this.ensureFolder(mapping.localFolder);
+		}
+
+		const importedPaths: string[] = [];
+		for (let i = 0; i < blocks.length; i++) {
+			const block = blocks[i];
+			this.onProgress?.({
+				channelSlug: mapping.channelSlug,
+				phase: "blocks",
+				current: i + 1,
+				total: blocks.length,
+			});
+
 			if (this.shouldExclude(block)) {
 				result.skipped++;
 				continue;
 			}
 
 			try {
-				await this.pullBlock(block, mapping, result);
+				const path = await this.pullBlock(
+					block,
+					mapping,
+					channel,
+					result,
+					dryRun
+				);
+				importedPaths.push(path);
 			} catch (err) {
 				result.errors.push({
 					blockId: block.id,
@@ -128,172 +161,164 @@ export class SyncEngine {
 				});
 			}
 		}
+
+		await this.updateChannelIndex(mapping, channel, importedPaths, dryRun, result);
 	}
 
 	private async pullBlock(
 		block: ArenaBlock,
 		mapping: ChannelMapping,
-		result: SyncResult
-	): Promise<void> {
-		const fileName = this.blockFileName(block);
-		const filePath = normalizePath(`${mapping.localFolder}/${fileName}`);
-		const markdown = blockToMarkdown(block, this.settings);
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean
+	): Promise<string> {
+		const noteFileName = this.blockFileName(block);
+		const notePath = normalizePath(`${mapping.localFolder}/${noteFileName}`);
+		const assetPath = await this.ensureBlockAsset(
+			block,
+			mapping,
+			dryRun,
+			result
+		);
+		const markdown = blockToMarkdown(block, this.settings, {
+			channelSlug: channel.slug,
+			channelTitle: channel.title,
+			assetPath,
+		});
 		const remoteHash = computeHash(markdown);
-
-		const existing = this.vault.getAbstractFileByPath(filePath);
+		const existing = this.vault.getAbstractFileByPath(notePath);
 		const record = this.findRecord(block.id, mapping.channelId);
 
 		if (!existing) {
-			// New block — create local file
-			await this.vault.create(filePath, markdown);
-			this.upsertRecord(block.id, mapping.channelId, filePath, remoteHash, remoteHash);
 			result.created++;
-			return;
+			result.actions.push(`create ${notePath}`);
+			if (!dryRun) {
+				await this.vault.create(notePath, markdown);
+				this.upsertRecord(block.id, mapping.channelId, notePath, remoteHash, remoteHash);
+			}
+			return notePath;
 		}
 
-		if (!(existing instanceof TFile)) return;
+		if (!(existing instanceof TFile)) {
+			result.actions.push(`skip ${notePath} (not a file)`);
+			return notePath;
+		}
 
 		const localContent = await this.vault.read(existing);
 		const localHash = computeHash(localContent);
-
 		if (localHash === remoteHash) {
 			result.skipped++;
-			return;
-		}
-
-		// Conflict detection
-		if (record && localHash !== record.localHash && remoteHash !== record.remoteHash) {
-			const conflict: ConflictItem = {
-				blockId: block.id,
-				localPath: filePath,
-				localModified: new Date(existing.stat.mtime).toISOString(),
-				remoteModified: block.updated_at,
-				strategy: this.settings.conflictStrategy,
-			};
-			result.conflicts.push(conflict);
-
-			const resolved = this.resolveConflict(
-				conflict,
-				localContent,
-				markdown
-			);
-			if (resolved !== null) {
-				await this.vault.modify(existing, resolved);
-				const h = computeHash(resolved);
-				this.upsertRecord(block.id, mapping.channelId, filePath, h, remoteHash);
-				result.updated++;
+			result.actions.push(`skip ${notePath}`);
+			if (!record && !dryRun) {
+				this.upsertRecord(block.id, mapping.channelId, notePath, localHash, remoteHash);
 			}
-			return;
+			return notePath;
 		}
 
-		// No conflict — overwrite local with remote
-		await this.vault.modify(existing, markdown);
-		this.upsertRecord(block.id, mapping.channelId, filePath, remoteHash, remoteHash);
 		result.updated++;
+		result.actions.push(`update ${notePath}`);
+		if (!dryRun) {
+			await this.vault.modify(existing, markdown);
+			this.upsertRecord(block.id, mapping.channelId, notePath, remoteHash, remoteHash);
+		}
+		return notePath;
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  Push: Local → Remote                                              */
-	/* ------------------------------------------------------------------ */
-
-	private async push(
+	private async ensureBlockAsset(
+		block: ArenaBlock,
 		mapping: ChannelMapping,
+		dryRun: boolean,
+		result: SyncResult
+	): Promise<string | undefined> {
+		let url: string | null = null;
+		let fileName: string | null = null;
+
+		if (block.class === "Image") {
+			if (this.settings.imageHandling !== "download" || !block.image) {
+				return undefined;
+			}
+			url = block.image.original.url;
+			fileName = block.image.filename;
+		}
+
+		if (block.class === "Attachment") {
+			if (this.settings.attachmentHandling !== "download" || !block.attachment) {
+				return undefined;
+			}
+			url = block.attachment.url;
+			fileName = block.attachment.file_name;
+		}
+
+		if (!url || !fileName) return undefined;
+
+		const baseFolder = this.resolveAttachmentBaseFolder(mapping);
+		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
+		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
+		result.downloaded++;
+		result.actions.push(`${dryRun ? "download" : "ensure"} asset ${assetPath}`);
+
+		if (dryRun) return assetPath;
+
+		await this.ensureFolder(baseFolder);
+		const existing = this.vault.getAbstractFileByPath(assetPath);
+		if (existing instanceof TFile) {
+			return assetPath;
+		}
+
+		const data = await this.api.downloadBinary(url);
+		await this.vault.createBinary(assetPath, data);
+		return assetPath;
+	}
+
+	private async updateChannelIndex(
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		notePaths: string[],
+		dryRun: boolean,
 		result: SyncResult
 	): Promise<void> {
-		const folder = this.vault.getAbstractFileByPath(mapping.localFolder);
-		if (!folder || !(folder instanceof TFolder)) return;
+		const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+		const sorted = [...notePaths].sort();
+		const lines: string[] = [
+			`# ${channel.title}`,
+			"",
+			`- Are.na: https://www.are.na/channel/${channel.slug}`,
+			`- Imported blocks: ${sorted.length}`,
+			"",
+			"## Notes",
+		];
+		for (const notePath of sorted) {
+			lines.push(`- [[${notePath}]]`);
+		}
+		lines.push("");
+		const content = lines.join("\n");
+		const existing = this.vault.getAbstractFileByPath(indexPath);
+		result.actions.push(`${existing ? "update" : "create"} ${indexPath}`);
 
-		const files = folder.children.filter(
-			(f): f is TFile => f instanceof TFile && f.extension === "md"
-		);
-
-		for (const file of files) {
-			try {
-				await this.pushFile(file, mapping, result);
-			} catch (err) {
-				result.errors.push({
-					blockId: null,
-					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
-					recoverable: true,
-				});
-			}
+		if (dryRun) return;
+		if (!existing) {
+			await this.vault.create(indexPath, content);
+			return;
+		}
+		if (existing instanceof TFile) {
+			await this.vault.modify(existing, content);
 		}
 	}
 
-	private async pushFile(
-		file: TFile,
-		mapping: ChannelMapping,
-		result: SyncResult
-	): Promise<void> {
-		const content = await this.vault.read(file);
-		const localHash = computeHash(content);
-		const { title, body } = markdownToBlockContent(content);
-
-		// Find existing sync record
-		const record = this.settings.syncRecords.find(
-			(r) => r.localPath === file.path && r.channelId === mapping.channelId
-		);
-
-		if (record) {
-			if (localHash === record.localHash) {
-				result.skipped++;
-				return;
-			}
-			// Update existing remote block
-			await this.api.updateBlock(mapping.channelSlug, record.blockId, {
-				content: body,
-				title: title || undefined,
-			});
-			record.localHash = localHash;
-			record.lastSyncedAt = new Date().toISOString();
-			result.updated++;
-		} else {
-			// Create new remote block
-			const block = await this.api.createBlock(
-				mapping.channelSlug,
-				body,
-				title || undefined
-			);
-			this.upsertRecord(
-				block.id,
-				mapping.channelId,
-				file.path,
-				localHash,
-				computeHash(body)
-			);
-			result.created++;
+	private resolveAttachmentBaseFolder(mapping: ChannelMapping): string {
+		switch (this.settings.attachmentStorage) {
+			case "channel":
+				return normalizePath(`${mapping.localFolder}/_attachments`);
+			case "custom":
+				return normalizePath(
+					this.settings.customAttachmentFolder ||
+					this.settings.globalAttachmentFolder
+				);
+			case "global":
+			default:
+				return normalizePath(this.settings.globalAttachmentFolder);
 		}
 	}
-
-	/* ------------------------------------------------------------------ */
-	/*  Conflict resolution                                               */
-	/* ------------------------------------------------------------------ */
-
-	private resolveConflict(
-		conflict: ConflictItem,
-		localContent: string,
-		remoteContent: string
-	): string | null {
-		switch (conflict.strategy) {
-			case "local-wins":
-				return localContent;
-			case "remote-wins":
-				return remoteContent;
-			case "newest-wins": {
-				const localTime = new Date(conflict.localModified).getTime();
-				const remoteTime = new Date(conflict.remoteModified).getTime();
-				return localTime >= remoteTime ? localContent : remoteContent;
-			}
-			case "ask":
-				// Return null — the UI layer will show a modal
-				return null;
-		}
-	}
-
-	/* ------------------------------------------------------------------ */
-	/*  Helpers                                                           */
-	/* ------------------------------------------------------------------ */
 
 	private blockFileName(block: ArenaBlock): string {
 		const sanitize = (s: string) =>
@@ -313,10 +338,7 @@ export class SyncEngine {
 		return this.settings.excludeClasses.includes(block.class);
 	}
 
-	private findRecord(
-		blockId: number,
-		channelId: number
-	): SyncRecord | undefined {
+	private findRecord(blockId: number, channelId: number): SyncRecord | undefined {
 		return this.settings.syncRecords.find(
 			(r) => r.blockId === blockId && r.channelId === channelId
 		);
@@ -339,7 +361,6 @@ export class SyncEngine {
 			lastSyncedAt: new Date().toISOString(),
 			localHash,
 			remoteHash,
-			syncDirection: this.settings.defaultSyncDirection,
 		};
 		if (idx >= 0) {
 			this.settings.syncRecords[idx] = record;
