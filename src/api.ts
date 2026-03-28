@@ -3,6 +3,17 @@ import type {ArenaBlock, ArenaChannel, ArenaChannelListItem, ArenaPaginatedRespo
 
 const BASE_URL = "https://api.are.na/v2";
 const PER_PAGE = 100;
+const MAX_RETRIES = 3;
+const REQUEST_DELAY = 100; // ms between requests
+const JITTER = 50; // ms
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withJitter(baseDelay: number): number {
+	return baseDelay + Math.random() * JITTER;
+}
 
 /**
  * Lightweight Are.na REST client.
