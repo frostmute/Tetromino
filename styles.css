@@ -134,3 +134,75 @@
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 }
+
+/* ── Summary + diff modals ───────────────────────────────────────── */
+
+.arena-sync-summary-modal .arena-sync-summary-stats {
+	margin-bottom: 12px;
+}
+
+.arena-sync-summary-duration {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.arena-sync-summary-modal ul {
+	margin: 8px 0 12px;
+	padding-left: 18px;
+}
+
+.arena-sync-diff {
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 12px;
+	white-space: pre;
+	overflow: auto;
+	max-height: 60vh;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-small);
+}
+
+.arena-sync-diff-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.arena-sync-diff-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 8px 10px;
+}
+
+.arena-sync-diff-path {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	word-break: break-all;
+}
+
+/* ── Migration modal ─────────────────────────────────────────────── */
+
+.arena-sync-migration-modal .arena-sync-migration-section {
+	margin-top: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-secondary);
+}
+
+.arena-sync-migration-path {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.arena-sync-migration-counts {
+	margin-top: 6px;
+	font-size: var(--font-ui-small);
+}

@@ -4,6 +4,12 @@ import { SyncEngine } from "./sync-engine";
 import { ArenaSyncSettingTab } from "./settings-tab";
 import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
+import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
+import {
+	buildMigrationPlan,
+	computeCurrentAttachmentBase,
+	executeMigration,
+} from "./migration";
 
 const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
 
@@ -11,9 +17,9 @@ export default class ArenaSyncPlugin extends Plugin {
 	settings: ArenaSyncSettings = DEFAULT_SETTINGS;
 	api!: ArenaApi;
 	engine!: SyncEngine;
-	private syncTimer: ReturnType<typeof setInterval> | null = null;
 	private isSyncing = false;
 	private statusBarItem: HTMLElement | null = null;
+	private isMigrating = false;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -100,31 +106,38 @@ export default class ArenaSyncPlugin extends Plugin {
 			},
 		});
 
-		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
-		this.resetSyncTimer();
+		this.addCommand({
+			id: "arena-sync-migration-preview",
+			name: "Preview attachment migration",
+			callback: async () => {
+				await this.checkForMigrationPrompt(true);
+			},
+		});
 
-		if (this.settings.syncOnStartup) {
-			if (!this.settings.apiToken) {
-				new Notice(
-					"Are.na Import: Startup sync skipped — API token not configured.",
-				);
-			} else if (this.settings.channelMappings.length === 0) {
-				new Notice(
-					"Are.na Import: Startup sync skipped — no channels configured.",
-				);
-			} else {
-				setTimeout(() => this.runSync(false), 3000);
-			}
-		}
+		this.addCommand({
+			id: "arena-sync-migration-run",
+			name: "Run attachment migration",
+			callback: async () => {
+				await this.runMigration();
+			},
+		});
+
+		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
+
+		this.checkForMigrationPrompt(false);
 	}
 
 	onunload(): void {
-		this.clearSyncTimer();
 	}
 
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		const changed = this.normalizeMappings();
+		const updatedBases = this.ensureAttachmentBaseSnapshots();
+		if (changed || updatedBases) {
+			await this.saveData(this.settings);
+		}
 	}
 
 	async saveSettings(): Promise<void> {
@@ -139,12 +152,16 @@ export default class ArenaSyncPlugin extends Plugin {
 			this.settings,
 			(progress) => this.updateProgressStatus(progress),
 		);
-		this.resetSyncTimer();
+		await this.checkForMigrationPrompt(false);
 	}
 
 	async runSync(dryRun = false): Promise<void> {
 		if (this.isSyncing) {
 			new Notice("Are.na Import is already running...");
+			return;
+		}
+		if (this.isMigrating) {
+			new Notice("Attachment migration is running. Try again after it finishes.");
 			return;
 		}
 		if (!this.settings.apiToken) {
@@ -171,6 +188,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				await this.writeImportReport(result, "all");
 			}
 			this.notifySyncResult(result);
+			this.showSummaryModal(result, dryRun ? "Preview" : "Sync");
 		} catch (err) {
 			new Notice(`Are.na Import failed: ${(err as Error).message}`);
 		} finally {
@@ -182,6 +200,10 @@ export default class ArenaSyncPlugin extends Plugin {
 	async runChannelSync(slug: string, dryRun = false): Promise<void> {
 		if (this.isSyncing) {
 			new Notice("Are.na Import is already running...");
+			return;
+		}
+		if (this.isMigrating) {
+			new Notice("Attachment migration is running. Try again after it finishes.");
 			return;
 		}
 		const mapping = this.settings.channelMappings.find(
@@ -208,29 +230,12 @@ export default class ArenaSyncPlugin extends Plugin {
 				await this.writeImportReport(result, slug);
 			}
 			this.notifySyncResult(result);
+			this.showSummaryModal(result, dryRun ? "Preview" : "Sync");
 		} catch (err) {
 			new Notice(`Import failed for ${slug}: ${(err as Error).message}`);
 		} finally {
 			this.isSyncing = false;
 			this.updateStatusBar("idle");
-		}
-	}
-
-	resetSyncTimer(): void {
-		this.clearSyncTimer();
-		const mins = this.settings.syncInterval;
-		if (mins > 0) {
-			this.syncTimer = setInterval(
-				() => this.runSync(false),
-				mins * 60 * 1000,
-			);
-		}
-	}
-
-	private clearSyncTimer(): void {
-		if (this.syncTimer) {
-			clearInterval(this.syncTimer);
-			this.syncTimer = null;
 		}
 	}
 
@@ -270,6 +275,8 @@ export default class ArenaSyncPlugin extends Plugin {
 		const parts: string[] = [];
 		if (result.created > 0) parts.push(`${result.created} created`);
 		if (result.updated > 0) parts.push(`${result.updated} updated`);
+		if (result.moved > 0) parts.push(`${result.moved} moved`);
+		if (result.deleted > 0) parts.push(`${result.deleted} deleted`);
 		if (result.downloaded > 0)
 			parts.push(`${result.downloaded} assets downloaded`);
 		if (result.errors.length > 0)
@@ -300,20 +307,22 @@ export default class ArenaSyncPlugin extends Plugin {
 			minute: "2-digit",
 			second: "2-digit",
 		});
-		const lines: string[] = [
-			`## ${timestamp} (${scope})`,
-			"",
-			`- created: ${result.created}`,
-			`- updated: ${result.updated}`,
-			`- downloaded: ${result.downloaded}`,
-			`- skipped: ${result.skipped}`,
-			`- errors: ${result.errors.length}`,
-			`- duration_ms: ${result.duration}`,
-			"",
-			"### Actions",
-			...result.actions.map((a) => `- ${a}`),
-			"",
-		];
+			const lines: string[] = [
+				`## ${timestamp} (${scope})`,
+				"",
+				`- created: ${result.created}`,
+				`- updated: ${result.updated}`,
+				`- moved: ${result.moved}`,
+				`- deleted: ${result.deleted}`,
+				`- downloaded: ${result.downloaded}`,
+				`- skipped: ${result.skipped}`,
+				`- errors: ${result.errors.length}`,
+				`- duration_ms: ${result.duration}`,
+				"",
+				"### Actions",
+				...result.actions.map((a) => `- ${a}`),
+				"",
+			];
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
 		if (!existing) {
 			await this.app.vault.create(filePath, lines.join("\n"));
@@ -325,6 +334,130 @@ export default class ArenaSyncPlugin extends Plugin {
 				existing,
 				`${current}\n${lines.join("\n")}`,
 			);
+		}
+	}
+
+	private showSummaryModal(result: SyncResult, label: string): void {
+		const title = `Are.na Import ${label} Summary`;
+		new SyncSummaryModal(this.app, result, title).open();
+	}
+
+	private normalizeMappings(): boolean {
+		let changed = false;
+		this.settings.channelMappings = this.settings.channelMappings.map(
+			(mapping) => {
+				const normalized = { ...mapping };
+				if (normalized.attachmentStorageOverride === undefined) {
+					normalized.attachmentStorageOverride = null;
+					changed = true;
+				}
+				if (normalized.customAttachmentFolderOverride === undefined) {
+					normalized.customAttachmentFolderOverride = "";
+					changed = true;
+				}
+				if (normalized.lastAttachmentBase === undefined) {
+					normalized.lastAttachmentBase = null;
+					changed = true;
+				}
+				return normalized;
+			},
+		);
+		return changed;
+	}
+
+	private ensureAttachmentBaseSnapshots(): boolean {
+		let changed = false;
+		for (const mapping of this.settings.channelMappings) {
+			if (!mapping.lastAttachmentBase) {
+				mapping.lastAttachmentBase = computeCurrentAttachmentBase(
+					this.settings,
+					mapping,
+				);
+				changed = true;
+			}
+		}
+		return changed;
+	}
+
+	async checkForMigrationPrompt(force: boolean): Promise<void> {
+		const plan = await buildMigrationPlan(this.app, this.settings);
+		if (plan.channels.length === 0) return;
+		if (!force && this.isMigrating) return;
+		new MigrationPreviewModal(this.app, plan, async () => {
+			await this.runMigration(plan);
+		}).open();
+	}
+
+	async runMigration(planOverride?: Awaited<ReturnType<typeof buildMigrationPlan>>): Promise<void> {
+		if (this.isMigrating) {
+			new Notice("Are.na Import migration is already running...");
+			return;
+		}
+		this.isMigrating = true;
+		this.updateStatusBar("syncing", "Migrating attachments...");
+		try {
+			const plan = planOverride ?? (await buildMigrationPlan(this.app, this.settings));
+			if (plan.channels.length === 0) {
+				new Notice("No attachment migration required.");
+				return;
+			}
+			const report = await executeMigration(this.app, plan);
+			for (const channel of plan.channels) {
+				const mapping = this.settings.channelMappings.find(
+					(m) => m.channelSlug === channel.channelSlug,
+				);
+				if (mapping) {
+					mapping.lastAttachmentBase = channel.toBase;
+				}
+			}
+			await this.saveSettings();
+			await this.writeMigrationReport(report);
+			new Notice(
+				`Attachment migration complete: ${report.moved} moved, ${report.updated} notes updated.`,
+			);
+		} catch (err) {
+			new Notice(`Attachment migration failed: ${(err as Error).message}`);
+		} finally {
+			this.isMigrating = false;
+			this.updateStatusBar("idle");
+		}
+	}
+
+	private async writeMigrationReport(report: Awaited<ReturnType<typeof executeMigration>>): Promise<void> {
+		const folder = normalizePath("Are.na");
+		const filePath = normalizePath("Are.na/migration-history.md");
+		if (!this.app.vault.getAbstractFileByPath(folder)) {
+			await this.app.vault.createFolder(folder);
+		}
+		const timestamp = new Date().toLocaleString("en-US", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		});
+		const lines: string[] = [
+			`## ${timestamp}`,
+			"",
+			`- moved: ${report.moved}`,
+			`- updated: ${report.updated}`,
+			`- skipped: ${report.skipped}`,
+			`- errors: ${report.errors.length}`,
+			`- duration_ms: ${report.duration}`,
+			"",
+			"### Errors",
+			...report.errors.map((e) => `- ${e}`),
+			"",
+		];
+		const existing = this.app.vault.getAbstractFileByPath(filePath);
+		if (!existing) {
+			await this.app.vault.create(filePath, lines.join(\"\\n\"));
+			return;
+		}
+		if (existing instanceof TFile) {
+			const current = await this.app.vault.read(existing);
+			await this.app.vault.modify(existing, `${current}\\n${lines.join(\"\\n\")}`);
 		}
 	}
 }

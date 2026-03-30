@@ -19,6 +19,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
 
 		containerEl.createEl("h1", { text: "Are.na Import" });
 		containerEl.createEl("p", {
@@ -51,35 +52,6 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					const ok = await this.plugin.api.verifyToken();
 					new Notice(ok ? "Token is valid" : "Invalid token");
 				}),
-			);
-
-		containerEl.createEl("h2", { text: "Import behavior" });
-		new Setting(containerEl)
-			.setName("Import interval")
-			.setDesc("Minutes between automatic imports (0 = manual)")
-			.addText((text) =>
-				text
-					.setPlaceholder("30")
-					.setValue(String(this.plugin.settings.syncInterval))
-					.onChange(async (value) => {
-						const n = parseInt(value, 10);
-						if (!isNaN(n) && n >= 0) {
-							this.plugin.settings.syncInterval = n;
-							await this.plugin.saveSettings();
-							this.plugin.resetSyncTimer();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Import on startup")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.syncOnStartup)
-					.onChange(async (value) => {
-						this.plugin.settings.syncOnStartup = value;
-						await this.plugin.saveSettings();
-					}),
 			);
 
 		containerEl.createEl("h2", { text: "Content rendering" });
@@ -263,6 +235,9 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						localFolder: "",
 						lastSyncedAt: null,
 						enabled: true,
+						attachmentStorageOverride: null,
+						customAttachmentFolderOverride: "",
+						lastAttachmentBase: null,
 					});
 					await this.plugin.saveSettings();
 					this.display();
@@ -272,11 +247,29 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		for (let i = 0; i < this.plugin.settings.channelMappings.length; i++) {
 			this.renderMapping(containerEl, i);
 		}
+
+		containerEl.createEl("h2", { text: "Attachment migration" });
+		new Setting(containerEl)
+			.setName("Preview migration")
+			.setDesc("Dry-run preview with diffs")
+			.addButton((btn) =>
+				btn.setButtonText("Preview").onClick(async () => {
+					await this.plugin.checkForMigrationPrompt(true);
+				}),
+			);
+		new Setting(containerEl)
+			.setName("Run migration")
+			.setDesc("Move attachments and update embeds")
+			.addButton((btn) =>
+				btn.setButtonText("Run").setCta().onClick(async () => {
+					await this.plugin.runMigration();
+				}),
+			);
 	}
 
 	private renderMapping(containerEl: HTMLElement, index: number): void {
 		const mapping = this.plugin.settings.channelMappings[index];
-		const wrapper = containerEl.createDiv({ cls: "arena-mapping-row" });
+		const wrapper = containerEl.createDiv({ cls: "arena-sync-mapping" });
 
 		new Setting(wrapper)
 			.setName(`Mapping #${index + 1}`)
@@ -329,5 +322,42 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						this.display();
 					}),
 			);
+
+		new Setting(wrapper)
+			.setName("Attachment storage override")
+			.setDesc("Override attachment location for this channel")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						inherit: "Inherit global setting",
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					})
+					.setValue(mapping.attachmentStorageOverride ?? "inherit")
+					.onChange(async (value) => {
+						mapping.attachmentStorageOverride =
+							value === "inherit"
+								? null
+								: (value as AttachmentStorage);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (mapping.attachmentStorageOverride === "custom") {
+			new Setting(wrapper)
+				.setName("Channel custom attachment folder")
+				.setDesc("Overrides the global custom folder for this channel")
+				.addText((text) =>
+					text
+						.setPlaceholder("Path/In/Vault")
+						.setValue(mapping.customAttachmentFolderOverride || "")
+						.onChange(async (v) => {
+							mapping.customAttachmentFolderOverride = v.trim();
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 	}
 }

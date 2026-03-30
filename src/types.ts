@@ -92,6 +92,9 @@ export interface ChannelMapping {
 	localFolder: string;
 	lastSyncedAt: string | null;
 	enabled: boolean;
+	attachmentStorageOverride?: AttachmentStorage | null;
+	customAttachmentFolderOverride?: string;
+	lastAttachmentBase?: string | null;
 }
 
 export interface SyncRecord {
@@ -107,10 +110,14 @@ export interface SyncResult {
 	created: number;
 	updated: number;
 	deleted: number;
+	moved: number;
 	skipped: number;
 	downloaded: number;
 	dryRun: boolean;
 	actions: string[];
+	moves: MoveRecord[];
+	fileDiffs: FileDiff[];
+	missingPaths: string[];
 	errors: SyncError[];
 	duration: number;
 }
@@ -131,6 +138,19 @@ export interface SyncError {
 	channelSlug: string;
 	message: string;
 	recoverable: boolean;
+}
+
+export interface MoveRecord {
+	from: string;
+	to: string;
+}
+
+export interface FileDiff {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+	kind: "create" | "update" | "move" | "delete";
 }
 
 export interface ArenaSyncSettings {

@@ -14,8 +14,10 @@ import {
 	blockFileName as utilsBlockFileName,
 	blockToMarkdown,
 	computeHash,
+	resolveAttachmentBaseFolder,
 	sanitiseFilename,
 } from "./utils";
+import { unifiedDiff } from "./diff";
 
 type ProgressHandler = (progress: ImportProgress) => void;
 
@@ -43,10 +45,14 @@ export class SyncEngine {
 			created: 0,
 			updated: 0,
 			deleted: 0,
+			moved: 0,
 			skipped: 0,
 			downloaded: 0,
 			dryRun,
 			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
 			errors: [],
 			duration: 0,
 		};
@@ -59,9 +65,13 @@ export class SyncEngine {
 				aggregate.created += result.created;
 				aggregate.updated += result.updated;
 				aggregate.deleted += result.deleted;
+				aggregate.moved += result.moved;
 				aggregate.skipped += result.skipped;
 				aggregate.downloaded += result.downloaded;
 				aggregate.actions.push(...result.actions);
+				aggregate.moves.push(...result.moves);
+				aggregate.fileDiffs.push(...result.fileDiffs);
+				aggregate.missingPaths.push(...result.missingPaths);
 				aggregate.errors.push(...result.errors);
 			} catch (err) {
 				aggregate.errors.push({
@@ -72,6 +82,8 @@ export class SyncEngine {
 				});
 			}
 		}
+
+		await this.updateMasterOverview(aggregate, dryRun);
 
 		aggregate.duration = Date.now() - start;
 		return aggregate;
@@ -86,10 +98,14 @@ export class SyncEngine {
 			created: 0,
 			updated: 0,
 			deleted: 0,
+			moved: 0,
 			skipped: 0,
 			downloaded: 0,
 			dryRun,
 			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
 			errors: [],
 			duration: 0,
 		};
@@ -134,6 +150,7 @@ export class SyncEngine {
 		}
 
 		const importedPaths: string[] = [];
+		const importedBlockIds: number[] = [];
 		for (let i = 0; i < blocks.length; i++) {
 			const block = blocks[i];
 			this.onProgress?.({
@@ -157,6 +174,7 @@ export class SyncEngine {
 					dryRun,
 				);
 				importedPaths.push(path);
+				importedBlockIds.push(block.id);
 			} catch (err) {
 				result.errors.push({
 					blockId: block.id,
@@ -174,6 +192,8 @@ export class SyncEngine {
 			dryRun,
 			result,
 		);
+
+		this.markMissing(mapping, importedBlockIds, result);
 	}
 
 	private async pullBlock(
@@ -193,18 +213,41 @@ export class SyncEngine {
 			dryRun,
 			result,
 		);
+		const record = this.findRecord(block.id, mapping.channelId);
+		let existing = this.vault.getAbstractFileByPath(notePath);
+		let moved = false;
+
+		if (record && record.localPath !== notePath) {
+			const oldFile = this.vault.getAbstractFileByPath(record.localPath);
+			if (oldFile instanceof TFile) {
+				moved = true;
+				result.moved++;
+				result.moves.push({ from: record.localPath, to: notePath });
+				result.actions.push(`move ${record.localPath} -> ${notePath}`);
+				if (!dryRun && !existing) {
+					await this.vault.rename(oldFile, notePath);
+					existing = this.vault.getAbstractFileByPath(notePath);
+				}
+			}
+		}
+
 		const markdown = blockToMarkdown(block, this.settings, {
 			channelSlug: channel.slug,
 			channelTitle: channel.title,
 			assetPath,
 		});
 		const remoteHash = computeHash(markdown);
-		const existing = this.vault.getAbstractFileByPath(notePath);
-		const record = this.findRecord(block.id, mapping.channelId);
 
 		if (!existing) {
 			result.created++;
 			result.actions.push(`create ${notePath}`);
+			result.fileDiffs.push({
+				path: notePath,
+				before: "",
+				after: markdown,
+				diff: unifiedDiff("", markdown, "empty", notePath),
+				kind: "create",
+			});
 			if (!dryRun) {
 				await this.vault.create(notePath, markdown);
 				this.upsertRecord(
@@ -236,12 +279,27 @@ export class SyncEngine {
 					localHash,
 					remoteHash,
 				);
+			} else if (moved && !dryRun) {
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
 			}
 			return notePath;
 		}
 
 		result.updated++;
 		result.actions.push(`update ${notePath}`);
+		result.fileDiffs.push({
+			path: notePath,
+			before: localContent,
+			after: markdown,
+			diff: unifiedDiff(localContent, markdown, notePath, notePath),
+			kind: "update",
+		});
 		if (!dryRun) {
 			await this.vault.modify(existing, markdown);
 			this.upsertRecord(
@@ -285,7 +343,7 @@ export class SyncEngine {
 
 		if (!url || !fileName) return undefined;
 
-		const baseFolder = this.resolveAttachmentBaseFolder(mapping);
+		const baseFolder = resolveAttachmentBaseFolder(this.settings, mapping);
 		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
 		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
 		result.downloaded++;
@@ -332,7 +390,24 @@ export class SyncEngine {
 		lines.push("");
 		const content = lines.join("\n");
 		const existing = this.vault.getAbstractFileByPath(indexPath);
+		if (existing && !(existing instanceof TFile)) {
+			result.actions.push(`skip ${indexPath} (not a file)`);
+			return;
+		}
+		const before =
+			existing instanceof TFile ? await this.vault.read(existing) : "";
+		if (existing && before === content) {
+			result.actions.push(`skip ${indexPath}`);
+			return;
+		}
 		result.actions.push(`${existing ? "update" : "create"} ${indexPath}`);
+		result.fileDiffs.push({
+			path: indexPath,
+			before,
+			after: content,
+			diff: unifiedDiff(before, content, indexPath, indexPath),
+			kind: existing ? "update" : "create",
+		});
 
 		if (dryRun) return;
 		if (!existing) {
@@ -344,18 +419,47 @@ export class SyncEngine {
 		}
 	}
 
-	private resolveAttachmentBaseFolder(mapping: ChannelMapping): string {
-		switch (this.settings.attachmentStorage) {
-			case "channel":
-				return normalizePath(`${mapping.localFolder}/_attachments`);
-			case "custom":
-				return normalizePath(
-					this.settings.customAttachmentFolder ||
-						this.settings.globalAttachmentFolder,
-				);
-			case "global":
-			default:
-				return normalizePath(this.settings.globalAttachmentFolder);
+	private async updateMasterOverview(
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<void> {
+		const overviewPath = normalizePath("Are.na/overview.md");
+		const lines: string[] = ["# Are.na Overview", "", "## Channels"];
+		for (const mapping of this.settings.channelMappings) {
+			if (!mapping.enabled) continue;
+			const title = mapping.channelTitle || mapping.channelSlug;
+			const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+			lines.push(`- [[${indexPath}|${title}]]`);
+		}
+		lines.push("");
+		const content = lines.join("\n");
+		const existing = this.vault.getAbstractFileByPath(overviewPath);
+		if (existing && !(existing instanceof TFile)) {
+			result.actions.push(`skip ${overviewPath} (not a file)`);
+			return;
+		}
+		const before =
+			existing instanceof TFile ? await this.vault.read(existing) : "";
+		if (existing && before === content) {
+			result.actions.push(`skip ${overviewPath}`);
+			return;
+		}
+		result.actions.push(`${existing ? "update" : "create"} ${overviewPath}`);
+		result.fileDiffs.push({
+			path: overviewPath,
+			before,
+			after: content,
+			diff: unifiedDiff(before, content, overviewPath, overviewPath),
+			kind: existing ? "update" : "create",
+		});
+		if (dryRun) return;
+		await this.ensureFolder("Are.na");
+		if (!existing) {
+			await this.vault.create(overviewPath, content);
+			return;
+		}
+		if (existing instanceof TFile) {
+			await this.vault.modify(existing, content);
 		}
 	}
 
@@ -410,6 +514,26 @@ export class SyncEngine {
 			if (!this.vault.getAbstractFileByPath(current)) {
 				await this.vault.createFolder(current);
 			}
+		}
+	}
+
+	private markMissing(
+		mapping: ChannelMapping,
+		importedBlockIds: number[],
+		result: SyncResult,
+	): void {
+		if (!mapping.channelId) return;
+		const imported = new Set(importedBlockIds);
+		const missing = this.settings.syncRecords.filter(
+			(record) =>
+				record.channelId === mapping.channelId &&
+				!imported.has(record.blockId),
+		);
+		if (missing.length === 0) return;
+		for (const record of missing) {
+			result.deleted++;
+			result.missingPaths.push(record.localPath);
+			result.actions.push(`missing ${record.localPath}`);
 		}
 	}
 }

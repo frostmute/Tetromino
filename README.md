@@ -12,18 +12,22 @@ This plugin is **one-way import only**: Are.na → Obsidian.
 - Creates Markdown files for Are.na blocks
 - Updates existing imported files when remote block content changes
 - Adds optional YAML frontmatter metadata
-- Supports manual import, startup import, and interval-based auto-import
+- Manual import only (no background sync)
 - Supports dry-run preview commands
 - Downloads images and non-image attachments (including PDFs) when configured
 - Supports attachment storage in channel-local, global, or custom folders
+- Supports per-channel attachment storage overrides
+- Includes attachment migration preview + diff and migration history log
 - Writes channel index notes for graph-friendly linking
+- Writes a master overview note for all synced channels
+- Shows a sync summary modal with diffs for updated files
 - Shows page/block progress in the status bar for large channels
 
 ## What it does not do
 
 - ❌ Push from Obsidian back to Are.na (one-way import only)
 - ❌ Automatic deletion of local files when blocks are removed remotely
-- ❌ Real-time sync (configurable polling interval only)
+- ❌ Background sync (manual only)
 
 ## Rate Limiting
 
@@ -36,28 +40,30 @@ If you encounter rate-limit errors (HTTP 429), the plugin will automatically ret
 
 ## Commands
 
-- `Sync all channels now`
+- `Import all channels now`
 - `Preview import (dry-run)`
-- `Sync current channel`
+- `Import current channel`
 - `Preview current channel import (dry-run)`
 - `Open channel on Are.na`
+- `Preview attachment migration`
+- `Run attachment migration`
 
 ## Settings
 
 - API token with verify action
-- Import interval (minutes)
-- Import on startup toggle
 - Block file naming (`title`, `id`, `title-id`)
 - Image handling (`download`, `embed`, `link`)
 - Attachment handling (`download`, `link`)
 - Downloaded attachment render (`embed`, `link`)
 - Attachment storage (`with channel notes`, `global`, `custom`)
+- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
 - Global and custom attachment folder paths
 - Frontmatter toggle
 - Notifications toggle
 - Debug logging toggle
 - Channel mappings (`channel slug` -> `local folder`)
 - Block class exclusion filter (skip Image, Media, etc.)
+- Attachment migration preview + run controls
 
 ## How import works
 
@@ -67,7 +73,9 @@ If you encounter rate-limit errors (HTTP 429), the plugin will automatically ret
 4. Optional asset downloads are resolved and linked in notes.
 5. Existing files are overwritten when remote content changes.
 6. Channel index notes are regenerated with links to imported notes.
-7. Sync records and last-import timestamps are persisted in plugin data.
+7. A master overview note is regenerated with links to each channel index.
+8. A sync summary modal is displayed with diffs for updated files.
+9. Sync records and last-import timestamps are persisted in plugin data.
 
 ## Installation
 
@@ -124,8 +132,7 @@ See [SECURITY.md](SECURITY.md) for detailed security information.
 - Try importing smaller channels first
 
 ### Files aren't updating
-- Ensure "Import on startup" or sync interval is configured
-- Or manually trigger with Command Palette: `Sync all channels now`
+- Manually trigger with Command Palette: `Sync all channels now`
 - Check that channel mappings are enabled (toggle in settings)
 
 ### Assets aren't downloading

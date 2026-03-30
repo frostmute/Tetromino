@@ -1,5 +1,11 @@
-import {createHash} from "crypto";
-import type {ArenaBlock, ArenaSyncSettings} from "./types";
+import { createHash } from "crypto";
+import { normalizePath } from "obsidian";
+import type {
+	AttachmentStorage,
+	ArenaBlock,
+	ArenaSyncSettings,
+	ChannelMapping,
+} from "./types";
 
 export interface MarkdownContext {
 	channelSlug?: string;
@@ -116,6 +122,27 @@ export function blockToMarkdown(
 
 	parts.push("");
 	return parts.join("\n");
+}
+
+export function resolveAttachmentBaseFolder(
+	settings: ArenaSyncSettings,
+	mapping: ChannelMapping
+): string {
+	const storage: AttachmentStorage =
+		mapping.attachmentStorageOverride ?? settings.attachmentStorage;
+	switch (storage) {
+		case "channel":
+			return normalizePath(`${mapping.localFolder}/_attachments`);
+		case "custom":
+			return normalizePath(
+				mapping.customAttachmentFolderOverride ||
+					settings.customAttachmentFolder ||
+					settings.globalAttachmentFolder
+			);
+		case "global":
+		default:
+			return normalizePath(settings.globalAttachmentFolder);
+	}
 }
 
 export function markdownToBlockContent(md: string): {
