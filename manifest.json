@@ -1,10 +1,10 @@
 {
-  "id": "arena-sync",
-  "name": "Are.na Sync",
-  "version": "1.0.0",
-  "minAppVersion": "1.4.0",
+	"id": "arena-sync",
+	"name": "Are.na Sync",
+	"version": "1.0.0",
+	"minAppVersion": "1.4.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
-  "author": "Arena Sync Contributors",
-  "authorUrl": "https://github.com/arena-sync",
-  "isDesktopOnly": false
+	"author": "Are.na Sync Contributors",
+	"authorUrl": "https://github.com/yourusername/arena-sync-obsidian",
+	"isDesktopOnly": false
 }

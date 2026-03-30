@@ -2,7 +2,9 @@
 
 Import Are.na channel content into your Obsidian vault as Markdown notes.
 
-This plugin is one-way only: **Are.na -> Obsidian**.
+This plugin is **one-way import only**: Are.na → Obsidian.
+
+> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
 
 ## What it does
 
@@ -19,8 +21,18 @@ This plugin is one-way only: **Are.na -> Obsidian**.
 
 ## What it does not do
 
-- No push from Obsidian back to Are.na
-- No automatic deletion of local files when blocks are removed remotely
+- ❌ Push from Obsidian back to Are.na (one-way import only)
+- ❌ Automatic deletion of local files when blocks are removed remotely
+- ❌ Real-time sync (configurable polling interval only)
+
+## Rate Limiting
+
+Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+- **< 100 blocks**: Import completes in seconds
+- **100–1,000 blocks**: Import takes 1–5 minutes
+- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+
+If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
 
 ## Commands
 
@@ -45,6 +57,7 @@ This plugin is one-way only: **Are.na -> Obsidian**.
 - Notifications toggle
 - Debug logging toggle
 - Channel mappings (`channel slug` -> `local folder`)
+- Block class exclusion filter (skip Image, Media, etc.)
 
 ## How import works
 
@@ -89,6 +102,38 @@ Lint:
 ```bash
 npm run lint
 ```
+
+## Security
+
+- **API tokens** are masked in the settings UI and stored securely in Obsidian's plugin data directory.
+- **No telemetry**: This plugin does not collect any usage data.
+- **No external requests**: Only Are.na API calls are made (no tracking pixels, analytics, etc.).
+
+See [SECURITY.md](SECURITY.md) for detailed security information.
+
+## Troubleshooting
+
+### Import fails with "Invalid API token"
+1. Generate a new token at https://dev.are.na/oauth/applications
+2. Paste it in settings and click "Verify"
+3. Ensure the token has at least `read` scope
+
+### Import is slow or times out
+- Large channels (1,000+ blocks) may take 10+ minutes due to API rate limits
+- Check debug logging in settings to see progress
+- Try importing smaller channels first
+
+### Files aren't updating
+- Ensure "Import on startup" or sync interval is configured
+- Or manually trigger with Command Palette: `Sync all channels now`
+- Check that channel mappings are enabled (toggle in settings)
+
+### Assets aren't downloading
+- Images and PDFs only download if "Image handling" or "Attachment handling" is set to "Download to vault"
+- Check that attachment storage folder is writable
+- Check disk space
+
+For more help, enable "Debug logging" in settings and check the browser console (`Ctrl/Cmd + Shift + I`).
 
 ## License
 

@@ -147,7 +147,6 @@ export interface ArenaSyncSettings {
 	channelMappings: ChannelMapping[];
 	syncRecords: SyncRecord[];
 	frontmatterEnabled: boolean;
-	frontmatterFields: string[];
 	excludeClasses: string[];
 	notifyOnSync: boolean;
 	debugLogging: boolean;
@@ -167,7 +166,6 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	channelMappings: [],
 	syncRecords: [],
 	frontmatterEnabled: true,
-	frontmatterFields: ["arena-id", "arena-channel", "arena-class", "arena-source", "arena-created", "arena-updated"],
 	excludeClasses: [],
 	notifyOnSync: true,
 	debugLogging: false,

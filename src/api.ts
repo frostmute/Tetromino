@@ -1,11 +1,17 @@
-import {requestUrl, RequestUrlParam} from "obsidian";
-import type {ArenaBlock, ArenaChannel, ArenaChannelListItem, ArenaPaginatedResponse} from "./types";
+import { requestUrl, RequestUrlParam } from "obsidian";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaChannelListItem,
+	ArenaPaginatedResponse,
+} from "./types";
 
 const BASE_URL = "https://api.are.na/v2";
 const PER_PAGE = 100;
 const MAX_RETRIES = 3;
 const REQUEST_DELAY = 100; // ms between requests
 const JITTER = 50; // ms
+const RATE_LIMIT_STATUS = 429;
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,36 +43,95 @@ export class ArenaApi {
 	private async request<T>(
 		method: string,
 		path: string,
-		body?: unknown
+		body?: unknown,
 	): Promise<T> {
-		const params: RequestUrlParam = {
-			url: `${BASE_URL}${path}`,
-			method,
-			headers: this.headers(),
-		};
-		if (body) {
-			params.body = JSON.stringify(body);
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			const params: RequestUrlParam = {
+				url: `${BASE_URL}${path}`,
+				method,
+				headers: this.headers(),
+			};
+			if (body) {
+				params.body = JSON.stringify(body);
+			}
+
+			if (this.debug) {
+				console.log(`[arena-sync] ${method} ${params.url}`);
+			}
+
+			const res = await requestUrl(params);
+
+			// Handle rate limiting with exponential backoff
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				const backoffMs = retryAfter * 1000;
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API rate limited (429). Max retries exceeded. ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Rate limited. Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				const errorMessage = this.getErrorMessage(res.status);
+				throw new Error(errorMessage);
+			}
+
+			return res.json as T;
 		}
 
-		if (this.debug) {
-			console.log(`[arena-sync] ${method} ${params.url}`);
-		}
+		throw new Error("Are.na API request failed after max retries");
+	}
 
-		const res = await requestUrl(params);
-
-		if (res.status < 200 || res.status >= 300) {
-			throw new Error(
-				`Are.na API error ${res.status}: ${JSON.stringify(res.json)}`
-			);
+	private getErrorMessage(status: number): string {
+		switch (status) {
+			case 400:
+				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
+			case 401:
+				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
+			case 403:
+				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
+			case 404:
+				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
+			case 429:
+				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
+			case 500:
+				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
+			case 502:
+			case 503:
+			case 504:
+				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
+			default:
+				return `Are.na API error ${status}. Please try again or check Are.na status.`;
 		}
-		return res.json as T;
 	}
 
 	async verifyToken(): Promise<boolean> {
 		try {
 			await this.request("GET", "/me");
 			return true;
-		} catch {
+		} catch (err) {
+			if (this.debug) {
+				console.log(`[arena-sync] Token verification failed:`, err);
+			}
 			return false;
 		}
 	}
@@ -74,17 +139,17 @@ export class ArenaApi {
 	async getChannel(slug: string): Promise<ArenaChannel> {
 		return this.request<ArenaChannel>(
 			"GET",
-			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`
+			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
 		);
 	}
 
 	async getChannelContents(
 		slug: string,
-		page = 1
+		page = 1,
 	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
 		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
 			"GET",
-			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`
+			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
 		);
 	}
 
@@ -94,7 +159,7 @@ export class ArenaApi {
 
 	async getAllChannelBlocksWithProgress(
 		slug: string,
-		onPage: (currentPage: number, totalPages: number) => void
+		onPage: (currentPage: number, totalPages: number) => void,
 	): Promise<ArenaBlock[]> {
 		const blocks: ArenaBlock[] = [];
 		const seenBlockIds = new Set<number>();
@@ -120,7 +185,7 @@ export class ArenaApi {
 				if (page.length && page.length > 0) {
 					totalPagesEstimate = Math.max(
 						totalPagesEstimate,
-						Math.ceil(page.length / PER_PAGE)
+						Math.ceil(page.length / PER_PAGE),
 					);
 				}
 
@@ -138,17 +203,23 @@ export class ArenaApi {
 				const emptyPage = page.contents.length === 0;
 				const lastPageByCount = page.contents.length < PER_PAGE;
 				const lastPageByTotal = pageNumber >= totalPagesEstimate;
-				const duplicatePage = newBlocksCount === 0 && page.contents.length > 0;
+				const duplicatePage =
+					newBlocksCount === 0 && page.contents.length > 0;
 
-				if (emptyPage || lastPageByCount || lastPageByTotal || duplicatePage) {
+				if (
+					emptyPage ||
+					lastPageByCount ||
+					lastPageByTotal ||
+					duplicatePage
+				) {
 					hasMore = false;
 					if (this.debug) {
 						console.log(
 							`[arena-sync] Stopping pagination for ${slug}: ` +
-							`page=${pageNumber}, totalPages=${totalPagesEstimate}, ` +
-							`blocksOnPage=${page.contents.length}, ` +
-							`newBlocks=${newBlocksCount}, ` +
-							`reason=${emptyPage ? 'empty' : lastPageByCount ? 'partial' : lastPageByTotal ? 'total' : 'duplicates'}`
+								`page=${pageNumber}, totalPages=${totalPagesEstimate}, ` +
+								`blocksOnPage=${page.contents.length}, ` +
+								`newBlocks=${newBlocksCount}, ` +
+								`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
 						);
 					}
 				} else {
@@ -158,25 +229,27 @@ export class ArenaApi {
 				consecutiveErrors++;
 				console.error(
 					`[arena-sync] Error fetching page ${pageNumber} for ${slug} ` +
-					`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
-					error
+						`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
+					error,
 				);
 
 				if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
 					throw new Error(
 						`Failed to fetch channel ${slug} after ${MAX_CONSECUTIVE_ERRORS} consecutive errors. ` +
-						`Last error: ${(error as Error).message}`
+							`Last error: ${(error as Error).message}`,
 					);
 				}
 
-				await delay(REQUEST_DELAY * consecutiveErrors + withJitter(JITTER));
+				await delay(
+					REQUEST_DELAY * consecutiveErrors + withJitter(JITTER),
+				);
 			}
 		}
 
 		if (this.debug) {
 			console.log(
 				`[arena-sync] Fetched ${blocks.length} unique blocks from ${slug} ` +
-				`across ${pageNumber} page(s)`
+					`across ${pageNumber} page(s)`,
 			);
 		}
 
@@ -184,11 +257,11 @@ export class ArenaApi {
 	}
 
 	async listMyChannels(
-		page = 1
+		page = 1,
 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
 		return this.request<ArenaPaginatedResponse<ArenaChannelListItem>>(
 			"GET",
-			`/me/channels?page=${page}&per=${PER_PAGE}`
+			`/me/channels?page=${page}&per=${PER_PAGE}`,
 		);
 	}
 
@@ -197,14 +270,51 @@ export class ArenaApi {
 	}
 
 	async downloadBinary(url: string): Promise<ArrayBuffer> {
-		const res = await requestUrl({
-			url,
-			method: "GET",
-			headers: this.headers(),
-		});
-		if (res.status < 200 || res.status >= 300) {
-			throw new Error(`Asset download failed (${res.status}) for ${url}`);
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			const res = await requestUrl({
+				url,
+				method: "GET",
+				headers: this.headers(),
+			});
+
+			// Handle rate limiting
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Asset download rate limited (429). ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Download rate limited. ` +
+							`Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(retryAfter * 1000);
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				throw new Error(
+					`Asset download failed (${res.status}) for ${url}`,
+				);
+			}
+
+			return res.arrayBuffer;
 		}
-		return res.arrayBuffer;
+
+		throw new Error(`Asset download failed after max retries for ${url}`);
 	}
 }

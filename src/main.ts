@@ -1,9 +1,9 @@
-import {addIcon, normalizePath, Notice, Plugin, TFile} from "obsidian";
-import {ArenaApi} from "./api";
-import {SyncEngine} from "./sync-engine";
-import {ArenaSyncSettingTab} from "./settings-tab";
-import type {ArenaSyncSettings, ImportProgress, SyncResult} from "./types";
-import {DEFAULT_SETTINGS} from "./types";
+import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
+import { ArenaApi } from "./api";
+import { SyncEngine } from "./sync-engine";
+import { ArenaSyncSettingTab } from "./settings-tab";
+import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
+import { DEFAULT_SETTINGS } from "./types";
 
 const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
 
@@ -18,12 +18,15 @@ export default class ArenaSyncPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		this.api = new ArenaApi(this.settings.apiToken, this.settings.debugLogging);
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
 		this.engine = new SyncEngine(
 			this.app,
 			this.api,
 			this.settings,
-			(progress) => this.updateProgressStatus(progress)
+			(progress) => this.updateProgressStatus(progress),
 		);
 
 		addIcon("arena-sync", ARENA_ICON);
@@ -53,7 +56,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder)
+					file.path.startsWith(m.localFolder),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
@@ -69,7 +72,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder)
+					file.path.startsWith(m.localFolder),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
@@ -85,13 +88,13 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder)
+					file.path.startsWith(m.localFolder),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
 				window.open(
 					`https://www.are.na/channel/${mapping.channelSlug}`,
-					"_blank"
+					"_blank",
 				);
 				return true;
 			},
@@ -100,8 +103,18 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
 		this.resetSyncTimer();
 
-		if (this.settings.syncOnStartup && this.settings.apiToken) {
-			setTimeout(() => this.runSync(false), 3000);
+		if (this.settings.syncOnStartup) {
+			if (!this.settings.apiToken) {
+				new Notice(
+					"Are.na Import: Startup sync skipped — API token not configured.",
+				);
+			} else if (this.settings.channelMappings.length === 0) {
+				new Notice(
+					"Are.na Import: Startup sync skipped — no channels configured.",
+				);
+			} else {
+				setTimeout(() => this.runSync(false), 3000);
+			}
 		}
 	}
 
@@ -116,13 +129,17 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		this.api = new ArenaApi(this.settings.apiToken, this.settings.debugLogging);
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
 		this.engine = new SyncEngine(
 			this.app,
 			this.api,
 			this.settings,
-			(progress) => this.updateProgressStatus(progress)
+			(progress) => this.updateProgressStatus(progress),
 		);
+		this.resetSyncTimer();
 	}
 
 	async runSync(dryRun = false): Promise<void> {
@@ -134,8 +151,13 @@ export default class ArenaSyncPlugin extends Plugin {
 			new Notice("Are.na Import: Please set your API token in settings.");
 			return;
 		}
-		if (this.settings.channelMappings.length === 0) {
-			new Notice("Are.na Import: No channels configured.");
+		const validMappings = this.settings.channelMappings.filter(
+			(m) => m.enabled && m.channelSlug.trim() && m.localFolder.trim(),
+		);
+		if (validMappings.length === 0) {
+			new Notice(
+				"Are.na Import: No valid channels configured (check that channel slug and folder are not empty).",
+			);
 			return;
 		}
 
@@ -143,7 +165,7 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.updateStatusBar("syncing");
 
 		try {
-			const result = await this.engine.syncAll({dryRun});
+			const result = await this.engine.syncAll({ dryRun });
 			if (!dryRun) {
 				await this.saveSettings();
 				await this.writeImportReport(result, "all");
@@ -162,9 +184,17 @@ export default class ArenaSyncPlugin extends Plugin {
 			new Notice("Are.na Import is already running...");
 			return;
 		}
-		const mapping = this.settings.channelMappings.find((m) => m.channelSlug === slug);
+		const mapping = this.settings.channelMappings.find(
+			(m) => m.channelSlug === slug && m.enabled,
+		);
 		if (!mapping) {
-			new Notice(`Channel "${slug}" not found in settings.`);
+			new Notice(
+				`Channel "${slug}" not found in settings or is disabled.`,
+			);
+			return;
+		}
+		if (!mapping.channelSlug.trim() || !mapping.localFolder.trim()) {
+			new Notice(`Channel "${slug}" has empty slug or folder path.`);
 			return;
 		}
 
@@ -172,7 +202,7 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.updateStatusBar("syncing");
 
 		try {
-			const result = await this.engine.syncChannel(mapping, {dryRun});
+			const result = await this.engine.syncChannel(mapping, { dryRun });
 			if (!dryRun) {
 				await this.saveSettings();
 				await this.writeImportReport(result, slug);
@@ -192,7 +222,7 @@ export default class ArenaSyncPlugin extends Plugin {
 		if (mins > 0) {
 			this.syncTimer = setInterval(
 				() => this.runSync(false),
-				mins * 60 * 1000
+				mins * 60 * 1000,
 			);
 		}
 	}
@@ -216,15 +246,23 @@ export default class ArenaSyncPlugin extends Plugin {
 	private updateProgressStatus(progress: ImportProgress): void {
 		if (!this.isSyncing) return;
 		const percentage =
-			progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+			progress.total > 0
+				? Math.round((progress.current / progress.total) * 100)
+				: 0;
 		const barWidth = 10;
-		const filled = Math.max(0, Math.min(barWidth, Math.round((percentage / 100) * barWidth)));
+		const filled = Math.max(
+			0,
+			Math.min(barWidth, Math.round((percentage / 100) * barWidth)),
+		);
 		const bar = `[${"#".repeat(filled)}${"-".repeat(barWidth - filled)}]`;
 		const label =
 			progress.phase === "pages"
 				? `pages ${progress.current}/${progress.total}`
 				: `blocks ${progress.current}/${progress.total}`;
-		this.updateStatusBar("syncing", `${bar} ${percentage}% ${progress.channelSlug} ${label}`);
+		this.updateStatusBar(
+			"syncing",
+			`${bar} ${percentage}% ${progress.channelSlug} ${label}`,
+		);
 	}
 
 	private notifySyncResult(result: SyncResult): void {
@@ -232,22 +270,36 @@ export default class ArenaSyncPlugin extends Plugin {
 		const parts: string[] = [];
 		if (result.created > 0) parts.push(`${result.created} created`);
 		if (result.updated > 0) parts.push(`${result.updated} updated`);
-		if (result.downloaded > 0) parts.push(`${result.downloaded} assets downloaded`);
-		if (result.errors.length > 0) parts.push(`${result.errors.length} errors`);
+		if (result.downloaded > 0)
+			parts.push(`${result.downloaded} assets downloaded`);
+		if (result.errors.length > 0)
+			parts.push(`${result.errors.length} errors`);
 		if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
 		const summary = parts.length > 0 ? parts.join(", ") : "no changes";
 		const seconds = (result.duration / 1000).toFixed(1);
-		const prefix = result.dryRun ? "Are.na Import preview" : "Are.na Import";
+		const prefix = result.dryRun
+			? "Are.na Import preview"
+			: "Are.na Import";
 		new Notice(`${prefix}: ${summary} (${seconds}s)`);
 	}
 
-	private async writeImportReport(result: SyncResult, scope: string): Promise<void> {
+	private async writeImportReport(
+		result: SyncResult,
+		scope: string,
+	): Promise<void> {
 		const folder = normalizePath("Are.na");
 		const filePath = normalizePath("Are.na/import-history.md");
 		if (!this.app.vault.getAbstractFileByPath(folder)) {
 			await this.app.vault.createFolder(folder);
 		}
-		const timestamp = new Date().toISOString();
+		const timestamp = new Date().toLocaleString("en-US", {
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		});
 		const lines: string[] = [
 			`## ${timestamp} (${scope})`,
 			"",
@@ -269,7 +321,10 @@ export default class ArenaSyncPlugin extends Plugin {
 		}
 		if (existing instanceof TFile) {
 			const current = await this.app.vault.read(existing);
-			await this.app.vault.modify(existing, `${current}\n${lines.join("\n")}`);
+			await this.app.vault.modify(
+				existing,
+				`${current}\n${lines.join("\n")}`,
+			);
 		}
 	}
 }

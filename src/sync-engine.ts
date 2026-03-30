@@ -1,5 +1,5 @@
-import {App, normalizePath, TFile, Vault} from "obsidian";
-import {ArenaApi} from "./api";
+import { App, normalizePath, TFile, Vault } from "obsidian";
+import { ArenaApi } from "./api";
 import type {
 	ArenaBlock,
 	ArenaChannel,
@@ -29,7 +29,7 @@ export class SyncEngine {
 		app: App,
 		api: ArenaApi,
 		settings: ArenaSyncSettings,
-		onProgress?: ProgressHandler
+		onProgress?: ProgressHandler,
 	) {
 		this.api = api;
 		this.settings = settings;
@@ -79,7 +79,7 @@ export class SyncEngine {
 
 	async syncChannel(
 		mapping: ChannelMapping,
-		options: SyncOptions = {}
+		options: SyncOptions = {},
 	): Promise<SyncResult> {
 		const dryRun = options.dryRun === true;
 		const result: SyncResult = {
@@ -115,7 +115,7 @@ export class SyncEngine {
 		mapping: ChannelMapping,
 		channel: ArenaChannel,
 		result: SyncResult,
-		dryRun: boolean
+		dryRun: boolean,
 	): Promise<void> {
 		const blocks = await this.api.getAllChannelBlocksWithProgress(
 			mapping.channelSlug,
@@ -126,7 +126,7 @@ export class SyncEngine {
 					current: currentPage,
 					total: totalPages,
 				});
-			}
+			},
 		);
 
 		if (!dryRun) {
@@ -154,7 +154,7 @@ export class SyncEngine {
 					mapping,
 					channel,
 					result,
-					dryRun
+					dryRun,
 				);
 				importedPaths.push(path);
 			} catch (err) {
@@ -167,7 +167,13 @@ export class SyncEngine {
 			}
 		}
 
-		await this.updateChannelIndex(mapping, channel, importedPaths, dryRun, result);
+		await this.updateChannelIndex(
+			mapping,
+			channel,
+			importedPaths,
+			dryRun,
+			result,
+		);
 	}
 
 	private async pullBlock(
@@ -175,15 +181,17 @@ export class SyncEngine {
 		mapping: ChannelMapping,
 		channel: ArenaChannel,
 		result: SyncResult,
-		dryRun: boolean
+		dryRun: boolean,
 	): Promise<string> {
 		const noteFileName = this.blockFileName(block);
-		const notePath = normalizePath(`${mapping.localFolder}/${noteFileName}`);
+		const notePath = normalizePath(
+			`${mapping.localFolder}/${noteFileName}`,
+		);
 		const assetPath = await this.ensureBlockAsset(
 			block,
 			mapping,
 			dryRun,
-			result
+			result,
 		);
 		const markdown = blockToMarkdown(block, this.settings, {
 			channelSlug: channel.slug,
@@ -199,7 +207,13 @@ export class SyncEngine {
 			result.actions.push(`create ${notePath}`);
 			if (!dryRun) {
 				await this.vault.create(notePath, markdown);
-				this.upsertRecord(block.id, mapping.channelId, notePath, remoteHash, remoteHash);
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					remoteHash,
+					remoteHash,
+				);
 			}
 			return notePath;
 		}
@@ -215,7 +229,13 @@ export class SyncEngine {
 			result.skipped++;
 			result.actions.push(`skip ${notePath}`);
 			if (!record && !dryRun) {
-				this.upsertRecord(block.id, mapping.channelId, notePath, localHash, remoteHash);
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
 			}
 			return notePath;
 		}
@@ -224,7 +244,13 @@ export class SyncEngine {
 		result.actions.push(`update ${notePath}`);
 		if (!dryRun) {
 			await this.vault.modify(existing, markdown);
-			this.upsertRecord(block.id, mapping.channelId, notePath, remoteHash, remoteHash);
+			this.upsertRecord(
+				block.id,
+				mapping.channelId,
+				notePath,
+				remoteHash,
+				remoteHash,
+			);
 		}
 		return notePath;
 	}
@@ -233,7 +259,7 @@ export class SyncEngine {
 		block: ArenaBlock,
 		mapping: ChannelMapping,
 		dryRun: boolean,
-		result: SyncResult
+		result: SyncResult,
 	): Promise<string | undefined> {
 		let url: string | null = null;
 		let fileName: string | null = null;
@@ -247,7 +273,10 @@ export class SyncEngine {
 		}
 
 		if (block.class === "Attachment") {
-			if (this.settings.attachmentHandling !== "download" || !block.attachment) {
+			if (
+				this.settings.attachmentHandling !== "download" ||
+				!block.attachment
+			) {
 				return undefined;
 			}
 			url = block.attachment.url;
@@ -260,7 +289,9 @@ export class SyncEngine {
 		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
 		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
 		result.downloaded++;
-		result.actions.push(`${dryRun ? "download" : "ensure"} asset ${assetPath}`);
+		result.actions.push(
+			`${dryRun ? "download" : "ensure"} asset ${assetPath}`,
+		);
 
 		if (dryRun) return assetPath;
 
@@ -280,7 +311,7 @@ export class SyncEngine {
 		channel: ArenaChannel,
 		notePaths: string[],
 		dryRun: boolean,
-		result: SyncResult
+		result: SyncResult,
 	): Promise<void> {
 		const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
 		const sorted = [...notePaths].sort();
@@ -293,7 +324,10 @@ export class SyncEngine {
 			"## Notes",
 		];
 		for (const notePath of sorted) {
-			lines.push(`- [[${notePath}]]`);
+			// Extract filename and create clean link text
+			const fileName = notePath.split("/").pop() || notePath;
+			const linkText = fileName.replace(".md", "");
+			lines.push(`- [[${notePath}|${linkText}]]`);
 		}
 		lines.push("");
 		const content = lines.join("\n");
@@ -317,7 +351,7 @@ export class SyncEngine {
 			case "custom":
 				return normalizePath(
 					this.settings.customAttachmentFolder ||
-					this.settings.globalAttachmentFolder
+						this.settings.globalAttachmentFolder,
 				);
 			case "global":
 			default:
@@ -333,9 +367,12 @@ export class SyncEngine {
 		return this.settings.excludeClasses.includes(block.class);
 	}
 
-	private findRecord(blockId: number, channelId: number): SyncRecord | undefined {
+	private findRecord(
+		blockId: number,
+		channelId: number,
+	): SyncRecord | undefined {
 		return this.settings.syncRecords.find(
-			(r) => r.blockId === blockId && r.channelId === channelId
+			(r) => r.blockId === blockId && r.channelId === channelId,
 		);
 	}
 
@@ -344,10 +381,10 @@ export class SyncEngine {
 		channelId: number,
 		localPath: string,
 		localHash: string,
-		remoteHash: string
+		remoteHash: string,
 	): void {
 		const idx = this.settings.syncRecords.findIndex(
-			(r) => r.blockId === blockId && r.channelId === channelId
+			(r) => r.blockId === blockId && r.channelId === channelId,
 		);
 		const record: SyncRecord = {
 			blockId,

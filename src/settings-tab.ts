@@ -1,4 +1,4 @@
-import {App, Notice, PluginSettingTab, Setting} from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ArenaSyncPlugin from "./main";
 import type {
 	AttachmentHandling,
@@ -20,7 +20,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h1", {text: "Are.na Import"});
+		containerEl.createEl("h1", { text: "Are.na Import" });
 		containerEl.createEl("p", {
 			text: "One-way import from Are.na into this vault.",
 			cls: "setting-item-description",
@@ -29,24 +29,31 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.createEl("h2", { text: "Authentication" });
 		new Setting(containerEl)
 			.setName("API token")
-			.setDesc("Generate a token at https://dev.are.na/oauth/applications")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter your Are.na token")
+			.setDesc(
+				"Generate a token at https://dev.are.na/oauth/applications",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
 					.setValue(this.plugin.settings.apiToken)
 					.onChange(async (value) => {
 						this.plugin.settings.apiToken = value.trim();
 						await this.plugin.saveSettings();
-					})
-			)
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
 			.addButton((btn) =>
 				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
 					const ok = await this.plugin.api.verifyToken();
 					new Notice(ok ? "Token is valid" : "Invalid token");
-				})
+				}),
 			);
 
-		containerEl.createEl("h2", {text: "Import behavior"});
+		containerEl.createEl("h2", { text: "Import behavior" });
 		new Setting(containerEl)
 			.setName("Import interval")
 			.setDesc("Minutes between automatic imports (0 = manual)")
@@ -61,7 +68,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 							this.plugin.resetSyncTimer();
 						}
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -72,10 +79,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.syncOnStartup = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
-		containerEl.createEl("h2", {text: "Content rendering"});
+		containerEl.createEl("h2", { text: "Content rendering" });
 		new Setting(containerEl)
 			.setName("Block file naming")
 			.addDropdown((dd) =>
@@ -87,9 +94,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					} as Record<BlockNamingScheme, string>)
 					.setValue(this.plugin.settings.blockNaming)
 					.onChange(async (value) => {
-						this.plugin.settings.blockNaming = value as BlockNamingScheme;
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -104,9 +112,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					} as Record<ImageHandling, string>)
 					.setValue(this.plugin.settings.imageHandling)
 					.onChange(async (value) => {
-						this.plugin.settings.imageHandling = value as ImageHandling;
+						this.plugin.settings.imageHandling =
+							value as ImageHandling;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -123,7 +132,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						this.plugin.settings.attachmentHandling =
 							value as AttachmentHandling;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -135,12 +144,14 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						link: "Link",
 						embed: "Embed",
 					} as Record<DownloadedAttachmentLinkStyle, string>)
-					.setValue(this.plugin.settings.downloadedAttachmentLinkStyle)
+					.setValue(
+						this.plugin.settings.downloadedAttachmentLinkStyle,
+					)
 					.onChange(async (value) => {
 						this.plugin.settings.downloadedAttachmentLinkStyle =
 							value as DownloadedAttachmentLinkStyle;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -154,10 +165,11 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					} as Record<AttachmentStorage, string>)
 					.setValue(this.plugin.settings.attachmentStorage)
 					.onChange(async (value) => {
-						this.plugin.settings.attachmentStorage = value as AttachmentStorage;
+						this.plugin.settings.attachmentStorage =
+							value as AttachmentStorage;
 						await this.plugin.saveSettings();
 						this.display();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -168,9 +180,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.setPlaceholder("Are.na/Attachments")
 					.setValue(this.plugin.settings.globalAttachmentFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.globalAttachmentFolder = value.trim();
+						this.plugin.settings.globalAttachmentFolder =
+							value.trim();
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -181,9 +194,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.setPlaceholder("Path/In/Vault")
 					.setValue(this.plugin.settings.customAttachmentFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.customAttachmentFolder = value.trim();
+						this.plugin.settings.customAttachmentFolder =
+							value.trim();
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
 		new Setting(containerEl)
@@ -194,10 +208,28 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.frontmatterEnabled = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
-		containerEl.createEl("h2", {text: "Notifications and logging"});
+		new Setting(containerEl)
+			.setName("Exclude block classes")
+			.setDesc(
+				"Comma-separated list of block types to skip (e.g., Image, Media)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Image, Media")
+					.setValue(this.plugin.settings.excludeClasses.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.excludeClasses = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		containerEl.createEl("h2", { text: "Notifications and logging" });
 		new Setting(containerEl)
 			.setName("Show notifications")
 			.addToggle((toggle) =>
@@ -206,19 +238,17 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.notifyOnSync = value;
 						await this.plugin.saveSettings();
-					})
+					}),
 			);
 
-		new Setting(containerEl)
-			.setName("Debug logging")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.debugLogging)
-					.onChange(async (value) => {
-						this.plugin.settings.debugLogging = value;
-						await this.plugin.saveSettings();
-					})
-			);
+		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+			toggle
+				.setValue(this.plugin.settings.debugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.debugLogging = value;
+					await this.plugin.saveSettings();
+				}),
+		);
 
 		containerEl.createEl("h2", { text: "Channel mappings" });
 		new Setting(containerEl)
@@ -236,7 +266,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					});
 					await this.plugin.saveSettings();
 					this.display();
-				})
+				}),
 			);
 
 		for (let i = 0; i < this.plugin.settings.channelMappings.length; i++) {
@@ -253,31 +283,41 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.setDesc(
 				mapping.lastSyncedAt
 					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}`
-					: "Never imported"
+					: "Never imported",
 			)
 			.addText((text) =>
 				text
 					.setPlaceholder("channel-slug")
 					.setValue(mapping.channelSlug)
 					.onChange(async (v) => {
-						mapping.channelSlug = v.trim();
+						const trimmed = v.trim();
+						if (!trimmed) {
+							new Notice("Channel slug cannot be empty");
+							return;
+						}
+						mapping.channelSlug = trimmed;
 						await this.plugin.saveSettings();
-					})
+					}),
 			)
 			.addText((text) =>
 				text
 					.setPlaceholder("Vault/Folder")
 					.setValue(mapping.localFolder)
 					.onChange(async (v) => {
-						mapping.localFolder = v.trim();
+						const trimmed = v.trim();
+						if (!trimmed) {
+							new Notice("Local folder path cannot be empty");
+							return;
+						}
+						mapping.localFolder = trimmed;
 						await this.plugin.saveSettings();
-					})
+					}),
 			)
 			.addToggle((toggle) =>
 				toggle.setValue(mapping.enabled).onChange(async (v) => {
 					mapping.enabled = v;
 					await this.plugin.saveSettings();
-				})
+				}),
 			)
 			.addButton((btn) =>
 				btn
@@ -287,7 +327,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						this.plugin.settings.channelMappings.splice(index, 1);
 						await this.plugin.saveSettings();
 						this.display();
-					})
+					}),
 			);
 	}
 }
