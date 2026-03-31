@@ -12,6 +12,7 @@ const MAX_RETRIES = 3;
 const REQUEST_DELAY = 100; // ms between requests
 const JITTER = 50; // ms
 const RATE_LIMIT_STATUS = 429;
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -19,6 +20,12 @@ function delay(ms: number): Promise<void> {
 
 function withJitter(baseDelay: number): number {
 	return baseDelay + Math.random() * JITTER;
+}
+
+function transientBackoffMs(attempt: number): number {
+	// 1s, 2s, 4s ... plus jitter.
+	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
+	return Math.round(withJitter(base));
 }
 
 export class ArenaApi {
@@ -61,7 +68,17 @@ export class ArenaApi {
 				console.log(`[arena-sync] ${method} ${params.url}`);
 			}
 
-			const res = await requestUrl(params);
+			let res;
+			try {
+				res = await requestUrl(params);
+			} catch (err) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw err;
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
 
 			// Handle rate limiting with exponential backoff
 			if (res.status === RATE_LIMIT_STATUS) {
@@ -86,6 +103,25 @@ export class ArenaApi {
 					);
 				}
 
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (TRANSIENT_STATUSES.has(res.status)) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API temporary failure (${res.status}). ` +
+							`Max retries exceeded.`,
+					);
+				}
+				const backoffMs = transientBackoffMs(attempts);
+				if (this.debug) {
+					console.log(
+						`[arena-sync] ${res.status} retry in ${backoffMs}ms ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
 				await delay(backoffMs);
 				continue;
 			}
@@ -273,11 +309,21 @@ export class ArenaApi {
 		let attempts = 0;
 
 		while (attempts < MAX_RETRIES) {
-			const res = await requestUrl({
-				url,
-				method: "GET",
-				headers: this.headers(),
-			});
+			let res;
+			try {
+				res = await requestUrl({
+					url,
+					method: "GET",
+					headers: this.headers(),
+				});
+			} catch (err) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw err;
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
 
 			// Handle rate limiting
 			if (res.status === RATE_LIMIT_STATUS) {
@@ -303,6 +349,17 @@ export class ArenaApi {
 				}
 
 				await delay(retryAfter * 1000);
+				continue;
+			}
+
+			if (TRANSIENT_STATUSES.has(res.status)) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Asset download temporary failure (${res.status}) for ${url}`,
+					);
+				}
+				await delay(transientBackoffMs(attempts));
 				continue;
 			}
 

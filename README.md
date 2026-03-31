@@ -15,9 +15,11 @@ This plugin is **one-way import only**: Are.na → Obsidian.
 - Manual import only (no background sync)
 - Supports dry-run preview commands
 - Downloads images and non-image attachments (including PDFs) when configured
+- Supports image embeds using Are.na display images in note body
 - Supports attachment storage in channel-local, global, or custom folders
 - Supports per-channel attachment storage overrides
 - Includes attachment migration preview + diff and migration history log
+- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
 - Writes channel index notes for graph-friendly linking
 - Writes a master overview note for all synced channels
 - Shows a sync summary modal with diffs for updated files
@@ -37,6 +39,7 @@ Are.na's API allows **120 requests per minute** for authenticated requests. For 
 - **1,000+ blocks**: Import may take 10+ minutes due to pagination
 
 If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
 
 ## Commands
 
@@ -52,6 +55,7 @@ If you encounter rate-limit errors (HTTP 429), the plugin will automatically ret
 
 - API token with verify action
 - Block file naming (`title`, `id`, `title-id`)
+- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
 - Image handling (`download`, `embed`, `link`)
 - Attachment handling (`download`, `link`)
 - Downloaded attachment render (`embed`, `link`)

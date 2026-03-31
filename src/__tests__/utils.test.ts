@@ -92,7 +92,24 @@ describe("blockToMarkdown", () => {
 		});
 		const s = { ...settings, imageHandling: "link" as const };
 		const md = blockToMarkdown(block, s);
-		expect(md).toContain("![Test Block](https://cdn.are.na/photo.jpg)");
+		expect(md).toContain("[Test Block](https://cdn.are.na/photo_display.jpg)");
+	});
+
+	it("embeds image blocks using Are.na display image in embed mode", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...settings, imageHandling: "embed" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("![Test Block](https://cdn.are.na/photo_display.jpg)");
 	});
 
 	it("handles an attachment block", () => {
@@ -115,6 +132,49 @@ describe("blockToMarkdown", () => {
 		const block = makeBlock({ title: null });
 		const md = blockToMarkdown(block, settings);
 		expect(md).toContain("# Block 12345");
+	});
+
+	it("adds optional banner frontmatter field when enabled", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = {
+			...settings,
+			bannerFieldEnabled: true,
+			bannerFieldName: "banner",
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
+	});
+
+	it("supports display-first banner priority", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = {
+			...settings,
+			bannerFieldEnabled: true,
+			bannerFieldName: "banner",
+			bannerImagePriority: "display-first" as const,
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain('banner: "https://cdn.are.na/photo_display.jpg"');
 	});
 });
 

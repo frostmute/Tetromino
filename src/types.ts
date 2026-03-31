@@ -84,6 +84,7 @@ export type ImageHandling = "embed" | "link" | "download";
 export type AttachmentHandling = "link" | "download";
 export type DownloadedAttachmentLinkStyle = "embed" | "link";
 export type AttachmentStorage = "channel" | "global" | "custom";
+export type BannerImagePriority = "thumb-first" | "display-first";
 
 export interface ChannelMapping {
 	channelSlug: string;
@@ -158,6 +159,9 @@ export interface ArenaSyncSettings {
 	syncInterval: number;
 	syncOnStartup: boolean;
 	blockNaming: BlockNamingScheme;
+	bannerFieldEnabled: boolean;
+	bannerFieldName: string;
+	bannerImagePriority: BannerImagePriority;
 	imageHandling: ImageHandling;
 	attachmentHandling: AttachmentHandling;
 	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
@@ -177,6 +181,9 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	syncInterval: 30,
 	syncOnStartup: false,
 	blockNaming: "title",
+	bannerFieldEnabled: false,
+	bannerFieldName: "banner",
+	bannerImagePriority: "thumb-first",
 	imageHandling: "download",
 	attachmentHandling: "download",
 	downloadedAttachmentLinkStyle: "link",

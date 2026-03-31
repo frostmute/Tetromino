@@ -7335,3 +7335,2342 @@ Verified:
 
 Your package is at:
 - `dist/Are.na-Importer-1.0.0.zip`
+
+---
+
+_**User (2026-03-31 00:39:34Z)**_
+
+2 of the channels seemed to import ok.... but the third got a 504 error...  the channel slug was: rad-readings....  also, can we set a property of 'banner' and add the thumbnail that arena shows for the block, if there is one, in that field.... also, for images, can we embed the image, or whatever the arena block shows when browsing the channel, into the body of the note?  ALSO, we can make the 'banner' property optional in settings? it is for compatability with the "Banners" obsidian plugin
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:49Z)**_
+
+This is a great set of improvements, and all three requests make sense together. I’m going to do three focused updates now: make API handling more resilient for `504`/transient errors, add an optional `banner` frontmatter field for Banners plugin compatibility, and improve image note rendering so it can embed the same visual Are.na shows.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,340p' src/api.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,340p' src/api.ts"
+Chunk ID: 76f5c4
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2033
+Output:
+import { requestUrl, RequestUrlParam } from "obsidian";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaChannelListItem,
+	ArenaPaginatedResponse,
+} from "./types";
+
+const BASE_URL = "https://api.are.na/v2";
+const PER_PAGE = 100;
+const MAX_RETRIES = 3;
+const REQUEST_DELAY = 100; // ms between requests
+const JITTER = 50; // ms
+const RATE_LIMIT_STATUS = 429;
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withJitter(baseDelay: number): number {
+	return baseDelay + Math.random() * JITTER;
+}
+
+export class ArenaApi {
+	private token: string;
+	private debug: boolean;
+
+	constructor(token: string, debug = false) {
+		this.token = token;
+		this.debug = debug;
+	}
+
+	private headers(): Record<string, string> {
+		const h: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (this.token) {
+			h["Authorization"] = `Bearer ${this.token}`;
+		}
+		return h;
+	}
+
+	private async request<T>(
+		method: string,
+		path: string,
+		body?: unknown,
+	): Promise<T> {
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			const params: RequestUrlParam = {
+				url: `${BASE_URL}${path}`,
+				method,
+				headers: this.headers(),
+			};
+			if (body) {
+				params.body = JSON.stringify(body);
+			}
+
+			if (this.debug) {
+				console.log(`[arena-sync] ${method} ${params.url}`);
+			}
+
+			const res = await requestUrl(params);
+
+			// Handle rate limiting with exponential backoff
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				const backoffMs = retryAfter * 1000;
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API rate limited (429). Max retries exceeded. ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Rate limited. Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				const errorMessage = this.getErrorMessage(res.status);
+				throw new Error(errorMessage);
+			}
+
+			return res.json as T;
+		}
+
+		throw new Error("Are.na API request failed after max retries");
+	}
+
+	private getErrorMessage(status: number): string {
+		switch (status) {
+			case 400:
+				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
+			case 401:
+				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
+			case 403:
+				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
+			case 404:
+				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
+			case 429:
+				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
+			case 500:
+				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
+			case 502:
+			case 503:
+			case 504:
+				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
+			default:
+				return `Are.na API error ${status}. Please try again or check Are.na status.`;
+		}
+	}
+
+	async verifyToken(): Promise<boolean> {
+		try {
+			await this.request("GET", "/me");
+			return true;
+		} catch (err) {
+			if (this.debug) {
+				console.log(`[arena-sync] Token verification failed:`, err);
+			}
+			return false;
+		}
+	}
+
+	async getChannel(slug: string): Promise<ArenaChannel> {
+		return this.request<ArenaChannel>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
+		);
+	}
+
+	async getChannelContents(
+		slug: string,
+		page = 1,
+	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
+		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
+		);
+	}
+
+	async getAllChannelBlocks(slug: string): Promise<ArenaBlock[]> {
+		return this.getAllChannelBlocksWithProgress(slug, () => {});
+	}
+
+	async getAllChannelBlocksWithProgress(
+		slug: string,
+		onPage: (currentPage: number, totalPages: number) => void,
+	): Promise<ArenaBlock[]> {
+		const blocks: ArenaBlock[] = [];
+		const seenBlockIds = new Set<number>();
+		let pageNumber = 1;
+		let hasMore = true;
+		let totalPagesEstimate = 1;
+		let consecutiveErrors = 0;
+		const MAX_CONSECUTIVE_ERRORS = 3;
+
+		while (hasMore) {
+			try {
+				if (pageNumber > 1) {
+					await delay(withJitter(REQUEST_DELAY));
+				}
+
+				const page = await this.getChannelContents(slug, pageNumber);
+				consecutiveErrors = 0;
+
+				if (page.total_pages && page.total_pages > totalPagesEstimate) {
+					totalPagesEstimate = page.total_pages;
+				}
+
+				if (page.length && page.length > 0) {
+					totalPagesEstimate = Math.max(
+						totalPagesEsti
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/utils.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/utils.ts"
+Chunk ID: b0e649
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1268
+Output:
+import { createHash } from "crypto";
+import { normalizePath } from "obsidian";
+import type {
+	AttachmentStorage,
+	ArenaBlock,
+	ArenaSyncSettings,
+	ChannelMapping,
+} from "./types";
+
+export interface MarkdownContext {
+	channelSlug?: string;
+	channelTitle?: string;
+	assetPath?: string;
+}
+
+function yamlQuote(value: string): string {
+	return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+export function normalizeArenaUrl(url: string): string {
+	if (!url) return url;
+	try {
+		const parsed = new URL(url);
+		if (parsed.hostname === "api.are.na") {
+			const path = parsed.pathname.replace(/^\/v2/, "");
+			const converted = path
+				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+				.replace(/^\/users\/([^/]+).*$/, "/user/$1");
+			return `https://www.are.na${converted}`;
+		}
+		return url;
+	} catch {
+		return url;
+	}
+}
+
+/**
+ * Convert an Are.na block into a Markdown string suitable for Obsidian.
+ */
+export function blockToMarkdown(
+	block: ArenaBlock,
+	settings: ArenaSyncSettings,
+	context: MarkdownContext = {}
+): string {
+	const parts: string[] = [];
+
+	if (settings.frontmatterEnabled) {
+		parts.push("---");
+		parts.push(`arena_id: ${block.id}`);
+		parts.push(`arena_url: ${yamlQuote(`https://www.are.na/block/${block.id}`)}`);
+		parts.push(`arena_class: ${yamlQuote(block.class)}`);
+		parts.push(`arena_created_at: ${yamlQuote(block.created_at)}`);
+		parts.push(`arena_updated_at: ${yamlQuote(block.updated_at)}`);
+		if (context.channelSlug) {
+			parts.push(`arena_channel_slug: ${yamlQuote(context.channelSlug)}`);
+		}
+		if (context.channelTitle) {
+			parts.push(`arena_channel_title: ${yamlQuote(context.channelTitle)}`);
+		}
+		if (block.source?.url) {
+			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
+		}
+		parts.push("---");
+		parts.push("");
+	}
+
+	const title = block.title ?? `Block ${block.id}`;
+	parts.push(`# ${title}`);
+	parts.push("");
+
+	switch (block.class) {
+		case "Text":
+			parts.push(block.content ?? "");
+			break;
+		case "Image":
+			if (block.image) {
+				if (settings.imageHandling === "link" && !context.assetPath) {
+					parts.push(`![${title}](${block.image.original.url})`);
+				} else {
+					const ref = context.assetPath ?? block.image.filename;
+					parts.push(`![[${ref}]]`);
+				}
+			}
+			break;
+		case "Link":
+			if (block.source?.url) {
+				const source = normalizeArenaUrl(block.source.url);
+				parts.push(`[${block.source.title || source}](${source})`);
+			}
+			if (block.description) {
+				parts.push("");
+				parts.push(block.description);
+			}
+			break;
+		case "Media":
+			if (block.source?.url) {
+				parts.push(`<${normalizeArenaUrl(block.source.url)}>`);
+			}
+			break;
+		case "Attachment":
+			if (block.attachment) {
+				if (context.assetPath && settings.attachmentHandling === "download") {
+					if (settings.downloadedAttachmentLinkStyle === "embed") {
+						parts.push(`![[${context.assetPath}]]`);
+					} else {
+						parts.push(`[[${context.assetPath}|${block.attachment.file_name}]]`);
+					}
+				} else {
+					parts.push(`[${block.attachment.file_name}](${block.attachment.url})`);
+				}
+			}
+			break;
+	}
+
+	if (block.description && block.class !== "Link") {
+		parts.push("");
+		parts.push("---");
+		parts.push("");
+		parts.push(block.description);
+	}
+
+	parts.push("");
+	return parts.join("\n");
+}
+
+export function resolveAttachmentBaseFolder(
+	settings: ArenaSyncSettings,
+	mapping: ChannelMapping
+): string {
+	const storage: AttachmentStorage =
+		mapping.attachmentStorageOverride ?? settings.attachmentStorage;
+	switch (storage) {
+		case "channel":
+			return normalizePath(`${mapping.localFolder}/_attachments`);
+		case "custom":
+			return normalizePath(
+				mapping.customAttachmentFolderOverride ||
+					settings.customAttachmentFolder ||
+					settings.globalAttachmentFolder
+			);
+		case "global":
+		default:
+			return normalizePath(settings.globalAttachmentFolder);
+	}
+}
+
+export function markdownToBlockContent(md: string): {
+	title: string;
+	content: string;
+} {
+	let body = md;
+
+	if (body.startsWith("---")) {
+		const end = body.indexOf("---", 3);
+		if (end !== -1) {
+			body = body.slice(end + 3).trimStart();
+		}
+	}
+
+	let title = "";
+	const h1 = body.match(/^# (.+)$/m);
+	if (h1) {
+		title = h1[1].trim();
+		body = body.replace(h1[0], "").trimStart();
+	}
+
+	body = body.replace(/\n---\s*$/g, "").trimEnd();
+
+	return { title, content: body };
+}
+
+export function computeHash(input: string): string {
+	return createHash("sha256").update(input, "utf8").digest("hex").slice(0, 16);
+}
+
+export function sanitiseFilename(name: string): string {
+	return name
+		// eslint-disable-next-line no-control-regex
+		.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+export function blockFileName(
+	block: ArenaBlock,
+	scheme: "title" | "id" | "title-id"
+): string {
+	const safeTi
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/types.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/types.ts"
+Chunk ID: 1c9a74
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1012
+Output:
+/**
+ * Are.na API type definitions
+ */
+
+export interface ArenaUser {
+	id: number;
+	slug: string;
+	username: string;
+	first_name: string;
+	last_name: string;
+	avatar: string;
+	channel_count: number;
+}
+
+export interface ArenaBlock {
+	id: number;
+	title: string | null;
+	content: string | null;
+	content_html: string | null;
+	description: string | null;
+	description_html: string | null;
+	source: { url: string; title: string } | null;
+	image: {
+		filename: string;
+		content_type: string;
+		original: { url: string };
+		display: { url: string };
+		thumb: { url: string };
+	} | null;
+	attachment: {
+		file_name: string;
+		file_size: number;
+		url: string;
+		content_type: string;
+		extension: string;
+	} | null;
+	class: string;
+	base_class: "Block";
+	created_at: string;
+	updated_at: string;
+	connected_at: string;
+	position: number;
+	user: ArenaUser;
+}
+
+export interface ArenaChannel {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	status: "closed" | "public" | "private";
+	user: ArenaUser;
+	contents: ArenaBlock[];
+	created_at: string;
+	updated_at: string;
+	metadata: {
+		description: string | null;
+	} | null;
+}
+
+export interface ArenaChannelListItem {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	status: "closed" | "public" | "private";
+	updated_at: string;
+}
+
+export interface ArenaPaginatedResponse<T> {
+	contents: T[];
+	length: number;
+	total_pages: number;
+	current_page: number;
+	per: number;
+}
+
+/**
+ * Plugin-specific types
+ */
+
+export type BlockNamingScheme = "title" | "id" | "title-id";
+export type ImageHandling = "embed" | "link" | "download";
+export type AttachmentHandling = "link" | "download";
+export type DownloadedAttachmentLinkStyle = "embed" | "link";
+export type AttachmentStorage = "channel" | "global" | "custom";
+
+export interface ChannelMapping {
+	channelSlug: string;
+	channelId: number;
+	channelTitle: string;
+	localFolder: string;
+	lastSyncedAt: string | null;
+	enabled: boolean;
+	attachmentStorageOverride?: AttachmentStorage | null;
+	customAttachmentFolderOverride?: string;
+	lastAttachmentBase?: string | null;
+}
+
+export interface SyncRecord {
+	blockId: number;
+	channelId: number;
+	localPath: string;
+	lastSyncedAt: string;
+	localHash: string;
+	remoteHash: string;
+}
+
+export interface SyncResult {
+	created: number;
+	updated: number;
+	deleted: number;
+	moved: number;
+	skipped: number;
+	downloaded: number;
+	dryRun: boolean;
+	actions: string[];
+	moves: MoveRecord[];
+	fileDiffs: FileDiff[];
+	missingPaths: string[];
+	errors: SyncError[];
+	duration: number;
+}
+
+export interface SyncOptions {
+	dryRun?: boolean;
+}
+
+export interface ImportProgress {
+	channelSlug: string;
+	phase: "pages" | "blocks";
+	current: number;
+	total: number;
+}
+
+export interface SyncError {
+	blockId: number | null;
+	channelSlug: string;
+	message: string;
+	recoverable: boolean;
+}
+
+export interface MoveRecord {
+	from: string;
+	to: string;
+}
+
+export interface FileDiff {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+	kind: "create" | "update" | "move" | "delete";
+}
+
+export interface ArenaSyncSettings {
+	apiToken: string;
+	syncInterval: number;
+	syncOnStartup: boolean;
+	blockNaming: BlockNamingScheme;
+	imageHandling: ImageHandling;
+	attachmentHandling: AttachmentHandling;
+	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+	attachmentStorage: AttachmentStorage;
+	globalAttachmentFolder: string;
+	customAttachmentFolder: string;
+	channelMappings: ChannelMapping[];
+	syncRecords: SyncRecord[];
+	frontmatterEnabled: boolean;
+	excludeClasses: string[];
+	notifyOnSync: boolean;
+	debugLogging: boolean;
+}
+
+export const DEFAULT_SETTINGS: ArenaSyncSettings = {
+	apiToken: "",
+	syncInterval: 30,
+	syncOnStartup: false,
+	blockNaming: "title",
+	imageHandling: "download",
+	attachmentHandling: "download",
+	downloadedAttachmentLinkStyle: "link",
+	attachmentStorage: "global",
+	globalAttachmentFolder: "Are.na/Attachments",
+	customAttachmentFolder: "",
+	channelMappings: [],
+	syncRecords: [],
+	frontmatterEnabled: true,
+	excludeClasses: [],
+	notifyOnSync: true,
+	debugLogging: false,
+};
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:54Z)**_
+
+I found the relevant pieces and confirmed we can wire this cleanly through existing settings/rendering. Next I’ll patch `types`, `settings-tab`, `utils`, and `api` together so the behavior is consistent and testable.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/settings-tab.ts"
+Chunk ID: 16e28f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1885
+Output:
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import type ArenaSyncPlugin from "./main";
+import type {
+	AttachmentHandling,
+	AttachmentStorage,
+	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
+	ImageHandling,
+} from "./types";
+
+export class ArenaSyncSettingTab extends PluginSettingTab {
+	plugin: ArenaSyncPlugin;
+
+	constructor(app: App, plugin: ArenaSyncPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
+
+		containerEl.createEl("h1", { text: "Are.na Import" });
+		containerEl.createEl("p", {
+			text: "One-way import from Are.na into this vault.",
+			cls: "setting-item-description",
+		});
+
+		containerEl.createEl("h2", { text: "Authentication" });
+		new Setting(containerEl)
+			.setName("API token")
+			.setDesc(
+				"Generate a token at https://dev.are.na/oauth/applications",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
+					.setValue(this.plugin.settings.apiToken)
+					.onChange(async (value) => {
+						this.plugin.settings.apiToken = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
+			.addButton((btn) =>
+				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
+					const ok = await this.plugin.api.verifyToken();
+					new Notice(ok ? "Token is valid" : "Invalid token");
+				}),
+			);
+
+		containerEl.createEl("h2", { text: "Content rendering" });
+		new Setting(containerEl)
+			.setName("Block file naming")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						title: "Block title",
+						id: "Block ID",
+						"title-id": "Title (ID)",
+					} as Record<BlockNamingScheme, string>)
+					.setValue(this.plugin.settings.blockNaming)
+					.onChange(async (value) => {
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Image handling")
+			.setDesc("How image blocks are rendered")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						download: "Download to vault",
+						embed: "Embed reference",
+						link: "External link",
+					} as Record<ImageHandling, string>)
+					.setValue(this.plugin.settings.imageHandling)
+					.onChange(async (value) => {
+						this.plugin.settings.imageHandling =
+							value as ImageHandling;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Attachment handling")
+			.setDesc("For PDFs and other non-image attachments")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						download: "Download to vault",
+						link: "External link",
+					} as Record<AttachmentHandling, string>)
+					.setValue(this.plugin.settings.attachmentHandling)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentHandling =
+							value as AttachmentHandling;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Downloaded attachment render")
+			.setDesc("When attachments are downloaded locally")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						link: "Link",
+						embed: "Embed",
+					} as Record<DownloadedAttachmentLinkStyle, string>)
+					.setValue(
+						this.plugin.settings.downloadedAttachmentLinkStyle,
+					)
+					.onChange(async (value) => {
+						this.plugin.settings.downloadedAttachmentLinkStyle =
+							value as DownloadedAttachmentLinkStyle;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Attachment storage location")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					} as Record<AttachmentStorage, string>)
+					.setValue(this.plugin.settings.attachmentStorage)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentStorage =
+							value as AttachmentStorage;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Global attachment folder")
+			.setDesc("Used when storage location is Global folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na/Attachments")
+					.setValue(this.plugin.settings.globalAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.globalAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Custom attachment folder")
+			.setDesc("Used when storage location is Custom folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Path/In/Vault")
+					.setValue(this.plugin.settings.customAt
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,420p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '260,420p' src/settings-tab.ts"
+Chunk ID: 7ba0a8
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 723
+Output:
+		new Setting(containerEl)
+			.setName("Run migration")
+			.setDesc("Move attachments and update embeds")
+			.addButton((btn) =>
+				btn.setButtonText("Run").setCta().onClick(async () => {
+					await this.plugin.runMigration();
+				}),
+			);
+	}
+
+	private renderMapping(containerEl: HTMLElement, index: number): void {
+		const mapping = this.plugin.settings.channelMappings[index];
+		const wrapper = containerEl.createDiv({ cls: "arena-sync-mapping" });
+
+		new Setting(wrapper)
+			.setName(`Mapping #${index + 1}`)
+			.setDesc(
+				mapping.lastSyncedAt
+					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}`
+					: "Never imported",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("channel-slug")
+					.setValue(mapping.channelSlug)
+					.onChange(async (v) => {
+						const trimmed = v.trim();
+						if (!trimmed) {
+							new Notice("Channel slug cannot be empty");
+							return;
+						}
+						mapping.channelSlug = trimmed;
+						await this.plugin.saveSettings();
+					}),
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Vault/Folder")
+					.setValue(mapping.localFolder)
+					.onChange(async (v) => {
+						const trimmed = v.trim();
+						if (!trimmed) {
+							new Notice("Local folder path cannot be empty");
+							return;
+						}
+						mapping.localFolder = trimmed;
+						await this.plugin.saveSettings();
+					}),
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(mapping.enabled).onChange(async (v) => {
+					mapping.enabled = v;
+					await this.plugin.saveSettings();
+				}),
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Remove")
+					.setWarning()
+					.onClick(async () => {
+						this.plugin.settings.channelMappings.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(wrapper)
+			.setName("Attachment storage override")
+			.setDesc("Override attachment location for this channel")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						inherit: "Inherit global setting",
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					})
+					.setValue(mapping.attachmentStorageOverride ?? "inherit")
+					.onChange(async (value) => {
+						mapping.attachmentStorageOverride =
+							value === "inherit"
+								? null
+								: (value as AttachmentStorage);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (mapping.attachmentStorageOverride === "custom") {
+			new Setting(wrapper)
+				.setName("Channel custom attachment folder")
+				.setDesc("Overrides the global custom folder for this channel")
+				.addText((text) =>
+					text
+						.setPlaceholder("Path/In/Vault")
+						.setValue(mapping.customAttachmentFolderOverride || "")
+						.onChange(async (v) => {
+							mapping.customAttachmentFolderOverride = v.trim();
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:39:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,280p' src/__tests__/utils.test.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,280p' src/__tests__/utils.test.ts"
+Chunk ID: 756b24
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1572
+Output:
+import {
+	blockFileName,
+	blockToMarkdown,
+	computeHash,
+	markdownToBlockContent,
+	normalizeArenaUrl,
+	sanitiseFilename,
+} from "../utils";
+import type {ArenaBlock, ArenaSyncSettings} from "../types";
+import {DEFAULT_SETTINGS} from "../types";
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+
+function makeBlock(overrides: Partial<ArenaBlock> = {}): ArenaBlock {
+	return {
+		id: 12345,
+		title: "Test Block",
+		content: "Hello world",
+		content_html: "<p>Hello world</p>",
+		description: null,
+		description_html: null,
+		source: null,
+		image: null,
+		attachment: null,
+		class: "Text",
+		base_class: "Block",
+		created_at: "2026-01-15T10:00:00.000Z",
+		updated_at: "2026-01-16T12:00:00.000Z",
+		connected_at: "2026-01-15T10:00:00.000Z",
+		position: 1,
+		user: {
+			id: 1,
+			slug: "testuser",
+			username: "testuser",
+			first_name: "Test",
+			last_name: "User",
+			avatar: "",
+			channel_count: 5,
+		},
+		...overrides,
+	};
+}
+
+/* ------------------------------------------------------------------ */
+/*  blockToMarkdown                                                   */
+/* ------------------------------------------------------------------ */
+
+describe("blockToMarkdown", () => {
+	const settings: ArenaSyncSettings = { ...DEFAULT_SETTINGS };
+
+	it("converts a text block with front-matter", () => {
+		const md = blockToMarkdown(makeBlock(), settings);
+		expect(md).toContain("---");
+		expect(md).toContain("arena_id: 12345");
+		expect(md).toContain('arena_class: "Text"');
+		expect(md).toContain("# Test Block");
+		expect(md).toContain("Hello world");
+	});
+
+	it("omits front-matter when disabled", () => {
+		const s = { ...settings, frontmatterEnabled: false };
+		const md = blockToMarkdown(makeBlock(), s);
+		expect(md).not.toContain("---\narena_id");
+		expect(md).toContain("# Test Block");
+	});
+
+	it("handles a link block", () => {
+		const block = makeBlock({
+			class: "Link",
+			content: null,
+			source: { url: "https://example.com", title: "Example" },
+			description: "A description",
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[Example](https://example.com)");
+		expect(md).toContain("A description");
+	});
+
+	it("handles an image block with external link", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...settings, imageHandling: "link" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("![Test Block](https://cdn.are.na/photo.jpg)");
+	});
+
+	it("handles an attachment block", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[notes.pdf](https://cdn.are.na/notes.pdf)");
+	});
+
+	it("falls back to Block ID when title is null", () => {
+		const block = makeBlock({ title: null });
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("# Block 12345");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  markdownToBlockContent                                            */
+/* ------------------------------------------------------------------ */
+
+describe("markdownToBlockContent", () => {
+	it("strips front-matter and extracts title", () => {
+		const md = [
+			"---",
+			"arena-id: 99",
+			"---",
+			"",
+			"# My Title",
+			"",
+			"Body text here.",
+		].join("\n");
+		const { title, content } = markdownToBlockContent(md);
+		expect(title).toBe("My Title");
+		expect(content).toBe("Body text here.");
+	});
+
+	it("handles content without front-matter", () => {
+		const md = "# Solo\n\nJust content.";
+		const { title, content } = markdownToBlockContent(md);
+		expect(title).toBe("Solo");
+		expect(content).toBe("Just content.");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  computeHash                                                       */
+/* ------------------------------------------------------------------ */
+
+describe("computeHash", () => {
+	it("returns a 16-char hex string", () => {
+		const h = computeHash("test");
+		expect(h).toMatch(/^[0-9a-f]{16}$/);
+	});
+
+	it("is deterministic", () => {
+		expect(computeHash("abc")).toBe(computeHash("abc"));
+	});
+
+	it("differs for different inputs", () => {
+		exp
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:09Z)**_
+
+I’m implementing this in a way that keeps it deterministic: retries for transient `504`-style failures, plus explicit settings for optional banner frontmatter and image-body embedding behavior. After patching, I’ll run tests/build so we can confirm it’s stable.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:14Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+ export interface ArenaSyncSettings {
+ 	apiToken: string;
+ 	syncInterval: number;
+ 	syncOnStartup: boolean;
+ 	blockNaming: BlockNamingScheme;
++	bannerFieldEnabled: boolean;
++	bannerFieldName: string;
+ 	imageHandling: ImageHandling;
+ 	attachmentHandling: AttachmentHandling;
+ 	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+@@
+ 	syncInterval: 30,
+ 	syncOnStartup: false,
+ 	blockNaming: "title",
++	bannerFieldEnabled: false,
++	bannerFieldName: "banner",
+ 	imageHandling: "download",
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:16Z)**_
+
+I’ve added the new banner settings to the typed config and defaults. Next I’m wiring the rendering logic so frontmatter gets `banner` only when enabled and available, and image `embed` mode uses the Are.na display image URL directly.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+ function yamlQuote(value: string): string {
+ 	return `"${value.replace(/"/g, '\\"')}"`;
+ }
++
++function resolveImageEmbedUrl(block: ArenaBlock): string | null {
++	if (!block.image) return null;
++	return (
++		block.image.display?.url ||
++		block.image.thumb?.url ||
++		block.image.original?.url ||
++		null
++	);
++}
++
++function resolveBlockBannerUrl(block: ArenaBlock): string | null {
++	if (!block.image) return null;
++	return (
++		block.image.thumb?.url ||
++		block.image.display?.url ||
++		block.image.original?.url ||
++		null
++	);
++}
+@@
+ 	if (settings.frontmatterEnabled) {
+ 		parts.push("---");
+ 		parts.push(`arena_id: ${block.id}`);
+@@
+ 		if (block.source?.url) {
+ 			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
+ 		}
++		if (settings.bannerFieldEnabled) {
++			const bannerValue = resolveBlockBannerUrl(block);
++			if (bannerValue) {
++				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
++				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
++			}
++		}
+ 		parts.push("---");
+ 		parts.push("");
+ 	}
+@@
+ 		case "Image":
+ 			if (block.image) {
+-				if (settings.imageHandling === "link" && !context.assetPath) {
+-					parts.push(`![${title}](${block.image.original.url})`);
+-				} else {
+-					const ref = context.assetPath ?? block.image.filename;
+-					parts.push(`![[${ref}]]`);
++				const embedUrl = resolveImageEmbedUrl(block);
++				if (settings.imageHandling === "download") {
++					const ref = context.assetPath ?? block.image.filename;
++					parts.push(`![[${ref}]]`);
++				} else if (settings.imageHandling === "embed") {
++					if (embedUrl) {
++						parts.push(`![${title}](${embedUrl})`);
++					}
++				} else if (embedUrl) {
++					parts.push(`[${title}](${embedUrl})`);
+ 				}
+ 			}
+ 			break;
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:27Z)**_
+
+I’ve completed the rendering side and now I’m adding the UI controls for optional banner frontmatter (`banner` field name is configurable), then I’ll harden API retry logic for transient gateway/server failures.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 		new Setting(containerEl)
+ 			.setName("Block file naming")
+ 			.addDropdown((dd) =>
+@@
+ 					}),
+ 			);
++
++		new Setting(containerEl)
++			.setName("Banner frontmatter field")
++			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.bannerFieldEnabled)
++					.onChange(async (value) => {
++						this.plugin.settings.bannerFieldEnabled = value;
++						await this.plugin.saveSettings();
++						this.display();
++					}),
++			);
++
++		if (this.plugin.settings.bannerFieldEnabled) {
++			new Setting(containerEl)
++				.setName("Banner field name")
++				.setDesc("Frontmatter key used for banner URL")
++				.addText((text) =>
++					text
++						.setPlaceholder("banner")
++						.setValue(this.plugin.settings.bannerFieldName)
++						.onChange(async (value) => {
++							this.plugin.settings.bannerFieldName =
++								value.trim() || "banner";
++							await this.plugin.saveSettings();
++						}),
++				);
++		}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:36Z)**_
+
+UI wiring is in place. I’m now patching API request/download retries so `504` and other transient failures are retried automatically with backoff instead of failing fast.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ const REQUEST_DELAY = 100; // ms between requests
+ const JITTER = 50; // ms
+ const RATE_LIMIT_STATUS = 429;
++const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+@@
+ function withJitter(baseDelay: number): number {
+ 	return baseDelay + Math.random() * JITTER;
+ }
++
++function transientBackoffMs(attempt: number): number {
++	// 1s, 2s, 4s ... plus jitter.
++	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
++	return Math.round(withJitter(base));
++}
+@@
+ 	private async request<T>(
+ 		method: string,
+ 		path: string,
+ 		body?: unknown,
+ 	): Promise<T> {
+ 		let attempts = 0;
+ 
+ 		while (attempts < MAX_RETRIES) {
+ 			const params: RequestUrlParam = {
+@@
+ 			if (this.debug) {
+ 				console.log(`[arena-sync] ${method} ${params.url}`);
+ 			}
+ 
+-			const res = await requestUrl(params);
++			let res;
++			try {
++				res = await requestUrl(params);
++			} catch (err) {
++				attempts++;
++				if (attempts >= MAX_RETRIES) {
++					throw err;
++				}
++				await delay(transientBackoffMs(attempts));
++				continue;
++			}
+@@
+ 			if (res.status === RATE_LIMIT_STATUS) {
+@@
+ 				await delay(backoffMs);
+ 				continue;
+ 			}
++
++			if (TRANSIENT_STATUSES.has(res.status)) {
++				attempts++;
++				if (attempts >= MAX_RETRIES) {
++					throw new Error(
++						`Are.na API temporary failure (${res.status}). ` +
++							`Max retries exceeded.`,
++					);
++				}
++				const backoffMs = transientBackoffMs(attempts);
++				if (this.debug) {
++					console.log(
++						`[arena-sync] ${res.status} retry in ${backoffMs}ms ` +
++							`(attempt ${attempts}/${MAX_RETRIES})`,
++					);
++				}
++				await delay(backoffMs);
++				continue;
++			}
+ 
+ 			if (res.status < 200 || res.status >= 300) {
+ 				const errorMessage = this.getErrorMessage(res.status);
+ 				throw new Error(errorMessage);
+ 			}
+@@
+ 	async downloadBinary(url: string): Promise<ArrayBuffer> {
+ 		let attempts = 0;
+ 
+ 		while (attempts < MAX_RETRIES) {
+-			const res = await requestUrl({
+-				url,
+-				method: "GET",
+-				headers: this.headers(),
+-			});
++			let res;
++			try {
++				res = await requestUrl({
++					url,
++					method: "GET",
++					headers: this.headers(),
++				});
++			} catch (err) {
++				attempts++;
++				if (attempts >= MAX_RETRIES) {
++					throw err;
++				}
++				await delay(transientBackoffMs(attempts));
++				continue;
++			}
+@@
+ 			if (res.status === RATE_LIMIT_STATUS) {
+@@
+ 				await delay(retryAfter * 1000);
+ 				continue;
+ 			}
++
++			if (TRANSIENT_STATUSES.has(res.status)) {
++				attempts++;
++				if (attempts >= MAX_RETRIES) {
++					throw new Error(
++						`Asset download temporary failure (${res.status}) for ${url}`,
++					);
++				}
++				await delay(transientBackoffMs(attempts));
++				continue;
++			}
+ 
+ 			if (res.status < 200 || res.status >= 300) {
+ 				throw new Error(
+ 					`Asset download failed (${res.status}) for ${url}`,
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:40:55Z)**_
+
+I’ve finished the retry hardening. I’m updating tests now to match the new image rendering behavior and to cover the new optional banner frontmatter field so we can trust this change.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:05Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__tests__/utils.test.ts`**
+
+```diff
+@@
+ 	it("handles an image block with external link", () => {
+ 		const block = makeBlock({
+ 			class: "Image",
+@@
+ 		});
+ 		const s = { ...settings, imageHandling: "link" as const };
+ 		const md = blockToMarkdown(block, s);
+-		expect(md).toContain("![Test Block](https://cdn.are.na/photo.jpg)");
++		expect(md).toContain("[Test Block](https://cdn.are.na/photo_display.jpg)");
++	});
++
++	it("embeds image blocks using Are.na display image in embed mode", () => {
++		const block = makeBlock({
++			class: "Image",
++			content: null,
++			image: {
++				filename: "photo.jpg",
++				content_type: "image/jpeg",
++				original: { url: "https://cdn.are.na/photo.jpg" },
++				display: { url: "https://cdn.are.na/photo_display.jpg" },
++				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
++			},
++		});
++		const s = { ...settings, imageHandling: "embed" as const };
++		const md = blockToMarkdown(block, s);
++		expect(md).toContain("![Test Block](https://cdn.are.na/photo_display.jpg)");
+ 	});
+@@
+ 	it("falls back to Block ID when title is null", () => {
+ 		const block = makeBlock({ title: null });
+ 		const md = blockToMarkdown(block, settings);
+ 		expect(md).toContain("# Block 12345");
+ 	});
++
++	it("adds optional banner frontmatter field when enabled", () => {
++		const block = makeBlock({
++			class: "Image",
++			content: null,
++			image: {
++				filename: "photo.jpg",
++				content_type: "image/jpeg",
++				original: { url: "https://cdn.are.na/photo.jpg" },
++				display: { url: "https://cdn.are.na/photo_display.jpg" },
++				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
++			},
++		});
++		const s = {
++			...settings,
++			bannerFieldEnabled: true,
++			bannerFieldName: "banner",
++		};
++		const md = blockToMarkdown(block, s);
++		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
++	});
+ });
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:07Z)**_
+
+I also want docs to match what you asked for, so I’m adding brief README notes for transient retry behavior and the optional banner/frontmatter compatibility setting.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ - Downloads images and non-image attachments (including PDFs) when configured
++- Supports image embeds using Are.na display images in note body
+ - Supports attachment storage in channel-local, global, or custom folders
+ - Supports per-channel attachment storage overrides
+ - Includes attachment migration preview + diff and migration history log
++- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+ - Writes channel index notes for graph-friendly linking
+ - Writes a master overview note for all synced channels
+ - Shows a sync summary modal with diffs for updated files
+ - Shows page/block progress in the status bar for large channels
+@@
+ If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
++Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+@@
+ - Block file naming (`title`, `id`, `title-id`)
++- Optional banner frontmatter field (`enabled`, `field name`)
+ - Image handling (`download`, `embed`, `link`)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:14Z)**_
+
+I’m running tests and a full build now so we can verify these changes don’t regress the pipeline and that your new options are safe to use immediately.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 05283e
+Wall time: 1.0015 seconds
+Process running with session ID 15608
+Original token count: 108
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:17Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 326830
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 638
+Output:
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode (1 ms)
+    ✓ handles an attachment block (1 ms)
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string (1 ms)
+    ✓ is deterministic (6 ms)
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace (1 ms)
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs (1 ms)
+    ✓ leaves external URLs unchanged
+
+-----------------|---------|----------|---------|---------|------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+-----------------|---------|----------|---------|---------|------------------------------------------
+All files        |    8.16 |    13.82 |    4.47 |    8.63 |                                          
+ api.ts          |       0 |        0 |       0 |       0 | 1-375                                    
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                     
+ main.ts         |       0 |        0 |       0 |       0 | 1-460                                    
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                    
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                    
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-387                                    
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-536                                    
+ types.ts        |     100 |      100 |     100 |     100 |                                          
+ utils.ts        |   81.25 |    51.28 |      90 |   83.48 | 54,76,79,129-132,136-139,149-152,164-176 
+-----------------|---------|----------|---------|---------|------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       20 passed, 20 total
+Snapshots:   0 total
+Time:        1.39 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: a880c3
+Wall time: 1.0009 seconds
+Process running with session ID 31593
+Original token count: 32
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: c8279f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17
+Output:
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:41:32Z)**_
+
+Great set of asks. I implemented all three and verified with tests + build.
+
+**What I changed**
+
+1. `504`/transient Are.na failures are now retried automatically  
+- Added retry/backoff for `500/502/503/504` in both API requests and binary downloads.
+- This should make channels like `rad-readings` much more resilient during temporary upstream outages.
+
+2. Optional `banner` frontmatter support (Banners plugin compatibility)  
+- Added settings:
+  - `Banner frontmatter field` (toggle)
+  - `Banner field name` (text, defaults to `banner`)
+- When enabled, notes include a banner URL only if a thumbnail/display image exists for that block.
+
+3. Better image note body rendering  
+- `imageHandling = embed` now embeds the Are.na display image URL directly in note body (`![...](...)`).
+- `imageHandling = download` still embeds local vault asset (`![[...]]`).
+- `imageHandling = link` now writes a normal link to the display image URL.
+
+**Files updated**
+- [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+- [types.ts](/home/frost/Are.na-Importer/src/types.ts)
+- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+
+**Validation**
+- `npm test -- --runInBand` passed (20/20)
+- `npm run build` passed
+- Zip artifact produced: `dist/Are.na-Importer-1.0.0.zip`
+
+If you want, next I can add one extra setting for banner fallback priority (`thumb` vs `display`) so you can tune exactly which image the Banners plugin uses.
+
+---
+
+_**User (2026-03-31 00:41:56Z)**_
+
+yes please
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:02Z)**_
+
+Perfect, that’s a clean enhancement. I’ll add a `banner image source priority` setting (`Thumb first` vs `Display first`), wire it into frontmatter generation, then run tests/build again.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "bannerField|banner" src/types.ts src/utils.ts src/settings-tab.ts src/__tests__/utils.test.ts README.md`</summary>
+```
+Command: /usr/bin/zsh -lc 'rg -n "bannerField|banner" src/types.ts src/utils.ts src/settings-tab.ts src/__tests__/utils.test.ts README.md'
+Chunk ID: ec698d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 416
+Output:
+src/__tests__/utils.test.ts:137:	it("adds optional banner frontmatter field when enabled", () => {
+src/__tests__/utils.test.ts:151:			bannerFieldEnabled: true,
+src/__tests__/utils.test.ts:152:			bannerFieldName: "banner",
+src/__tests__/utils.test.ts:155:		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
+src/settings-tab.ts:77:			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+src/settings-tab.ts:80:					.setValue(this.plugin.settings.bannerFieldEnabled)
+src/settings-tab.ts:82:						this.plugin.settings.bannerFieldEnabled = value;
+src/settings-tab.ts:88:		if (this.plugin.settings.bannerFieldEnabled) {
+src/settings-tab.ts:91:				.setDesc("Frontmatter key used for banner URL")
+src/settings-tab.ts:94:						.setPlaceholder("banner")
+src/settings-tab.ts:95:						.setValue(this.plugin.settings.bannerFieldName)
+src/settings-tab.ts:97:							this.plugin.settings.bannerFieldName =
+src/settings-tab.ts:98:								value.trim() || "banner";
+README.md:22:- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+README.md:58:- Optional banner frontmatter field (`enabled`, `field name`)
+src/utils.ts:84:		if (settings.bannerFieldEnabled) {
+src/utils.ts:85:			const bannerValue = resolveBlockBannerUrl(block);
+src/utils.ts:86:			if (bannerValue) {
+src/utils.ts:87:				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
+src/utils.ts:88:				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
+src/types.ts:161:	bannerFieldEnabled: boolean;
+src/types.ts:162:	bannerFieldName: string;
+src/types.ts:182:	bannerFieldEnabled: false,
+src/types.ts:183:	bannerFieldName: "banner",
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '120,240p' src/types.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '120,240p' src/types.ts"
+Chunk ID: c6d7d2
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 426
+Output:
+	missingPaths: string[];
+	errors: SyncError[];
+	duration: number;
+}
+
+export interface SyncOptions {
+	dryRun?: boolean;
+}
+
+export interface ImportProgress {
+	channelSlug: string;
+	phase: "pages" | "blocks";
+	current: number;
+	total: number;
+}
+
+export interface SyncError {
+	blockId: number | null;
+	channelSlug: string;
+	message: string;
+	recoverable: boolean;
+}
+
+export interface MoveRecord {
+	from: string;
+	to: string;
+}
+
+export interface FileDiff {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+	kind: "create" | "update" | "move" | "delete";
+}
+
+export interface ArenaSyncSettings {
+	apiToken: string;
+	syncInterval: number;
+	syncOnStartup: boolean;
+	blockNaming: BlockNamingScheme;
+	bannerFieldEnabled: boolean;
+	bannerFieldName: string;
+	imageHandling: ImageHandling;
+	attachmentHandling: AttachmentHandling;
+	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+	attachmentStorage: AttachmentStorage;
+	globalAttachmentFolder: string;
+	customAttachmentFolder: string;
+	channelMappings: ChannelMapping[];
+	syncRecords: SyncRecord[];
+	frontmatterEnabled: boolean;
+	excludeClasses: string[];
+	notifyOnSync: boolean;
+	debugLogging: boolean;
+}
+
+export const DEFAULT_SETTINGS: ArenaSyncSettings = {
+	apiToken: "",
+	syncInterval: 30,
+	syncOnStartup: false,
+	blockNaming: "title",
+	bannerFieldEnabled: false,
+	bannerFieldName: "banner",
+	imageHandling: "download",
+	attachmentHandling: "download",
+	downloadedAttachmentLinkStyle: "link",
+	attachmentStorage: "global",
+	globalAttachmentFolder: "Are.na/Attachments",
+	customAttachmentFolder: "",
+	channelMappings: [],
+	syncRecords: [],
+	frontmatterEnabled: true,
+	excludeClasses: [],
+	notifyOnSync: true,
+	debugLogging: false,
+};
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,180p' src/utils.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,180p' src/utils.ts"
+Chunk ID: 3a161a
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1203
+Output:
+import { createHash } from "crypto";
+import { normalizePath } from "obsidian";
+import type {
+	AttachmentStorage,
+	ArenaBlock,
+	ArenaSyncSettings,
+	ChannelMapping,
+} from "./types";
+
+export interface MarkdownContext {
+	channelSlug?: string;
+	channelTitle?: string;
+	assetPath?: string;
+}
+
+function yamlQuote(value: string): string {
+	return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function resolveImageEmbedUrl(block: ArenaBlock): string | null {
+	if (!block.image) return null;
+	return (
+		block.image.display?.url ||
+		block.image.thumb?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
+function resolveBlockBannerUrl(block: ArenaBlock): string | null {
+	if (!block.image) return null;
+	return (
+		block.image.thumb?.url ||
+		block.image.display?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
+export function normalizeArenaUrl(url: string): string {
+	if (!url) return url;
+	try {
+		const parsed = new URL(url);
+		if (parsed.hostname === "api.are.na") {
+			const path = parsed.pathname.replace(/^\/v2/, "");
+			const converted = path
+				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+				.replace(/^\/users\/([^/]+).*$/, "/user/$1");
+			return `https://www.are.na${converted}`;
+		}
+		return url;
+	} catch {
+		return url;
+	}
+}
+
+/**
+ * Convert an Are.na block into a Markdown string suitable for Obsidian.
+ */
+export function blockToMarkdown(
+	block: ArenaBlock,
+	settings: ArenaSyncSettings,
+	context: MarkdownContext = {}
+): string {
+	const parts: string[] = [];
+
+	if (settings.frontmatterEnabled) {
+		parts.push("---");
+		parts.push(`arena_id: ${block.id}`);
+		parts.push(`arena_url: ${yamlQuote(`https://www.are.na/block/${block.id}`)}`);
+		parts.push(`arena_class: ${yamlQuote(block.class)}`);
+		parts.push(`arena_created_at: ${yamlQuote(block.created_at)}`);
+		parts.push(`arena_updated_at: ${yamlQuote(block.updated_at)}`);
+		if (context.channelSlug) {
+			parts.push(`arena_channel_slug: ${yamlQuote(context.channelSlug)}`);
+		}
+		if (context.channelTitle) {
+			parts.push(`arena_channel_title: ${yamlQuote(context.channelTitle)}`);
+		}
+		if (block.source?.url) {
+			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
+		}
+		if (settings.bannerFieldEnabled) {
+			const bannerValue = resolveBlockBannerUrl(block);
+			if (bannerValue) {
+				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
+				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
+			}
+		}
+		parts.push("---");
+		parts.push("");
+	}
+
+	const title = block.title ?? `Block ${block.id}`;
+	parts.push(`# ${title}`);
+	parts.push("");
+
+	switch (block.class) {
+		case "Text":
+			parts.push(block.content ?? "");
+			break;
+		case "Image":
+			if (block.image) {
+				const embedUrl = resolveImageEmbedUrl(block);
+				if (settings.imageHandling === "download") {
+					const ref = context.assetPath ?? block.image.filename;
+					parts.push(`![[${ref}]]`);
+				} else if (settings.imageHandling === "embed") {
+					if (embedUrl) {
+						parts.push(`![${title}](${embedUrl})`);
+					}
+				} else if (embedUrl) {
+					parts.push(`[${title}](${embedUrl})`);
+				}
+			}
+			break;
+		case "Link":
+			if (block.source?.url) {
+				const source = normalizeArenaUrl(block.source.url);
+				parts.push(`[${block.source.title || source}](${source})`);
+			}
+			if (block.description) {
+				parts.push("");
+				parts.push(block.description);
+			}
+			break;
+		case "Media":
+			if (block.source?.url) {
+				parts.push(`<${normalizeArenaUrl(block.source.url)}>`);
+			}
+			break;
+		case "Attachment":
+			if (block.attachment) {
+				if (context.assetPath && settings.attachmentHandling === "download") {
+					if (settings.downloadedAttachmentLinkStyle === "embed") {
+						parts.push(`![[${context.assetPath}]]`);
+					} else {
+						parts.push(`[[${context.assetPath}|${block.attachment.file_name}]]`);
+					}
+				} else {
+					parts.push(`[${block.attachment.file_name}](${block.attachment.url})`);
+				}
+			}
+			break;
+	}
+
+	if (block.description && block.class !== "Link") {
+		parts.push("");
+		parts.push("---");
+		parts.push("");
+		parts.push(block.description);
+	}
+
+	parts.push("");
+	return parts.join("\n");
+}
+
+export function resolveAttachmentBaseFolder(
+	settings: ArenaSyncSettings,
+	mapping: ChannelMapping
+): string {
+	const storage: AttachmentStorage =
+		mapping.attachmentStorageOverride ?? settings.attachmentStorage;
+	switch (storage) {
+		case "channel":
+			return normalizePath(`${mapping.localFolder}/_attachments`);
+		case "custom":
+			return normalizePath(
+				mapping.customAttachmentFolderOverride ||
+					settings.customAttachmentFolder ||
+					settings.globalAttachmentFolder
+			);
+		case "global":
+		default:
+			return normalizePath(settings.globalAttachmentFolder);
+	}
+}
+
+export function markdownToBlockContent(md: string): {
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:05Z)**_
+
+I’ve got enough context; I’m now adding the new setting to types/defaults, updating the frontmatter resolver to honor the priority, then extending tests and README so behavior is explicit.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+ export type AttachmentHandling = "link" | "download";
+ export type DownloadedAttachmentLinkStyle = "embed" | "link";
+ export type AttachmentStorage = "channel" | "global" | "custom";
++export type BannerImagePriority = "thumb-first" | "display-first";
+@@
+ 	blockNaming: BlockNamingScheme;
+ 	bannerFieldEnabled: boolean;
+ 	bannerFieldName: string;
++	bannerImagePriority: BannerImagePriority;
+ 	imageHandling: ImageHandling;
+@@
+ 	blockNaming: "title",
+ 	bannerFieldEnabled: false,
+ 	bannerFieldName: "banner",
++	bannerImagePriority: "thumb-first",
+ 	imageHandling: "download",
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:13Z)**_
+
+Types and defaults are updated. Next I’m wiring this into markdown generation and exposing a dropdown in settings only when banner field is enabled, so the UI stays clean.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+ function resolveBlockBannerUrl(block: ArenaBlock): string | null {
+ 	if (!block.image) return null;
+-	return (
+-		block.image.thumb?.url ||
+-		block.image.display?.url ||
+-		block.image.original?.url ||
+-		null
+-	);
++	return null;
++}
++
++function resolveBlockBannerUrlWithPriority(
++	block: ArenaBlock,
++	priority: "thumb-first" | "display-first",
++): string | null {
++	if (!block.image) return null;
++	if (priority === "display-first") {
++		return (
++			block.image.display?.url ||
++			block.image.thumb?.url ||
++			block.image.original?.url ||
++			null
++		);
++	}
++	return (
++		block.image.thumb?.url ||
++		block.image.display?.url ||
++		block.image.original?.url ||
++		null
++	);
+ }
+@@
+ 		if (settings.bannerFieldEnabled) {
+-			const bannerValue = resolveBlockBannerUrl(block);
++			const bannerValue = resolveBlockBannerUrlWithPriority(
++				block,
++				settings.bannerImagePriority,
++			);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+-function resolveBlockBannerUrl(block: ArenaBlock): string | null {
+-	if (!block.image) return null;
+-	return null;
+-}
+-
+ function resolveBlockBannerUrlWithPriority(
+ 	block: ArenaBlock,
+ 	priority: "thumb-first" | "display-first",
+ ): string | null {
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ import type {
+ 	AttachmentHandling,
+ 	AttachmentStorage,
++	BannerImagePriority,
+ 	BlockNamingScheme,
+ 	DownloadedAttachmentLinkStyle,
+ 	ImageHandling,
+ } from "./types";
+@@
+ 		if (this.plugin.settings.bannerFieldEnabled) {
+ 			new Setting(containerEl)
+ 				.setName("Banner field name")
+ 				.setDesc("Frontmatter key used for banner URL")
+@@
+ 							await this.plugin.saveSettings();
+ 						}),
+ 				);
++
++			new Setting(containerEl)
++				.setName("Banner image source priority")
++				.setDesc("Choose thumbnail or display image as preferred banner URL")
++				.addDropdown((dd) =>
++					dd
++						.addOptions({
++							"thumb-first": "Thumb first",
++							"display-first": "Display first",
++						} as Record<BannerImagePriority, string>)
++						.setValue(this.plugin.settings.bannerImagePriority)
++						.onChange(async (value) => {
++							this.plugin.settings.bannerImagePriority =
++								value as BannerImagePriority;
++							await this.plugin.saveSettings();
++						}),
++				);
+ 		}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:29Z)**_
+
+UI is in. I’m adding tests for `display-first` priority and then updating README settings docs so this is discoverable for Banners-plugin users.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:34Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__tests__/utils.test.ts`**
+
+```diff
+@@
+ 	it("adds optional banner frontmatter field when enabled", () => {
+@@
+ 		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
+ 	});
++
++	it("supports display-first banner priority", () => {
++		const block = makeBlock({
++			class: "Image",
++			content: null,
++			image: {
++				filename: "photo.jpg",
++				content_type: "image/jpeg",
++				original: { url: "https://cdn.are.na/photo.jpg" },
++				display: { url: "https://cdn.are.na/photo_display.jpg" },
++				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
++			},
++		});
++		const s = {
++			...settings,
++			bannerFieldEnabled: true,
++			bannerFieldName: "banner",
++			bannerImagePriority: "display-first" as const,
++		};
++		const md = blockToMarkdown(block, s);
++		expect(md).toContain('banner: "https://cdn.are.na/photo_display.jpg"');
++	});
+ });
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+-- Optional banner frontmatter field (`enabled`, `field name`)
++- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:39Z)**_
+
+I’m running tests and build now to make sure the new priority setting is fully green and packaging still works.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 9938b2
+Wall time: 1.0021 seconds
+Process running with session ID 66723
+Original token count: 108
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 740601
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 645
+Output:
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (4 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode
+    ✓ handles an attachment block
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled (1 ms)
+    ✓ supports display-first banner priority
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title (1 ms)
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string (1 ms)
+    ✓ is deterministic
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters (1 ms)
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged
+
+-----------------|---------|----------|---------|---------|------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+-----------------|---------|----------|---------|---------|------------------------------------------
+All files        |    8.28 |    14.41 |    4.41 |    8.76 |                                          
+ api.ts          |       0 |        0 |       0 |       0 | 1-375                                    
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                     
+ main.ts         |       0 |        0 |       0 |       0 | 1-460                                    
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                    
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                    
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-405                                    
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-536                                    
+ types.ts        |     100 |      100 |     100 |     100 |                                          
+ utils.ts        |   81.57 |     48.5 |      90 |   83.78 | 65,87,90,143-146,150-153,163-166,178-190 
+-----------------|---------|----------|---------|---------|------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       21 passed, 21 total
+Snapshots:   0 total
+Time:        1.353 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: e5ba62
+Wall time: 1.0004 seconds
+Process running with session ID 1411
+Original token count: 32
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:47Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: bad1db
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17
+Output:
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:42:52Z)**_
+
+Love this refinement. I added it.
+
+**Implemented**
+- New setting: `Banner image source priority`
+- Options:
+  - `Thumb first` (default)
+  - `Display first`
+- Applied only when `Banner frontmatter field` is enabled.
+
+**Behavior**
+- Frontmatter banner URL now follows your selected priority:
+  - `thumb-first`: `thumb -> display -> original`
+  - `display-first`: `display -> thumb -> original`
+
+**Updated files**
+- [types.ts](/home/frost/Are.na-Importer/src/types.ts)
+- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+
+**Verification**
+- Tests passed: `21/21`
+- Build passed
+- Zip artifact created: `dist/Are.na-Importer-1.0.0.zip`

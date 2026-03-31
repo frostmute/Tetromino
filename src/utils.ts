@@ -17,6 +17,37 @@ function yamlQuote(value: string): string {
 	return `"${value.replace(/"/g, '\\"')}"`;
 }
 
+function resolveImageEmbedUrl(block: ArenaBlock): string | null {
+	if (!block.image) return null;
+	return (
+		block.image.display?.url ||
+		block.image.thumb?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
+function resolveBlockBannerUrlWithPriority(
+	block: ArenaBlock,
+	priority: "thumb-first" | "display-first",
+): string | null {
+	if (!block.image) return null;
+	if (priority === "display-first") {
+		return (
+			block.image.display?.url ||
+			block.image.thumb?.url ||
+			block.image.original?.url ||
+			null
+		);
+	}
+	return (
+		block.image.thumb?.url ||
+		block.image.display?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
 export function normalizeArenaUrl(url: string): string {
 	if (!url) return url;
 	try {
@@ -61,6 +92,16 @@ export function blockToMarkdown(
 		if (block.source?.url) {
 			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
 		}
+		if (settings.bannerFieldEnabled) {
+			const bannerValue = resolveBlockBannerUrlWithPriority(
+				block,
+				settings.bannerImagePriority,
+			);
+			if (bannerValue) {
+				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
+				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
+			}
+		}
 		parts.push("---");
 		parts.push("");
 	}
@@ -75,11 +116,16 @@ export function blockToMarkdown(
 			break;
 		case "Image":
 			if (block.image) {
-				if (settings.imageHandling === "link" && !context.assetPath) {
-					parts.push(`![${title}](${block.image.original.url})`);
-				} else {
+				const embedUrl = resolveImageEmbedUrl(block);
+				if (settings.imageHandling === "download") {
 					const ref = context.assetPath ?? block.image.filename;
 					parts.push(`![[${ref}]]`);
+				} else if (settings.imageHandling === "embed") {
+					if (embedUrl) {
+						parts.push(`![${title}](${embedUrl})`);
+					}
+				} else if (embedUrl) {
+					parts.push(`[${title}](${embedUrl})`);
 				}
 			}
 			break;

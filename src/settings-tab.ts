@@ -3,6 +3,7 @@ import type ArenaSyncPlugin from "./main";
 import type {
 	AttachmentHandling,
 	AttachmentStorage,
+	BannerImagePriority,
 	BlockNamingScheme,
 	DownloadedAttachmentLinkStyle,
 	ImageHandling,
@@ -71,6 +72,52 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Banner frontmatter field")
+			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.bannerFieldEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.bannerFieldEnabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.bannerFieldEnabled) {
+			new Setting(containerEl)
+				.setName("Banner field name")
+				.setDesc("Frontmatter key used for banner URL")
+				.addText((text) =>
+					text
+						.setPlaceholder("banner")
+						.setValue(this.plugin.settings.bannerFieldName)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerFieldName =
+								value.trim() || "banner";
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName("Banner image source priority")
+				.setDesc("Choose thumbnail or display image as preferred banner URL")
+				.addDropdown((dd) =>
+					dd
+						.addOptions({
+							"thumb-first": "Thumb first",
+							"display-first": "Display first",
+						} as Record<BannerImagePriority, string>)
+						.setValue(this.plugin.settings.bannerImagePriority)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerImagePriority =
+								value as BannerImagePriority;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		new Setting(containerEl)
 			.setName("Image handling")
