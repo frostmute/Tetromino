@@ -11,6 +11,26 @@ export interface MarkdownContext {
 	channelSlug?: string;
 	channelTitle?: string;
 	assetPath?: string;
+	bannerImageUrl?: string;
+	bodyImageUrl?: string;
+	comments?: Array<{
+		author: string;
+		body: string;
+		createdAt?: string;
+	}>;
+	connectedChannels?: Array<{
+		title: string;
+		slug?: string;
+	}>;
+}
+
+export function resolveChannelFolder(mapping: ChannelMapping): string {
+	const explicit = mapping.localFolder?.trim();
+	if (explicit) {
+		return normalizePath(explicit);
+	}
+	const slug = mapping.channelSlug?.trim();
+	return normalizePath(slug ? `Are.na/${slug}` : "Are.na");
 }
 
 function yamlQuote(value: string): string {
@@ -92,11 +112,16 @@ export function blockToMarkdown(
 		if (block.source?.url) {
 			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
 		}
+		if (settings.includeBlockDescriptionFrontmatter && block.description) {
+			parts.push(`arena_description: ${yamlQuote(block.description)}`);
+		}
 		if (settings.bannerFieldEnabled) {
-			const bannerValue = resolveBlockBannerUrlWithPriority(
-				block,
-				settings.bannerImagePriority,
-			);
+			const bannerValue =
+				context.bannerImageUrl ||
+				resolveBlockBannerUrlWithPriority(
+					block,
+					settings.bannerImagePriority,
+				);
 			if (bannerValue) {
 				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
 				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
@@ -109,6 +134,11 @@ export function blockToMarkdown(
 	const title = block.title ?? `Block ${block.id}`;
 	parts.push(`# ${title}`);
 	parts.push("");
+
+	if (context.bodyImageUrl && block.class !== "Image") {
+		parts.push(`![${title}](${context.bodyImageUrl})`);
+		parts.push("");
+	}
 
 	switch (block.class) {
 		case "Text":
@@ -166,6 +196,31 @@ export function blockToMarkdown(
 		parts.push(block.description);
 	}
 
+	if (context.connectedChannels && context.connectedChannels.length > 0) {
+		parts.push("");
+		parts.push("## This Block Also Appears In");
+		parts.push("");
+		for (const ch of context.connectedChannels) {
+			if (ch.slug) {
+				parts.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
+			} else {
+				parts.push(`- ${ch.title}`);
+			}
+		}
+	}
+
+	if (context.comments && context.comments.length > 0) {
+		parts.push("");
+		parts.push("## Comments");
+		parts.push("");
+		for (const comment of context.comments) {
+			const prefix = comment.createdAt
+				? `- **${comment.author}** (${comment.createdAt})`
+				: `- **${comment.author}**`;
+			parts.push(`${prefix}: ${comment.body}`);
+		}
+	}
+
 	parts.push("");
 	return parts.join("\n");
 }
@@ -178,7 +233,7 @@ export function resolveAttachmentBaseFolder(
 		mapping.attachmentStorageOverride ?? settings.attachmentStorage;
 	switch (storage) {
 		case "channel":
-			return normalizePath(`${mapping.localFolder}/_attachments`);
+			return normalizePath(`${resolveChannelFolder(mapping)}/_attachments`);
 		case "custom":
 			return normalizePath(
 				mapping.customAttachmentFolderOverride ||

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to `arena-sync-obsidian`.
+Thanks for contributing to `Are.na-Importer`.
 
 ## Scope and product behavior
 
@@ -14,8 +14,8 @@ Please keep changes aligned with that behavior unless maintainers explicitly dec
 ## Setup
 
 ```bash
-git clone https://github.com/arena-sync/arena-sync-obsidian.git
-cd arena-sync-obsidian
+git clone https://github.com/frostmute/Are.na-Importer.git
+cd Are.na-Importer
 npm install
 ```
 
@@ -30,6 +30,10 @@ Production build:
 ```bash
 npm run build
 ```
+
+Build output includes:
+- `main.js` in repo root
+- `dist/<plugin-id>-<version>.zip` packaged release artifact
 
 ## Quality checks
 
@@ -47,6 +51,7 @@ npm run build
 - Update docs for behavior changes.
 - Add tests for behavior changes where practical.
 - Add an entry under `[Unreleased]` in `CHANGELOG.md`.
+- Keep settings help text and README feature/setting lists in sync.
 
 ## Coding notes
 

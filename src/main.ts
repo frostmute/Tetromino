@@ -2,9 +2,16 @@ import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
 import { ArenaApi } from "./api";
 import { SyncEngine } from "./sync-engine";
 import { ArenaSyncSettingTab } from "./settings-tab";
-import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
+import type {
+	ArenaChannelListItem,
+	ArenaSyncSettings,
+	ChannelMapping,
+	ImportProgress,
+	SyncResult,
+} from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
+import { resolveChannelFolder } from "./utils";
 import {
 	buildMigrationPlan,
 	computeCurrentAttachmentBase,
@@ -62,7 +69,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder),
+					file.path.startsWith(resolveChannelFolder(m)),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
@@ -78,7 +85,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder),
+					file.path.startsWith(resolveChannelFolder(m)),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
@@ -94,7 +101,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				const file = this.app.workspace.getActiveFile();
 				if (!file) return false;
 				const mapping = this.settings.channelMappings.find((m) =>
-					file.path.startsWith(m.localFolder),
+					file.path.startsWith(resolveChannelFolder(m)),
 				);
 				if (!mapping) return false;
 				if (checking) return true;
@@ -157,7 +164,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runSync(dryRun = false): Promise<void> {
 		if (this.isSyncing) {
-			new Notice("Are.na Import is already running...");
+			new Notice("Are.na Importer is already running...");
 			return;
 		}
 		if (this.isMigrating) {
@@ -165,15 +172,15 @@ export default class ArenaSyncPlugin extends Plugin {
 			return;
 		}
 		if (!this.settings.apiToken) {
-			new Notice("Are.na Import: Please set your API token in settings.");
+			new Notice("Are.na Importer: Please set your API token in settings.");
 			return;
 		}
 		const validMappings = this.settings.channelMappings.filter(
-			(m) => m.enabled && m.channelSlug.trim() && m.localFolder.trim(),
+			(m) => m.enabled && m.channelSlug.trim(),
 		);
 		if (validMappings.length === 0) {
 			new Notice(
-				"Are.na Import: No valid channels configured (check that channel slug and folder are not empty).",
+				"Are.na Importer: No valid channels configured (check that channel slug is not empty).",
 			);
 			return;
 		}
@@ -190,7 +197,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			this.notifySyncResult(result);
 			this.showSummaryModal(result, dryRun ? "Preview" : "Sync");
 		} catch (err) {
-			new Notice(`Are.na Import failed: ${(err as Error).message}`);
+			new Notice(`Are.na Importer failed: ${(err as Error).message}`);
 		} finally {
 			this.isSyncing = false;
 			this.updateStatusBar("idle");
@@ -199,7 +206,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runChannelSync(slug: string, dryRun = false): Promise<void> {
 		if (this.isSyncing) {
-			new Notice("Are.na Import is already running...");
+			new Notice("Are.na Importer is already running...");
 			return;
 		}
 		if (this.isMigrating) {
@@ -215,8 +222,8 @@ export default class ArenaSyncPlugin extends Plugin {
 			);
 			return;
 		}
-		if (!mapping.channelSlug.trim() || !mapping.localFolder.trim()) {
-			new Notice(`Channel "${slug}" has empty slug or folder path.`);
+		if (!mapping.channelSlug.trim()) {
+			new Notice(`Channel "${slug}" has an empty slug.`);
 			return;
 		}
 
@@ -285,8 +292,8 @@ export default class ArenaSyncPlugin extends Plugin {
 		const summary = parts.length > 0 ? parts.join(", ") : "no changes";
 		const seconds = (result.duration / 1000).toFixed(1);
 		const prefix = result.dryRun
-			? "Are.na Import preview"
-			: "Are.na Import";
+			? "Are.na Importer preview"
+			: "Are.na Importer";
 		new Notice(`${prefix}: ${summary} (${seconds}s)`);
 	}
 
@@ -338,7 +345,7 @@ export default class ArenaSyncPlugin extends Plugin {
 	}
 
 	private showSummaryModal(result: SyncResult, label: string): void {
-		const title = `Are.na Import ${label} Summary`;
+		const title = `Are.na Importer ${label} Summary`;
 		new SyncSummaryModal(this.app, result, title).open();
 	}
 
@@ -379,6 +386,91 @@ export default class ArenaSyncPlugin extends Plugin {
 		return changed;
 	}
 
+	async importMyChannelsMappings(): Promise<{
+		created: number;
+		updated: number;
+		totalRemote: number;
+	}> {
+		if (!this.settings.apiToken) {
+			throw new Error("Please set your API token first.");
+		}
+
+		const remoteChannels = await this.api.listAllMyChannels();
+		let created = 0;
+		let updated = 0;
+		for (const remote of remoteChannels) {
+			const existing = this.settings.channelMappings.find(
+				(m) => m.channelSlug === remote.slug,
+			);
+			if (existing) {
+				const beforeId = existing.channelId;
+				const beforeTitle = existing.channelTitle;
+				existing.channelId = remote.id;
+				existing.channelTitle = remote.title;
+				if (beforeId !== existing.channelId || beforeTitle !== existing.channelTitle) {
+					updated++;
+				}
+				continue;
+			}
+			this.settings.channelMappings.push(this.createMappingFromChannel(remote));
+			created++;
+		}
+		await this.saveSettings();
+		return { created, updated, totalRemote: remoteChannels.length };
+	}
+
+	async resetChannelMappings(): Promise<void> {
+		this.settings.channelMappings = [];
+		await this.saveSettings();
+	}
+
+	async backupChannelMappings(): Promise<string> {
+		const folder = normalizePath("Are.na/channel-mapping-backups");
+		await this.ensureFolder(folder);
+		const stamp = new Date()
+			.toISOString()
+			.replace(/[:.]/g, "-")
+			.replace("T", "_")
+			.replace("Z", "");
+		const filePath = normalizePath(`${folder}/mappings-${stamp}.json`);
+		const payload = {
+			createdAt: new Date().toISOString(),
+			mappingCount: this.settings.channelMappings.length,
+			channelMappings: this.settings.channelMappings,
+		};
+		await this.app.vault.create(filePath, JSON.stringify(payload, null, 2));
+		return filePath;
+	}
+
+	async restoreLatestChannelMappingsBackup(): Promise<string> {
+		const folderPrefix = normalizePath("Are.na/channel-mapping-backups");
+		const candidates = this.app.vault
+			.getFiles()
+			.filter(
+				(file) =>
+					file.path.startsWith(`${folderPrefix}/`) &&
+					file.path.endsWith(".json"),
+			)
+			.sort((a, b) => a.path.localeCompare(b.path));
+		const latest = candidates[candidates.length - 1];
+		if (!latest) {
+			throw new Error("No channel mapping backups found.");
+		}
+		const raw = await this.app.vault.read(latest);
+		const data = JSON.parse(raw) as {
+			channelMappings?: ChannelMapping[];
+		};
+		if (!Array.isArray(data.channelMappings)) {
+			throw new Error("Latest backup is invalid.");
+		}
+		this.settings.channelMappings = data.channelMappings.map((mapping) => ({
+			...mapping,
+		}));
+		this.normalizeMappings();
+		await this.saveSettings();
+		return latest.path;
+	}
+
 	async checkForMigrationPrompt(force: boolean): Promise<void> {
 		const plan = await buildMigrationPlan(this.app, this.settings);
 		if (plan.channels.length === 0) return;
@@ -390,7 +482,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runMigration(planOverride?: Awaited<ReturnType<typeof buildMigrationPlan>>): Promise<void> {
 		if (this.isMigrating) {
-			new Notice("Are.na Import migration is already running...");
+			new Notice("Are.na Importer migration is already running...");
 			return;
 		}
 		this.isMigrating = true;
@@ -458,6 +550,32 @@ export default class ArenaSyncPlugin extends Plugin {
 		if (existing instanceof TFile) {
 			const current = await this.app.vault.read(existing);
 			await this.app.vault.modify(existing, `${current}\n${lines.join("\n")}`);
+		}
+	}
+
+	private createMappingFromChannel(remote: ArenaChannelListItem): ChannelMapping {
+		return {
+			channelSlug: remote.slug,
+			channelId: remote.id,
+			channelTitle: remote.title,
+			localFolder: "",
+			lastSyncedAt: null,
+			enabled: this.settings.autoEnableImportedChannels,
+			attachmentStorageOverride: null,
+			customAttachmentFolderOverride: "",
+			lastAttachmentBase: null,
+		};
+	}
+
+	private async ensureFolder(path: string): Promise<void> {
+		const normalized = normalizePath(path);
+		const parts = normalized.split("/").filter(Boolean);
+		let current = "";
+		for (const part of parts) {
+			current = current ? `${current}/${part}` : part;
+			if (!this.app.vault.getAbstractFileByPath(current)) {
+				await this.app.vault.createFolder(current);
+			}
 		}
 	}
 }

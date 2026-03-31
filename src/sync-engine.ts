@@ -14,6 +14,7 @@ import {
 	blockFileName as utilsBlockFileName,
 	blockToMarkdown,
 	computeHash,
+	resolveChannelFolder,
 	resolveAttachmentBaseFolder,
 	sanitiseFilename,
 } from "./utils";
@@ -26,6 +27,8 @@ export class SyncEngine {
 	private readonly settings: ArenaSyncSettings;
 	private vault: Vault;
 	private onProgress?: ProgressHandler;
+	private blockDetailsCache = new Map<number, unknown>();
+	private channelPreviewCache = new Map<string, string | null>();
 
 	constructor(
 		app: App,
@@ -93,6 +96,8 @@ export class SyncEngine {
 		mapping: ChannelMapping,
 		options: SyncOptions = {},
 	): Promise<SyncResult> {
+		this.blockDetailsCache.clear();
+		this.channelPreviewCache.clear();
 		const dryRun = options.dryRun === true;
 		const result: SyncResult = {
 			created: 0,
@@ -133,6 +138,7 @@ export class SyncEngine {
 		result: SyncResult,
 		dryRun: boolean,
 	): Promise<void> {
+		const channelFolder = resolveChannelFolder(mapping);
 		const blocks = await this.api.getAllChannelBlocksWithProgress(
 			mapping.channelSlug,
 			(currentPage, totalPages) => {
@@ -146,7 +152,7 @@ export class SyncEngine {
 		);
 
 		if (!dryRun) {
-			await this.ensureFolder(mapping.localFolder);
+			await this.ensureFolder(channelFolder);
 		}
 
 		const importedPaths: string[] = [];
@@ -204,8 +210,9 @@ export class SyncEngine {
 		dryRun: boolean,
 	): Promise<string> {
 		const noteFileName = this.blockFileName(block);
+		const channelFolder = resolveChannelFolder(mapping);
 		const notePath = normalizePath(
-			`${mapping.localFolder}/${noteFileName}`,
+			`${channelFolder}/${noteFileName}`,
 		);
 		const assetPath = await this.ensureBlockAsset(
 			block,
@@ -235,6 +242,7 @@ export class SyncEngine {
 			channelSlug: channel.slug,
 			channelTitle: channel.title,
 			assetPath,
+			...(await this.buildBlockContext(block, channel.slug)),
 		});
 		const remoteHash = computeHash(markdown);
 
@@ -371,16 +379,47 @@ export class SyncEngine {
 		dryRun: boolean,
 		result: SyncResult,
 	): Promise<void> {
-		const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+		const indexPath = this.channelIndexPath(mapping);
 		const sorted = [...notePaths].sort();
+		const channelDescription = channel.metadata?.description?.trim();
+		const appearsInChannels = this.extractChannelAppearsIn(channel);
+		const followerCount =
+			channel.follower_count ??
+			channel.followers_count ??
+			null;
 		const lines: string[] = [
 			`# ${channel.title}`,
 			"",
-			`- Are.na: https://www.are.na/channel/${channel.slug}`,
-			`- Imported blocks: ${sorted.length}`,
+			"## Info",
 			"",
-			"## Notes",
 		];
+		if (channelDescription) {
+			lines.push(channelDescription);
+			lines.push("");
+		}
+		lines.push(
+			`- Are.na: https://www.are.na/channel/${channel.slug}`,
+			`- Started: ${channel.created_at}`,
+			`- Modified: ${channel.updated_at}`,
+			`- Imported blocks: ${sorted.length}`,
+			`- Length: ${channel.length}`,
+		);
+		if (typeof followerCount === "number") {
+			lines.push(`- Followers: ${followerCount}`);
+		}
+		if (appearsInChannels.length > 0) {
+			lines.push("");
+			lines.push("## This Channel Appears In");
+			lines.push("");
+			for (const ch of appearsInChannels) {
+				if (ch.slug) {
+					lines.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
+				} else {
+					lines.push(`- ${ch.title}`);
+				}
+			}
+		}
+		lines.push("", "## Notes");
 		for (const notePath of sorted) {
 			// Extract filename and create clean link text
 			const fileName = notePath.split("/").pop() || notePath;
@@ -428,7 +467,7 @@ export class SyncEngine {
 		for (const mapping of this.settings.channelMappings) {
 			if (!mapping.enabled) continue;
 			const title = mapping.channelTitle || mapping.channelSlug;
-			const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+			const indexPath = this.channelIndexPath(mapping);
 			lines.push(`- [[${indexPath}|${title}]]`);
 		}
 		lines.push("");
@@ -469,6 +508,246 @@ export class SyncEngine {
 
 	private shouldExclude(block: ArenaBlock): boolean {
 		return this.settings.excludeClasses.includes(block.class);
+	}
+
+	private channelIndexPath(mapping: ChannelMapping): string {
+		const folder = resolveChannelFolder(mapping);
+		if (this.settings.channelIndexNoteStyle === "folder-name") {
+			const parts = folder.split("/").filter(Boolean);
+			const folderName = parts[parts.length - 1] || "index";
+			return normalizePath(`${folder}/${folderName}.md`);
+		}
+		return normalizePath(`${folder}/index.md`);
+	}
+
+	private async buildBlockContext(
+		block: ArenaBlock,
+		sourceChannelSlug: string,
+	): Promise<{
+		bannerImageUrl?: string;
+		bodyImageUrl?: string;
+		comments?: Array<{
+			author: string;
+			body: string;
+			createdAt?: string;
+		}>;
+		connectedChannels?: Array<{
+			title: string;
+			slug?: string;
+		}>;
+	}> {
+		const out: {
+			bannerImageUrl?: string;
+			bodyImageUrl?: string;
+			comments?: Array<{
+				author: string;
+				body: string;
+				createdAt?: string;
+			}>;
+			connectedChannels?: Array<{
+				title: string;
+				slug?: string;
+			}>;
+		} = {};
+
+		if (
+			this.settings.includeBlockComments ||
+			this.settings.includeBlockConnectedChannels
+		) {
+			const detail = await this.getBlockDetail(block.id);
+			if (detail && this.settings.includeBlockComments) {
+				const comments = this.extractComments(detail);
+				if (comments.length > 0) {
+					out.comments = comments;
+				}
+			}
+			if (detail && this.settings.includeBlockConnectedChannels) {
+				const channels = this.extractConnectedChannels(
+					detail,
+					sourceChannelSlug,
+				);
+				if (channels.length > 0) {
+					out.connectedChannels = channels;
+				}
+			}
+		}
+
+		if (this.settings.includeChannelBlockPreviewImage && block.class === "Channel") {
+			const slug = this.extractChannelSlugFromBlock(block);
+			if (slug) {
+				const previewUrl = await this.getChannelPreviewImage(slug);
+				if (previewUrl) {
+					out.bodyImageUrl = previewUrl;
+					out.bannerImageUrl = previewUrl;
+				}
+			}
+		}
+
+		return out;
+	}
+
+	private async getBlockDetail(id: number): Promise<unknown> {
+		if (this.blockDetailsCache.has(id)) {
+			return this.blockDetailsCache.get(id);
+		}
+		try {
+			const detail = await this.api.getBlock(id);
+			this.blockDetailsCache.set(id, detail);
+			return detail;
+		} catch {
+			this.blockDetailsCache.set(id, null);
+			return null;
+		}
+	}
+
+	private extractComments(detail: unknown): Array<{
+		author: string;
+		body: string;
+		createdAt?: string;
+	}> {
+		const obj = detail as Record<string, unknown>;
+		const raw = obj?.comments;
+		if (!Array.isArray(raw)) return [];
+		const comments: Array<{ author: string; body: string; createdAt?: string }> = [];
+		for (const item of raw) {
+			if (!item || typeof item !== "object") continue;
+			const c = item as Record<string, unknown>;
+			const body =
+				typeof c.body === "string"
+					? c.body
+					: typeof c.content === "string"
+						? c.content
+						: typeof c.comment === "string"
+							? c.comment
+							: "";
+			if (!body.trim()) continue;
+			const user = (c.user || {}) as Record<string, unknown>;
+			const author =
+				(typeof user.username === "string" && user.username) ||
+				(typeof user.slug === "string" && user.slug) ||
+				(typeof c.author === "string" && c.author) ||
+				"Unknown";
+			const createdAt =
+				typeof c.created_at === "string" ? c.created_at : undefined;
+			comments.push({ author, body: body.trim(), createdAt });
+		}
+		return comments;
+	}
+
+	private extractConnectedChannels(
+		detail: unknown,
+		sourceChannelSlug: string,
+	): Array<{ title: string; slug?: string }> {
+		const obj = detail as Record<string, unknown>;
+		const pools = [
+			obj.connected_by_channels,
+			obj.connected_channels,
+			obj.channels,
+			obj.appears_in_channels,
+		];
+		const bySlug = new Map<string, { title: string; slug?: string }>();
+		const byTitle = new Map<string, { title: string; slug?: string }>();
+		for (const pool of pools) {
+			if (!Array.isArray(pool)) continue;
+			for (const item of pool) {
+				if (!item || typeof item !== "object") continue;
+				const ch = item as Record<string, unknown>;
+				const slug =
+					typeof ch.slug === "string" && ch.slug.trim()
+						? ch.slug.trim()
+						: undefined;
+				const title =
+					typeof ch.title === "string" && ch.title.trim()
+						? ch.title.trim()
+						: slug || "Untitled";
+				if (slug && slug === sourceChannelSlug) continue;
+				const row = { title, slug };
+				if (slug) {
+					bySlug.set(slug, row);
+				} else {
+					byTitle.set(title.toLowerCase(), row);
+				}
+			}
+		}
+		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
+			a.title.localeCompare(b.title),
+		);
+	}
+
+	private extractChannelAppearsIn(
+		channel: ArenaChannel,
+	): Array<{ title: string; slug?: string }> {
+		const chObj = channel as unknown as Record<string, unknown>;
+		const pools = [
+			chObj.connected_by_channels,
+			chObj.connected_channels,
+			chObj.channels,
+			chObj.appears_in_channels,
+		];
+		const bySlug = new Map<string, { title: string; slug?: string }>();
+		const byTitle = new Map<string, { title: string; slug?: string }>();
+		for (const pool of pools) {
+			if (!Array.isArray(pool)) continue;
+			for (const item of pool) {
+				if (!item || typeof item !== "object") continue;
+				const row = item as Record<string, unknown>;
+				const slug =
+					typeof row.slug === "string" && row.slug.trim()
+						? row.slug.trim()
+						: undefined;
+				if (slug && slug === channel.slug) continue;
+				const title =
+					typeof row.title === "string" && row.title.trim()
+						? row.title.trim()
+						: slug || "Untitled";
+				if (slug) {
+					bySlug.set(slug, { title, slug });
+				} else {
+					byTitle.set(title.toLowerCase(), { title });
+				}
+			}
+		}
+		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
+			a.title.localeCompare(b.title),
+		);
+	}
+
+	private extractChannelSlugFromBlock(block: ArenaBlock): string | null {
+		const sourceUrl = block.source?.url;
+		if (!sourceUrl) return null;
+		try {
+			const url = new URL(sourceUrl);
+			const match = url.pathname.match(/\/channel\/([^/]+)/);
+			return match?.[1] ? decodeURIComponent(match[1]) : null;
+		} catch {
+			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
+			return match?.[1] ? decodeURIComponent(match[1]) : null;
+		}
+	}
+
+	private async getChannelPreviewImage(slug: string): Promise<string | null> {
+		if (this.channelPreviewCache.has(slug)) {
+			return this.channelPreviewCache.get(slug) || null;
+		}
+		try {
+			const page = await this.api.getChannelContents(slug, 1);
+			for (const block of page.contents) {
+				if (block.class !== "Image" || !block.image) continue;
+				const url =
+					block.image.display?.url ||
+					block.image.thumb?.url ||
+					block.image.original?.url ||
+					null;
+				if (url) {
+					this.channelPreviewCache.set(slug, url);
+					return url;
+				}
+			}
+		} catch {
+			// best effort only
+		}
+		this.channelPreviewCache.set(slug, null);
+		return null;
 	}
 
 	private findRecord(

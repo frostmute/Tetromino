@@ -48,6 +48,8 @@ export interface ArenaChannel {
 	title: string;
 	slug: string;
 	length: number;
+	follower_count?: number;
+	followers_count?: number;
 	status: "closed" | "public" | "private";
 	user: ArenaUser;
 	contents: ArenaBlock[];
@@ -85,6 +87,7 @@ export type AttachmentHandling = "link" | "download";
 export type DownloadedAttachmentLinkStyle = "embed" | "link";
 export type AttachmentStorage = "channel" | "global" | "custom";
 export type BannerImagePriority = "thumb-first" | "display-first";
+export type ChannelIndexNoteStyle = "index" | "folder-name";
 
 export interface ChannelMapping {
 	channelSlug: string;
@@ -158,10 +161,16 @@ export interface ArenaSyncSettings {
 	apiToken: string;
 	syncInterval: number;
 	syncOnStartup: boolean;
+	autoEnableImportedChannels: boolean;
 	blockNaming: BlockNamingScheme;
 	bannerFieldEnabled: boolean;
 	bannerFieldName: string;
 	bannerImagePriority: BannerImagePriority;
+	includeBlockDescriptionFrontmatter: boolean;
+	includeBlockComments: boolean;
+	includeBlockConnectedChannels: boolean;
+	includeChannelBlockPreviewImage: boolean;
+	channelIndexNoteStyle: ChannelIndexNoteStyle;
 	imageHandling: ImageHandling;
 	attachmentHandling: AttachmentHandling;
 	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
@@ -180,10 +189,16 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	apiToken: "",
 	syncInterval: 30,
 	syncOnStartup: false,
+	autoEnableImportedChannels: true,
 	blockNaming: "title",
 	bannerFieldEnabled: false,
 	bannerFieldName: "banner",
 	bannerImagePriority: "thumb-first",
+	includeBlockDescriptionFrontmatter: false,
+	includeBlockComments: false,
+	includeBlockConnectedChannels: false,
+	includeChannelBlockPreviewImage: false,
+	channelIndexNoteStyle: "index",
 	imageHandling: "download",
 	attachmentHandling: "download",
 	downloadedAttachmentLinkStyle: "link",

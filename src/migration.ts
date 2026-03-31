@@ -1,6 +1,6 @@
 import { App, normalizePath, TFile, Vault } from "obsidian";
 import { unifiedDiff } from "./diff";
-import { resolveAttachmentBaseFolder } from "./utils";
+import { resolveAttachmentBaseFolder, resolveChannelFolder } from "./utils";
 import type { ArenaSyncSettings, ChannelMapping } from "./types";
 
 export interface MigrationMove {
@@ -68,7 +68,7 @@ export async function buildMigrationPlan(
 
 	for (const mapping of settings.channelMappings) {
 		if (!mapping.enabled) continue;
-		if (!mapping.localFolder || !mapping.localFolder.trim()) continue;
+		const channelFolder = resolveChannelFolder(mapping);
 		const fromBase = normalizePath(
 			mapping.lastAttachmentBase ||
 				resolveAttachmentBaseFolder(settings, mapping),
@@ -81,7 +81,7 @@ export async function buildMigrationPlan(
 		const movesMap = new Map<string, string>();
 		const updates: MigrationFileUpdate[] = [];
 		const noteFiles = allFiles.filter((file) =>
-			isMarkdownFile(file, mapping.localFolder),
+			isMarkdownFile(file, channelFolder),
 		);
 
 		for (const note of noteFiles) {

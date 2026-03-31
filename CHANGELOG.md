@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **Are.na Sync for Obsidian** will be documented in this file.
+All notable changes to **Are.na Importer for Obsidian** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -12,11 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **YAML front-matter**: Configurable metadata fields (`arena-id`, `arena-url`, `arena-class`, `arena-created-at`, `arena-updated-at`, `arena-channel-slug`, `arena-channel-title`, `arena-source-url`).
 - **Image handling**: Download to vault, Obsidian embed, or external link modes.
 - **Attachment handling**: Download or link PDFs and other non-image attachments with flexible storage options (channel-local, global, or custom folders).
-- **Auto-sync timer**: Configurable interval (default 30 min) with manual trigger via Command Palette and ribbon icon.
-- **Sync on startup**: Optional full sync when Obsidian launches.
+- **Manual import flow**: Command-driven import with explicit user control.
 - **Channel mapping UI**: Map any number of Are.na channels to local vault folders with per-mapping enable/disable toggle.
-- **Commands**: Sync all channels · Sync current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
-- **Status bar indicator**: Live sync progress with pagination and block-level updates for large channels.
+- **Commands**: Import all channels · Import current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+- **Status bar indicator**: Live import progress with pagination and block-level updates for large channels.
 - **Dry-run mode**: Preview all changes before applying them.
 - **Channel index notes**: Auto-generated index files with links to all imported notes in a channel.
 - **Import history**: Transparent action logging in `Are.na/import-history.md` for audit trail.
@@ -37,32 +36,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - API tokens masked in settings UI (password input field).
-- Input validation for channel mappings (slug and folder path required).
+- Input validation for channel mappings (slug required, folder optional with deterministic default).
 - Secure token verification with clear feedback.
 
 ## [Unreleased]
 
-### Changed
-
-- Refactored plugin behavior to one-way import only (Are.na -> Obsidian).
-- Removed documentation references to push sync, two-way conflict flows, migration tooling, and preview mode.
-- Aligned command, settings, and feature docs with current runtime behavior.
-
 ### Added
 
-- Dry-run preview commands for full import and current-channel import.
-- Attachment handling controls for link/download behavior.
-- Downloaded attachment rendering controls (embed or link).
-- Attachment storage location controls (channel-local, global folder, custom folder).
-- Binary asset downloading for images and non-image attachments (including PDFs).
-- Pagination and block-level progress updates in status bar for large channels.
-- Channel index note generation with links to imported notes.
-- Import action history logging (`Are.na/import-history.md`) for transparency.
+- Sync summary modal with per-file diff viewer.
+- Master overview note generation (`Are.na/overview.md`).
+- Attachment migration system: preview modal, dry-run diffs, execution, and migration history log.
+- Per-channel attachment storage overrides.
+- Channel management tools in settings:
+  - `Import my channels` (bulk-create mappings from Are.na account)
+  - `Auto-enable imported channels` toggle (granular manual control)
+  - `Backup channel mappings`
+  - `Restore latest backup`
+  - `Reset channel mappings`
+- Optional banner frontmatter field for Obsidian Banners plugin compatibility:
+  - enable/disable toggle
+  - custom field name
+  - banner image source priority (`thumb-first` / `display-first`)
+- Optional block enrichment features:
+  - import block description into frontmatter (`arena_description`)
+  - import block comments into note body
+  - import connected channels where block appears, with clickable external links
+  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
+- Channel index enhancements:
+  - folder-note compatible index filename mode (`index.md` or `<folder-name>.md`)
+  - `Info` section with description, started, modified, length, followers (when available)
+  - best-effort `This Channel Appears In` section with clickable external links
+- Build packaging script that outputs `dist/<plugin-id>-<version>.zip` without relying on system `zip`.
 
-### Planned
-- Dataview-compatible front-matter presets
-- Drag-and-drop channel mapping UI
-- Selective block-class filtering per channel
+### Changed
+
+- Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
+- Mapping folder is now optional in settings UI; explicit folders still override default behavior.
+- API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
+
+### Fixed
+
+- Fixed pagination edge case where some channels could stop after the first 100 blocks.
+- Fixed packaging failures in environments without a system `zip` binary.
 
 ---
 
@@ -85,5 +100,5 @@ Each release entry follows this structure:
 ### Security   — vulnerability patches
 ```
 
-[Unreleased]: https://github.com/yourusername/arena-sync-obsidian/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/yourusername/arena-sync-obsidian/releases/tag/v1.0.0
+[Unreleased]: https://github.com/frostmute/Are.na-Importer/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/frostmute/Are.na-Importer/releases/tag/v1.0.0

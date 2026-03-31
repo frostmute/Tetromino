@@ -11,7 +11,7 @@ body:
     id: plugin-version
     attributes:
       label: Plugin version
-      description: "Find this in Settings → Community plugins → Are.na Sync"
+      description: "Find this in Settings → Community plugins → Are.na Importer"
       placeholder: "e.g. 1.0.0"
     validations:
       required: true
@@ -71,7 +71,7 @@ body:
     id: logs
     attributes:
       label: Console logs
-      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Sync → Debug logging** for verbose output."
+      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Importer → Debug logging** for verbose output."
       render: shell
 
   - type: textarea

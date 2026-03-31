@@ -4,6 +4,7 @@ import type {
 	AttachmentHandling,
 	AttachmentStorage,
 	BannerImagePriority,
+	ChannelIndexNoteStyle,
 	BlockNamingScheme,
 	DownloadedAttachmentLinkStyle,
 	ImageHandling,
@@ -22,17 +23,25 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Are.na Import" });
+		containerEl.createEl("h1", { text: "Are.na Importer" });
 		containerEl.createEl("p", {
-			text: "One-way import from Are.na into this vault.",
+			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
+			cls: "setting-item-description",
+		});
+		containerEl.createEl("p", {
+			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
 			cls: "setting-item-description",
 		});
 
-		containerEl.createEl("h2", { text: "Authentication" });
+		this.renderSectionHeader(
+			containerEl,
+			"Authentication",
+			"Connect your Are.na account for read-only import access.",
+		);
 		new Setting(containerEl)
 			.setName("API token")
 			.setDesc(
-				"Generate a token at https://dev.are.na/oauth/applications",
+				"Use a personal token from https://www.are.na/developers/personal-access-tokens.",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Are.na token")
@@ -55,9 +64,14 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		containerEl.createEl("h2", { text: "Content rendering" });
+		this.renderSectionHeader(
+			containerEl,
+			"Content rendering",
+			"Configure note format, metadata, and enrichment behavior.",
+		);
 		new Setting(containerEl)
 			.setName("Block file naming")
+			.setDesc("Choose the filename format for imported block notes.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -75,7 +89,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Banner frontmatter field")
-			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+			.setDesc("Add an optional banner URL frontmatter field for the Banners plugin.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.bannerFieldEnabled)
@@ -89,7 +103,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.bannerFieldEnabled) {
 			new Setting(containerEl)
 				.setName("Banner field name")
-				.setDesc("Frontmatter key used for banner URL")
+				.setDesc("Set the frontmatter key that stores the banner URL.")
 				.addText((text) =>
 					text
 						.setPlaceholder("banner")
@@ -103,7 +117,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 			new Setting(containerEl)
 				.setName("Banner image source priority")
-				.setDesc("Choose thumbnail or display image as preferred banner URL")
+				.setDesc("Choose whether thumbnail or display image is used first.")
 				.addDropdown((dd) =>
 					dd
 						.addOptions({
@@ -120,8 +134,79 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
+			.setName("Block description in frontmatter")
+			.setDesc("Add `arena_description` when a block description is available.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockDescriptionFrontmatter)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockDescriptionFrontmatter = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import block comments")
+			.setDesc("Import block comments into a `Comments` section in each note.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockComments)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockComments = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import connected channels")
+			.setDesc(
+				"Import channels where the block appears into a dedicated note section.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockConnectedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockConnectedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Channel block preview image")
+			.setDesc(
+				"For Channel blocks, use a best-effort linked channel preview image.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeChannelBlockPreviewImage)
+					.onChange(async (value) => {
+						this.plugin.settings.includeChannelBlockPreviewImage = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Channel index note naming")
+			.setDesc("Choose the channel index filename style for Folder Note compatibility.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						index: "index.md",
+						"folder-name": "match folder name",
+					} as Record<ChannelIndexNoteStyle, string>)
+					.setValue(this.plugin.settings.channelIndexNoteStyle)
+					.onChange(async (value) => {
+						this.plugin.settings.channelIndexNoteStyle =
+							value as ChannelIndexNoteStyle;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Image handling")
-			.setDesc("How image blocks are rendered")
+			.setDesc(
+				"Choose how image blocks are rendered: `Download`, `Embed`, or `Link`.",
+			)
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -139,7 +224,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Attachment handling")
-			.setDesc("For PDFs and other non-image attachments")
+			.setDesc("Choose how PDFs and other non-image files are rendered.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -156,7 +241,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Downloaded attachment render")
-			.setDesc("When attachments are downloaded locally")
+			.setDesc("Choose whether downloaded attachments are rendered as links or embeds.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -175,6 +260,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Attachment storage location")
+			.setDesc("Choose where downloaded files are stored in your vault.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -193,7 +279,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Global attachment folder")
-			.setDesc("Used when storage location is Global folder")
+			.setDesc("Use this path when attachment storage location is set to `Global folder`.")
 			.addText((text) =>
 				text
 					.setPlaceholder("Are.na/Attachments")
@@ -207,7 +293,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Custom attachment folder")
-			.setDesc("Used when storage location is Custom folder")
+			.setDesc("Use this path when attachment storage location is set to `Custom folder`.")
 			.addText((text) =>
 				text
 					.setPlaceholder("Path/In/Vault")
@@ -221,6 +307,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Add frontmatter")
+			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.frontmatterEnabled)
@@ -233,7 +320,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Exclude block classes")
 			.setDesc(
-				"Comma-separated list of block types to skip (e.g., Image, Media)",
+				"Enter a comma-separated list of block classes to skip, for example `Image, Media`.",
 			)
 			.addText((text) =>
 				text
@@ -248,9 +335,14 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl("h2", { text: "Notifications and logging" });
+		this.renderSectionHeader(
+			containerEl,
+			"Notifications and logging",
+			"Control notices and troubleshooting output.",
+		);
 		new Setting(containerEl)
 			.setName("Show notifications")
+			.setDesc("Show notices for import progress, completion, and failures.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.notifyOnSync)
@@ -260,19 +352,114 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
-			toggle
-				.setValue(this.plugin.settings.debugLogging)
-				.onChange(async (value) => {
-					this.plugin.settings.debugLogging = value;
-					await this.plugin.saveSettings();
-				}),
-		);
+		new Setting(containerEl)
+			.setName("Debug logging")
+			.setDesc("Log detailed import activity to the developer console.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.debugLogging)
+					.onChange(async (value) => {
+						this.plugin.settings.debugLogging = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 
-		containerEl.createEl("h2", { text: "Channel mappings" });
+		this.renderSectionHeader(
+			containerEl,
+			"Channel management",
+			"Bulk-manage mappings and safely back up or restore configuration.",
+		);
+		new Setting(containerEl)
+			.setName("Auto-enable imported channels")
+			.setDesc(
+				"When importing channels, create new mappings in the enabled state.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoEnableImportedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.autoEnableImportedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import my channels")
+			.setDesc(
+				"Fetch all your Are.na channels and create missing mappings using `Are.na/<slug>` by default.",
+			)
+			.addButton((btn) =>
+				btn.setButtonText("Import my channels").setCta().onClick(async () => {
+					try {
+						const result = await this.plugin.importMyChannelsMappings();
+						new Notice(
+							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
+						);
+						this.display();
+					} catch (err) {
+						new Notice(`Import my channels failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Backup channel mappings")
+			.setDesc("Save current channel mappings to a JSON backup file in your vault.")
+			.addButton((btn) =>
+				btn.setButtonText("Backup now").onClick(async () => {
+					try {
+						const path = await this.plugin.backupChannelMappings();
+						new Notice(`Channel mappings backed up to ${path}`);
+					} catch (err) {
+						new Notice(`Backup failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Restore latest backup")
+			.setDesc("Replace current mappings with the most recent backup file.")
+			.addButton((btn) =>
+				btn.setButtonText("Restore latest").onClick(async () => {
+					try {
+						const path =
+							await this.plugin.restoreLatestChannelMappingsBackup();
+						new Notice(`Restored channel mappings from ${path}`);
+						this.display();
+					} catch (err) {
+						new Notice(`Restore failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Reset channel mappings")
+			.setDesc("Remove all mappings from settings. Create a backup first.")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Reset mappings")
+					.setWarning()
+					.onClick(async () => {
+						const ok = window.confirm(
+							"Reset all channel mappings? This can be undone by restoring a backup.",
+						);
+						if (!ok) return;
+						await this.plugin.resetChannelMappings();
+						new Notice("Channel mappings reset.");
+						this.display();
+					}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Channel mappings",
+			"Each enabled mapping imports one Are.na channel into one vault folder.",
+		);
 		new Setting(containerEl)
 			.setName("Add channel")
-			.setDesc("Map an Are.na channel slug to a local folder")
+			.setDesc(
+				"Map an Are.na channel slug to a local folder. Default: `Are.na/<channel-slug>`.",
+			)
 			.addButton((btn) =>
 				btn.setButtonText("+ Add mapping").onClick(async () => {
 					this.plugin.settings.channelMappings.push({
@@ -295,10 +482,14 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			this.renderMapping(containerEl, i);
 		}
 
-		containerEl.createEl("h2", { text: "Attachment migration" });
+		this.renderSectionHeader(
+			containerEl,
+			"Attachment migration",
+			"Use this when changing attachment storage strategy to move files and update embeds safely.",
+		);
 		new Setting(containerEl)
 			.setName("Preview migration")
-			.setDesc("Dry-run preview with diffs")
+			.setDesc("Run a dry preview and inspect planned file diffs.")
 			.addButton((btn) =>
 				btn.setButtonText("Preview").onClick(async () => {
 					await this.plugin.checkForMigrationPrompt(true);
@@ -306,7 +497,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			);
 		new Setting(containerEl)
 			.setName("Run migration")
-			.setDesc("Move attachments and update embeds")
+			.setDesc("Move attachments and update embeds to new paths.")
 			.addButton((btn) =>
 				btn.setButtonText("Run").setCta().onClick(async () => {
 					await this.plugin.runMigration();
@@ -322,12 +513,12 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.setName(`Mapping #${index + 1}`)
 			.setDesc(
 				mapping.lastSyncedAt
-					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}`
-					: "Never imported",
+					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}.`
+					: "Never imported.",
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("channel-slug")
+					.setPlaceholder("Are.na channel slug")
 					.setValue(mapping.channelSlug)
 					.onChange(async (v) => {
 						const trimmed = v.trim();
@@ -341,15 +532,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("Vault/Folder")
+					.setPlaceholder("Optional custom vault folder (default: Are.na/<slug>)")
 					.setValue(mapping.localFolder)
 					.onChange(async (v) => {
-						const trimmed = v.trim();
-						if (!trimmed) {
-							new Notice("Local folder path cannot be empty");
-							return;
-						}
-						mapping.localFolder = trimmed;
+						mapping.localFolder = v.trim();
 						await this.plugin.saveSettings();
 					}),
 			)
@@ -372,7 +558,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(wrapper)
 			.setName("Attachment storage override")
-			.setDesc("Override attachment location for this channel")
+			.setDesc("Override the attachment storage location for this channel.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -395,7 +581,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		if (mapping.attachmentStorageOverride === "custom") {
 			new Setting(wrapper)
 				.setName("Channel custom attachment folder")
-				.setDesc("Overrides the global custom folder for this channel")
+				.setDesc("Override the global custom folder path for this channel.")
 				.addText((text) =>
 					text
 						.setPlaceholder("Path/In/Vault")
@@ -406,5 +592,17 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						}),
 				);
 		}
+	}
+
+	private renderSectionHeader(
+		containerEl: HTMLElement,
+		title: string,
+		description: string,
+	): void {
+		containerEl.createEl("h2", { text: title });
+		containerEl.createEl("p", {
+			text: description,
+			cls: "setting-item-description",
+		});
 	}
 }

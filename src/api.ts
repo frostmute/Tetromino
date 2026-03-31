@@ -201,7 +201,7 @@ export class ArenaApi {
 		const seenBlockIds = new Set<number>();
 		let pageNumber = 1;
 		let hasMore = true;
-		let totalPagesEstimate = 1;
+		let reportedTotalPages: number | null = null;
 		let consecutiveErrors = 0;
 		const MAX_CONSECUTIVE_ERRORS = 3;
 
@@ -214,15 +214,8 @@ export class ArenaApi {
 				const page = await this.getChannelContents(slug, pageNumber);
 				consecutiveErrors = 0;
 
-				if (page.total_pages && page.total_pages > totalPagesEstimate) {
-					totalPagesEstimate = page.total_pages;
-				}
-
-				if (page.length && page.length > 0) {
-					totalPagesEstimate = Math.max(
-						totalPagesEstimate,
-						Math.ceil(page.length / PER_PAGE),
-					);
+				if (page.total_pages && page.total_pages > 0) {
+					reportedTotalPages = page.total_pages;
 				}
 
 				let newBlocksCount = 0;
@@ -234,11 +227,13 @@ export class ArenaApi {
 					}
 				}
 
-				onPage(pageNumber, totalPagesEstimate);
+				onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
 
 				const emptyPage = page.contents.length === 0;
 				const lastPageByCount = page.contents.length < PER_PAGE;
-				const lastPageByTotal = pageNumber >= totalPagesEstimate;
+				const lastPageByTotal =
+					reportedTotalPages !== null &&
+					pageNumber >= reportedTotalPages;
 				const duplicatePage =
 					newBlocksCount === 0 && page.contents.length > 0;
 
@@ -252,7 +247,7 @@ export class ArenaApi {
 					if (this.debug) {
 						console.log(
 							`[arena-sync] Stopping pagination for ${slug}: ` +
-								`page=${pageNumber}, totalPages=${totalPagesEstimate}, ` +
+								`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
 								`blocksOnPage=${page.contents.length}, ` +
 								`newBlocks=${newBlocksCount}, ` +
 								`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
@@ -299,6 +294,19 @@ export class ArenaApi {
 			"GET",
 			`/me/channels?page=${page}&per=${PER_PAGE}`,
 		);
+	}
+
+	async listAllMyChannels(): Promise<ArenaChannelListItem[]> {
+		const all: ArenaChannelListItem[] = [];
+		let page = 1;
+		let totalPages = 1;
+		do {
+			const res = await this.listMyChannels(page);
+			all.push(...res.contents);
+			totalPages = Math.max(totalPages, res.total_pages || 1);
+			page++;
+		} while (page <= totalPages);
+		return all;
 	}
 
 	async getBlock(id: number): Promise<ArenaBlock> {

@@ -9674,3 +9674,8915 @@ Love this refinement. I added it.
 - Tests passed: `21/21`
 - Build passed
 - Zip artifact created: `dist/Are.na-Importer-1.0.0.zip`
+
+---
+
+_**User (2026-03-31 00:45:57Z)**_
+
+can we make all imported channels go into the main Are.na folder by default, with the ability to specifiy arbitrary location per channel in the vault, if needed?
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:19Z)**_
+
+This is a really good usability improvement. I’m implementing a default folder resolver so channels go to `Are.na/<channel-slug>` automatically when no folder is set, while still allowing a per-channel custom folder override.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "localFolder|startsWith\(m.localFolder|Map an Are.na channel slug" src/main.ts src/sync-engine.ts src/migration.ts src/settings-tab.ts README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"localFolder|startsWith\\(m.localFolder|Map an Are.na channel slug\" src/main.ts src/sync-engine.ts src/migration.ts src/settings-tab.ts README.md"
+Chunk ID: b73c21
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 269
+Output:
+src/main.ts:65:					file.path.startsWith(m.localFolder),
+src/main.ts:81:					file.path.startsWith(m.localFolder),
+src/main.ts:97:					file.path.startsWith(m.localFolder),
+src/main.ts:172:			(m) => m.enabled && m.channelSlug.trim() && m.localFolder.trim(),
+src/main.ts:218:		if (!mapping.channelSlug.trim() || !mapping.localFolder.trim()) {
+src/settings-tab.ts:275:			.setDesc("Map an Are.na channel slug to a local folder")
+src/settings-tab.ts:282:						localFolder: "",
+src/settings-tab.ts:345:					.setValue(mapping.localFolder)
+src/settings-tab.ts:352:						mapping.localFolder = trimmed;
+src/migration.ts:71:		if (!mapping.localFolder || !mapping.localFolder.trim()) continue;
+src/migration.ts:84:			isMarkdownFile(file, mapping.localFolder),
+src/sync-engine.ts:149:			await this.ensureFolder(mapping.localFolder);
+src/sync-engine.ts:208:			`${mapping.localFolder}/${noteFileName}`,
+src/sync-engine.ts:374:		const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+src/sync-engine.ts:431:			const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/main.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/main.ts"
+Chunk ID: e00415
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1901
+Output:
+import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
+import { ArenaApi } from "./api";
+import { SyncEngine } from "./sync-engine";
+import { ArenaSyncSettingTab } from "./settings-tab";
+import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
+import { DEFAULT_SETTINGS } from "./types";
+import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
+import {
+	buildMigrationPlan,
+	computeCurrentAttachmentBase,
+	executeMigration,
+} from "./migration";
+
+const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
+
+export default class ArenaSyncPlugin extends Plugin {
+	settings: ArenaSyncSettings = DEFAULT_SETTINGS;
+	api!: ArenaApi;
+	engine!: SyncEngine;
+	private isSyncing = false;
+	private statusBarItem: HTMLElement | null = null;
+	private isMigrating = false;
+
+	async onload(): Promise<void> {
+		await this.loadSettings();
+
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress),
+		);
+
+		addIcon("arena-sync", ARENA_ICON);
+		this.addRibbonIcon("arena-sync", "Import from Are.na", async () => {
+			await this.runSync(false);
+		});
+
+		this.statusBarItem = this.addStatusBarItem();
+		this.updateStatusBar("idle");
+
+		this.addCommand({
+			id: "arena-sync-now",
+			name: "Import all channels now",
+			callback: async () => await this.runSync(false),
+		});
+
+		this.addCommand({
+			id: "arena-sync-preview",
+			name: "Preview import (dry-run)",
+			callback: async () => await this.runSync(true),
+		});
+
+		this.addCommand({
+			id: "arena-sync-channel",
+			name: "Import current channel",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(m.localFolder),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				this.runChannelSync(mapping.channelSlug, false);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-channel-preview",
+			name: "Preview current channel import (dry-run)",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(m.localFolder),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				this.runChannelSync(mapping.channelSlug, true);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-open-channel",
+			name: "Open channel on Are.na",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(m.localFolder),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				window.open(
+					`https://www.are.na/channel/${mapping.channelSlug}`,
+					"_blank",
+				);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-migration-preview",
+			name: "Preview attachment migration",
+			callback: async () => {
+				await this.checkForMigrationPrompt(true);
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-migration-run",
+			name: "Run attachment migration",
+			callback: async () => {
+				await this.runMigration();
+			},
+		});
+
+		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
+
+		this.checkForMigrationPrompt(false);
+	}
+
+	onunload(): void {
+	}
+
+	async loadSettings(): Promise<void> {
+		const data = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		const changed = this.normalizeMappings();
+		const updatedBases = this.ensureAttachmentBaseSnapshots();
+		if (changed || updatedBases) {
+			await this.saveData(this.settings);
+		}
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress),
+		);
+		await this.checkForMigrationPrompt(false);
+	}
+
+	async runSync(dryRun = false): Promise<void> {
+		if (this.isSyncing) {
+			new Notice("Are.na Import is already running...");
+			return;
+		}
+		if (this.isMigrating) {
+			new Notic
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,240p' src/migration.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,240p' src/migration.ts"
+Chunk ID: 431903
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1322
+Output:
+import { App, normalizePath, TFile, Vault } from "obsidian";
+import { unifiedDiff } from "./diff";
+import { resolveAttachmentBaseFolder } from "./utils";
+import type { ArenaSyncSettings, ChannelMapping } from "./types";
+
+export interface MigrationMove {
+	from: string;
+	to: string;
+}
+
+export interface MigrationFileUpdate {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+}
+
+export interface MigrationChannelPlan {
+	channelSlug: string;
+	fromBase: string;
+	toBase: string;
+	moves: MigrationMove[];
+	updates: MigrationFileUpdate[];
+}
+
+export interface MigrationPlan {
+	channels: MigrationChannelPlan[];
+	totalMoves: number;
+	totalUpdates: number;
+}
+
+export interface MigrationReport {
+	moved: number;
+	updated: number;
+	skipped: number;
+	errors: string[];
+	duration: number;
+}
+
+function extractWikiPaths(content: string): string[] {
+	const paths: string[] = [];
+	const regex = /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]/g;
+	let match: RegExpExecArray | null;
+	while ((match = regex.exec(content)) !== null) {
+		const raw = (match[1] || match[2] || "").trim();
+		if (!raw) continue;
+		const pipeIdx = raw.indexOf("|");
+		const path = pipeIdx === -1 ? raw : raw.slice(0, pipeIdx).trim();
+		if (path) paths.push(path);
+	}
+	return paths;
+}
+
+function ensureTrailingSlash(path: string): string {
+	return path.endsWith("/") ? path : `${path}/`;
+}
+
+function isMarkdownFile(file: TFile, folder: string): boolean {
+	return file.extension === "md" && file.path.startsWith(folder);
+}
+
+export async function buildMigrationPlan(
+	app: App,
+	settings: ArenaSyncSettings,
+): Promise<MigrationPlan> {
+	const channels: MigrationChannelPlan[] = [];
+	const allFiles = app.vault.getFiles();
+
+	for (const mapping of settings.channelMappings) {
+		if (!mapping.enabled) continue;
+		if (!mapping.localFolder || !mapping.localFolder.trim()) continue;
+		const fromBase = normalizePath(
+			mapping.lastAttachmentBase ||
+				resolveAttachmentBaseFolder(settings, mapping),
+		);
+		const toBase = normalizePath(resolveAttachmentBaseFolder(settings, mapping));
+		if (!fromBase || fromBase === toBase) continue;
+
+		const oldPrefix = ensureTrailingSlash(fromBase);
+		const newPrefix = ensureTrailingSlash(toBase);
+		const movesMap = new Map<string, string>();
+		const updates: MigrationFileUpdate[] = [];
+		const noteFiles = allFiles.filter((file) =>
+			isMarkdownFile(file, mapping.localFolder),
+		);
+
+		for (const note of noteFiles) {
+			const before = await app.vault.read(note);
+			if (!before.includes(oldPrefix)) continue;
+			const after = before.split(oldPrefix).join(newPrefix);
+			if (after === before) continue;
+
+			updates.push({
+				path: note.path,
+				before,
+				after,
+				diff: unifiedDiff(before, after, note.path, note.path),
+			});
+
+			const paths = extractWikiPaths(before);
+			for (const p of paths) {
+				if (!p.startsWith(oldPrefix)) continue;
+				const suffix = p.slice(oldPrefix.length);
+				const from = normalizePath(p);
+				const to = normalizePath(`${toBase}/${suffix}`);
+				if (from && to) movesMap.set(from, to);
+			}
+		}
+
+		const moves = Array.from(movesMap.entries()).map(([from, to]) => ({
+			from,
+			to,
+		}));
+
+		if (moves.length === 0 && updates.length === 0) continue;
+
+		channels.push({
+			channelSlug: mapping.channelSlug,
+			fromBase,
+			toBase,
+			moves,
+			updates,
+		});
+	}
+
+	const totalMoves = channels.reduce((sum, c) => sum + c.moves.length, 0);
+	const totalUpdates = channels.reduce(
+		(sum, c) => sum + c.updates.length,
+		0,
+	);
+	return { channels, totalMoves, totalUpdates };
+}
+
+async function ensureFolder(vault: Vault, path: string): Promise<void> {
+	const normalized = normalizePath(path);
+	const parts = normalized.split("/").filter(Boolean);
+	let current = "";
+	for (const part of parts) {
+		current = current ? `${current}/${part}` : part;
+		if (!vault.getAbstractFileByPath(current)) {
+			await vault.createFolder(current);
+		}
+	}
+}
+
+export async function executeMigration(
+	app: App,
+	plan: MigrationPlan,
+): Promise<MigrationReport> {
+	const start = Date.now();
+	let moved = 0;
+	let updated = 0;
+	let skipped = 0;
+	const errors: string[] = [];
+
+	for (const channel of plan.channels) {
+		await ensureFolder(app.vault, channel.toBase);
+		for (const move of channel.moves) {
+			const file = app.vault.getAbstractFileByPath(move.from);
+			const exists = app.vault.getAbstractFileByPath(move.to);
+			if (!(file instanceof TFile)) {
+				skipped++;
+				continue;
+			}
+			if (exists) {
+				skipped++;
+				continue;
+			}
+			try {
+				await app.vault.rename(file, move.to);
+				moved++;
+			} catch (err) {
+				errors.push(
+					`Failed to move ${move.from} -> ${move.to}: ${(err as Error).message}`,
+				);
+			}
+		}
+
+		for (const update of channel.updates) {
+			const file = app.vault.getAbstractFileByPath(update.path);
+			if (!(file instanceof TFile)) {
+				skipped++;
+				continue;
+			}
+			try {
+				await
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '120,500p' src/sync-engine.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '120,500p' src/sync-engine.ts"
+Chunk ID: dd740d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2394
+Output:
+		await this.pull(mapping, channel, result, dryRun);
+
+		if (!dryRun) {
+			mapping.lastSyncedAt = new Date().toISOString();
+		}
+
+		result.duration = Date.now() - start;
+		return result;
+	}
+
+	private async pull(
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<void> {
+		const blocks = await this.api.getAllChannelBlocksWithProgress(
+			mapping.channelSlug,
+			(currentPage, totalPages) => {
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "pages",
+					current: currentPage,
+					total: totalPages,
+				});
+			},
+		);
+
+		if (!dryRun) {
+			await this.ensureFolder(mapping.localFolder);
+		}
+
+		const importedPaths: string[] = [];
+		const importedBlockIds: number[] = [];
+		for (let i = 0; i < blocks.length; i++) {
+			const block = blocks[i];
+			this.onProgress?.({
+				channelSlug: mapping.channelSlug,
+				phase: "blocks",
+				current: i + 1,
+				total: blocks.length,
+			});
+
+			if (this.shouldExclude(block)) {
+				result.skipped++;
+				continue;
+			}
+
+			try {
+				const path = await this.pullBlock(
+					block,
+					mapping,
+					channel,
+					result,
+					dryRun,
+				);
+				importedPaths.push(path);
+				importedBlockIds.push(block.id);
+			} catch (err) {
+				result.errors.push({
+					blockId: block.id,
+					channelSlug: mapping.channelSlug,
+					message: (err as Error).message,
+					recoverable: true,
+				});
+			}
+		}
+
+		await this.updateChannelIndex(
+			mapping,
+			channel,
+			importedPaths,
+			dryRun,
+			result,
+		);
+
+		this.markMissing(mapping, importedBlockIds, result);
+	}
+
+	private async pullBlock(
+		block: ArenaBlock,
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<string> {
+		const noteFileName = this.blockFileName(block);
+		const notePath = normalizePath(
+			`${mapping.localFolder}/${noteFileName}`,
+		);
+		const assetPath = await this.ensureBlockAsset(
+			block,
+			mapping,
+			dryRun,
+			result,
+		);
+		const record = this.findRecord(block.id, mapping.channelId);
+		let existing = this.vault.getAbstractFileByPath(notePath);
+		let moved = false;
+
+		if (record && record.localPath !== notePath) {
+			const oldFile = this.vault.getAbstractFileByPath(record.localPath);
+			if (oldFile instanceof TFile) {
+				moved = true;
+				result.moved++;
+				result.moves.push({ from: record.localPath, to: notePath });
+				result.actions.push(`move ${record.localPath} -> ${notePath}`);
+				if (!dryRun && !existing) {
+					await this.vault.rename(oldFile, notePath);
+					existing = this.vault.getAbstractFileByPath(notePath);
+				}
+			}
+		}
+
+		const markdown = blockToMarkdown(block, this.settings, {
+			channelSlug: channel.slug,
+			channelTitle: channel.title,
+			assetPath,
+		});
+		const remoteHash = computeHash(markdown);
+
+		if (!existing) {
+			result.created++;
+			result.actions.push(`create ${notePath}`);
+			result.fileDiffs.push({
+				path: notePath,
+				before: "",
+				after: markdown,
+				diff: unifiedDiff("", markdown, "empty", notePath),
+				kind: "create",
+			});
+			if (!dryRun) {
+				await this.vault.create(notePath, markdown);
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					remoteHash,
+					remoteHash,
+				);
+			}
+			return notePath;
+		}
+
+		if (!(existing instanceof TFile)) {
+			result.actions.push(`skip ${notePath} (not a file)`);
+			return notePath;
+		}
+
+		const localContent = await this.vault.read(existing);
+		const localHash = computeHash(localContent);
+		if (localHash === remoteHash) {
+			result.skipped++;
+			result.actions.push(`skip ${notePath}`);
+			if (!record && !dryRun) {
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
+			} else if (moved && !dryRun) {
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
+			}
+			return notePath;
+		}
+
+		result.updated++;
+		result.actions.push(`update ${notePath}`);
+		result.fileDiffs.push({
+			path: notePath,
+			before: localContent,
+			after: markdown,
+			diff: unifiedDiff(localContent, markdown, notePath, notePath),
+			kind: "update",
+		});
+		if (!dryRun) {
+			await this.vault.modify(existing, markdown);
+			this.upsertRecord(
+				block.id,
+				mapping.channelId,
+				notePath,
+				remoteHash,
+				remoteHash,
+			);
+		}
+		return notePath;
+	}
+
+	private async ensureBlockAsset(
+		block: ArenaBlock,
+		mapping: ChannelMapping,
+		dryRun: boolean,
+		result: SyncResult,
+	): Promise<string | undefined> {
+		let url: string | null = null;
+		let fileName: string | null = null;
+
+		if (block.class === "Image") {
+			if (this.settings.imageHandling !== "download" || !block.image) {
+				return undefined;
+			}
+			url = block.image.original.url;
+			fileName = block.image.filename;
+		}
+
+		if (block.class === "Attachment") {
+			if (
+		
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:24Z)**_
+
+I’ve identified all places that assumed `localFolder` is always set, including command detection and migration planning. I’m patching those to use a shared resolver so default behavior stays consistent everywhere.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+ export interface MarkdownContext {
+ 	channelSlug?: string;
+ 	channelTitle?: string;
+ 	assetPath?: string;
+ }
++
++export function resolveChannelFolder(mapping: ChannelMapping): string {
++	const explicit = mapping.localFolder?.trim();
++	if (explicit) {
++		return normalizePath(explicit);
++	}
++	const slug = mapping.channelSlug?.trim();
++	return normalizePath(slug ? `Are.na/${slug}` : "Are.na");
++}
+@@
+ 	switch (storage) {
+ 		case "channel":
+-			return normalizePath(`${mapping.localFolder}/_attachments`);
++			return normalizePath(`${resolveChannelFolder(mapping)}/_attachments`);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/sync-engine.ts`**
+
+```diff
+@@
+ import {
+ 	blockFileName as utilsBlockFileName,
+ 	blockToMarkdown,
+ 	computeHash,
++	resolveChannelFolder,
+ 	resolveAttachmentBaseFolder,
+ 	sanitiseFilename,
+ } from "./utils";
+@@
+ 	private async pull(
+ 		mapping: ChannelMapping,
+ 		channel: ArenaChannel,
+ 		result: SyncResult,
+ 		dryRun: boolean,
+ 	): Promise<void> {
++		const channelFolder = resolveChannelFolder(mapping);
+ 		const blocks = await this.api.getAllChannelBlocksWithProgress(
+ 			mapping.channelSlug,
+@@
+ 		if (!dryRun) {
+-			await this.ensureFolder(mapping.localFolder);
++			await this.ensureFolder(channelFolder);
+ 		}
+@@
+ 		const noteFileName = this.blockFileName(block);
++		const channelFolder = resolveChannelFolder(mapping);
+ 		const notePath = normalizePath(
+-			`${mapping.localFolder}/${noteFileName}`,
++			`${channelFolder}/${noteFileName}`,
+ 		);
+@@
+ 		result: SyncResult,
+ 	): Promise<void> {
+-		const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
++		const indexPath = normalizePath(
++			`${resolveChannelFolder(mapping)}/index.md`,
++		);
+@@
+ 		for (const mapping of this.settings.channelMappings) {
+ 			if (!mapping.enabled) continue;
+ 			const title = mapping.channelTitle || mapping.channelSlug;
+-			const indexPath = normalizePath(`${mapping.localFolder}/index.md`);
++			const indexPath = normalizePath(
++				`${resolveChannelFolder(mapping)}/index.md`,
++			);
+ 			lines.push(`- [[${indexPath}|${title}]]`);
+ 		}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:41Z)**_
+
+Core engine now uses the default folder resolver. I’m updating commands, validation, and migration so empty `localFolder` is valid and resolves to `Are.na/<slug>` automatically.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/main.ts`**
+
+```diff
+@@
+ import { ArenaSyncSettingTab } from "./settings-tab";
+ import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
+ import { DEFAULT_SETTINGS } from "./types";
+ import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
++import { resolveChannelFolder } from "./utils";
+@@
+ 				const file = this.app.workspace.getActiveFile();
+ 				if (!file) return false;
+ 				const mapping = this.settings.channelMappings.find((m) =>
+-					file.path.startsWith(m.localFolder),
++					file.path.startsWith(resolveChannelFolder(m)),
+ 				);
+@@
+ 				const file = this.app.workspace.getActiveFile();
+ 				if (!file) return false;
+ 				const mapping = this.settings.channelMappings.find((m) =>
+-					file.path.startsWith(m.localFolder),
++					file.path.startsWith(resolveChannelFolder(m)),
+ 				);
+@@
+ 				const file = this.app.workspace.getActiveFile();
+ 				if (!file) return false;
+ 				const mapping = this.settings.channelMappings.find((m) =>
+-					file.path.startsWith(m.localFolder),
++					file.path.startsWith(resolveChannelFolder(m)),
+ 				);
+@@
+ 		const validMappings = this.settings.channelMappings.filter(
+-			(m) => m.enabled && m.channelSlug.trim() && m.localFolder.trim(),
++			(m) => m.enabled && m.channelSlug.trim(),
+ 		);
+@@
+ 			new Notice(
+-				"Are.na Import: No valid channels configured (check that channel slug and folder are not empty).",
++				"Are.na Import: No valid channels configured (check that channel slug is not empty).",
+ 			);
+ 			return;
+ 		}
+@@
+-		if (!mapping.channelSlug.trim() || !mapping.localFolder.trim()) {
+-			new Notice(`Channel "${slug}" has empty slug or folder path.`);
++		if (!mapping.channelSlug.trim()) {
++			new Notice(`Channel "${slug}" has an empty slug.`);
+ 			return;
+ 		}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/migration.ts`**
+
+```diff
+@@
+ import { App, normalizePath, TFile, Vault } from "obsidian";
+ import { unifiedDiff } from "./diff";
+-import { resolveAttachmentBaseFolder } from "./utils";
++import { resolveAttachmentBaseFolder, resolveChannelFolder } from "./utils";
+@@
+ 	for (const mapping of settings.channelMappings) {
+ 		if (!mapping.enabled) continue;
+-		if (!mapping.localFolder || !mapping.localFolder.trim()) continue;
++		const channelFolder = resolveChannelFolder(mapping);
+ 		const fromBase = normalizePath(
+ 			mapping.lastAttachmentBase ||
+ 				resolveAttachmentBaseFolder(settings, mapping),
+ 		);
+@@
+ 		const movesMap = new Map<string, string>();
+ 		const updates: MigrationFileUpdate[] = [];
+ 		const noteFiles = allFiles.filter((file) =>
+-			isMarkdownFile(file, mapping.localFolder),
++			isMarkdownFile(file, channelFolder),
+ 		);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 		new Setting(containerEl)
+ 			.setName("Add channel")
+-			.setDesc("Map an Are.na channel slug to a local folder")
++			.setDesc(
++				"Map an Are.na channel slug to a local folder (default: Are.na/<channel-slug>)",
++			)
+@@
+ 			.addText((text) =>
+ 				text
+ 					.setPlaceholder("Vault/Folder")
+ 					.setValue(mapping.localFolder)
+ 					.onChange(async (v) => {
+-						const trimmed = v.trim();
+-						if (!trimmed) {
+-							new Notice("Local folder path cannot be empty");
+-							return;
+-						}
+-						mapping.localFolder = trimmed;
++						mapping.localFolder = v.trim();
+ 						await this.plugin.saveSettings();
+ 					}),
+ 			)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:58Z)**_
+
+I’ve updated behavior and UI descriptions; I’m also updating README wording so the default folder convention is explicit (`Are.na/<slug>`) and users know overrides are optional.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:46:59Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ - Channel mappings (`channel slug` -> `local folder`)
++  Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
+ - Block class exclusion filter (skip Image, Media, etc.)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "localFolder" src/main.ts src/sync-engine.ts src/migration.ts src/settings-tab.ts src/utils.ts | sed -n '1,200p'`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"localFolder\" src/main.ts src/sync-engine.ts src/migration.ts src/settings-tab.ts src/utils.ts | sed -n '1,200p'"
+Chunk ID: 83da0b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 58
+Output:
+src/utils.ts:17:	const explicit = mapping.localFolder?.trim();
+src/settings-tab.ts:284:						localFolder: "",
+src/settings-tab.ts:347:					.setValue(mapping.localFolder)
+src/settings-tab.ts:349:						mapping.localFolder = v.trim();
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:05Z)**_
+
+I’ve verified we removed all hard dependencies on `localFolder` being non-empty. I’m adding one quick unit test for the new default folder resolver, then running tests/build to confirm everything is clean.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__tests__/utils.test.ts`**
+
+```diff
+@@
+ import {
+ 	blockFileName,
+ 	blockToMarkdown,
+ 	computeHash,
+ 	markdownToBlockContent,
+ 	normalizeArenaUrl,
++	resolveChannelFolder,
+ 	sanitiseFilename,
+ } from "../utils";
+@@
+ describe("normalizeArenaUrl", () => {
+@@
+ 	it("leaves external URLs unchanged", () => {
+ 		expect(normalizeArenaUrl("https://example.com")).toBe("https://example.com");
+ 	});
+ });
++
++describe("resolveChannelFolder", () => {
++	it("uses default Are.na/<slug> when local folder is blank", () => {
++		expect(
++			resolveChannelFolder({
++				channelSlug: "rad-readings",
++				channelId: 0,
++				channelTitle: "",
++				localFolder: "",
++				lastSyncedAt: null,
++				enabled: true,
++			}),
++		).toBe("Are.na/rad-readings");
++	});
++
++	it("uses explicit local folder when provided", () => {
++		expect(
++			resolveChannelFolder({
++				channelSlug: "rad-readings",
++				channelId: 0,
++				channelTitle: "",
++				localFolder: "Custom/Wherever",
++				lastSyncedAt: null,
++				enabled: true,
++			}),
++		).toBe("Custom/Wherever");
++	});
++});
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: a50b0c
+Wall time: 1.0028 seconds
+Process running with session ID 17350
+Original token count: 402
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block
+    ✓ handles an image block with external link (1 ms)
+    ✓ embeds image blocks using Are.na display image in embed mode
+    ✓ handles an attachment block (1 ms)
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled (1 ms)
+    ✓ supports display-first banner priority
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title (1 ms)
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string
+    ✓ is deterministic (1 ms)
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme (1 ms)
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged (1 ms)
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:16Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: cc4660
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 389
+Output:
+-----------------|---------|----------|---------|---------|------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+-----------------|---------|----------|---------|---------|------------------------------------------
+All files        |    8.78 |    16.04 |    4.87 |    9.28 |                                          
+ api.ts          |       0 |        0 |       0 |       0 | 1-375                                    
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                     
+ main.ts         |       0 |        0 |       0 |       0 | 1-461                                    
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                    
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                    
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-402                                    
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-543                                    
+ types.ts        |     100 |      100 |     100 |     100 |                                          
+ utils.ts        |    82.5 |    50.34 |    90.9 |   84.61 | 74,96,99,152-155,159-162,172-175,187-199 
+-----------------|---------|----------|---------|---------|------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        1.512 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 89a614
+Wall time: 1.0011 seconds
+Process running with session ID 99368
+Original token count: 32
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:20Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: bc0a2f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17
+Output:
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:47:27Z)**_
+
+Absolutely, and it’s now implemented.
+
+**What changed**
+- If a channel mapping has an empty `localFolder`, import now defaults to:
+  - `Are.na/<channel-slug>`
+- You can still set any custom vault path per channel, and that explicit path wins.
+- This behavior is now consistent across:
+  - sync/import
+  - channel index generation
+  - master overview links
+  - attachment resolution (channel mode)
+  - migration planning
+  - command palette “current channel” detection
+
+**UI update**
+- Channel mapping description now states the default:
+  - `Are.na/<channel-slug>`
+- Local folder input can be left blank (no more error for empty folder).
+
+**Code touched**
+- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+- [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
+- [main.ts](/home/frost/Are.na-Importer/src/main.ts)
+- [migration.ts](/home/frost/Are.na-Importer/src/migration.ts)
+- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+
+**Validation**
+- Tests: passed (`23/23`)
+- Build: passed
+- Zip produced: `dist/Are.na-Importer-1.0.0.zip`
+
+---
+
+_**User (2026-03-31 00:49:30Z)**_
+
+can we add a feature to import all of the user's existing channels, upfront, that can be toggled off for granular manual control over channel import... like when you open the settings, there could be a button that says 'import my channels' and the settings ui fills with default channel mappings based on the user's are.na channels.... and a button to reset chennel mappings also.... and the ability to backup channel mapping configurations as well?
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:49:51Z)**_
+
+This is an excellent product-level idea, and we can implement it cleanly without removing manual control. I’m adding channel-management tooling in settings: one-click import of all your Are.na channels, reset mappings, and backup/restore of mapping configs, with a toggle controlling whether imported mappings auto-enable.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:49:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+ export interface ArenaSyncSettings {
+ 	apiToken: string;
+ 	syncInterval: number;
+ 	syncOnStartup: boolean;
++	autoEnableImportedChannels: boolean;
+ 	blockNaming: BlockNamingScheme;
+ 	bannerFieldEnabled: boolean;
+ 	bannerFieldName: string;
+ 	bannerImagePriority: BannerImagePriority;
+@@
+ 	apiToken: "",
+ 	syncInterval: 30,
+ 	syncOnStartup: false,
++	autoEnableImportedChannels: true,
+ 	blockNaming: "title",
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:49:57Z)**_
+
+I’ve added the settings model field. Next I’m wiring API pagination helper and plugin actions (`import`, `reset`, `backup`, `restore`) so the settings buttons can call real operations.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ 	async listMyChannels(
+ 		page = 1,
+ 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
+ 		return this.request<ArenaPaginatedResponse<ArenaChannelListItem>>(
+ 			"GET",
+ 			`/me/channels?page=${page}&per=${PER_PAGE}`,
+ 		);
+ 	}
++
++	async listAllMyChannels(): Promise<ArenaChannelListItem[]> {
++		const all: ArenaChannelListItem[] = [];
++		let page = 1;
++		let totalPages = 1;
++		do {
++			const res = await this.listMyChannels(page);
++			all.push(...res.contents);
++			totalPages = Math.max(totalPages, res.total_pages || 1);
++			page++;
++		} while (page <= totalPages);
++		return all;
++	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/main.ts`**
+
+```diff
+@@
+ import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
+ import { ArenaApi } from "./api";
+ import { SyncEngine } from "./sync-engine";
+ import { ArenaSyncSettingTab } from "./settings-tab";
+-import type { ArenaSyncSettings, ImportProgress, SyncResult } from "./types";
++import type {
++	ArenaChannelListItem,
++	ArenaSyncSettings,
++	ChannelMapping,
++	ImportProgress,
++	SyncResult,
++} from "./types";
+@@
+ 	private ensureAttachmentBaseSnapshots(): boolean {
+ 		let changed = false;
+ 		for (const mapping of this.settings.channelMappings) {
+@@
+ 		return changed;
+ 	}
++
++	async importMyChannelsMappings(): Promise<{
++		created: number;
++		updated: number;
++		totalRemote: number;
++	}> {
++		if (!this.settings.apiToken) {
++			throw new Error("Please set your API token first.");
++		}
++
++		const remoteChannels = await this.api.listAllMyChannels();
++		let created = 0;
++		let updated = 0;
++		for (const remote of remoteChannels) {
++			const existing = this.settings.channelMappings.find(
++				(m) => m.channelSlug === remote.slug,
++			);
++			if (existing) {
++				const beforeId = existing.channelId;
++				const beforeTitle = existing.channelTitle;
++				existing.channelId = remote.id;
++				existing.channelTitle = remote.title;
++				if (beforeId !== existing.channelId || beforeTitle !== existing.channelTitle) {
++					updated++;
++				}
++				continue;
++			}
++			this.settings.channelMappings.push(this.createMappingFromChannel(remote));
++			created++;
++		}
++		await this.saveSettings();
++		return { created, updated, totalRemote: remoteChannels.length };
++	}
++
++	async resetChannelMappings(): Promise<void> {
++		this.settings.channelMappings = [];
++		await this.saveSettings();
++	}
++
++	async backupChannelMappings(): Promise<string> {
++		const folder = normalizePath("Are.na/channel-mapping-backups");
++		await this.ensureFolder(folder);
++		const stamp = new Date()
++			.toISOString()
++			.replace(/[:.]/g, "-")
++			.replace("T", "_")
++			.replace("Z", "");
++		const filePath = normalizePath(`${folder}/mappings-${stamp}.json`);
++		const payload = {
++			createdAt: new Date().toISOString(),
++			mappingCount: this.settings.channelMappings.length,
++			channelMappings: this.settings.channelMappings,
++		};
++		await this.app.vault.create(filePath, JSON.stringify(payload, null, 2));
++		return filePath;
++	}
++
++	async restoreLatestChannelMappingsBackup(): Promise<string> {
++		const folderPrefix = normalizePath("Are.na/channel-mapping-backups");
++		const candidates = this.app.vault
++			.getFiles()
++			.filter(
++				(file) =>
++					file.path.startsWith(`${folderPrefix}/`) &&
++					file.path.endsWith(".json"),
++			)
++			.sort((a, b) => a.path.localeCompare(b.path));
++		const latest = candidates[candidates.length - 1];
++		if (!latest) {
++			throw new Error("No channel mapping backups found.");
++		}
++		const raw = await this.app.vault.read(latest);
++		const data = JSON.parse(raw) as {
++			channelMappings?: ChannelMapping[];
++		};
++		if (!Array.isArray(data.channelMappings)) {
++			throw new Error("Latest backup is invalid.");
++		}
++		this.settings.channelMappings = data.channelMappings.map((mapping) => ({
++			...mapping,
++		}));
++		this.normalizeMappings();
++		await this.saveSettings();
++		return latest.path;
++	}
+@@
+ 	private async writeMigrationReport(report: Awaited<ReturnType<typeof executeMigration>>): Promise<void> {
+@@
+ 		}
+ 	}
++
++	private createMappingFromChannel(remote: ArenaChannelListItem): ChannelMapping {
++		return {
++			channelSlug: remote.slug,
++			channelId: remote.id,
++			channelTitle: remote.title,
++			localFolder: "",
++			lastSyncedAt: null,
++			enabled: this.settings.autoEnableImportedChannels,
++			attachmentStorageOverride: null,
++			customAttachmentFolderOverride: "",
++			lastAttachmentBase: null,
++		};
++	}
++
++	private async ensureFolder(path: string): Promise<void> {
++		const normalized = normalizePath(path);
++		const parts = normalized.split("/").filter(Boolean);
++		let current = "";
++		for (const part of parts) {
++			current = current ? `${current}/${part}` : part;
++			if (!this.app.vault.getAbstractFileByPath(current)) {
++				await this.app.vault.createFolder(current);
++			}
++		}
++	}
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:30Z)**_
+
+Plugin actions are in place. I’m now adding a dedicated “Channel management” settings section with `Import my channels`, `Reset channel mappings`, and `Backup/Restore mappings`, plus the toggle for auto-enabling imported channels.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:45Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 		containerEl.createEl("h2", { text: "Notifications and logging" });
+@@
+ 		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+ 			toggle
+ 				.setValue(this.plugin.settings.debugLogging)
+ 				.onChange(async (value) => {
+ 					this.plugin.settings.debugLogging = value;
+ 					await this.plugin.saveSettings();
+ 				}),
+ 		);
++
++		containerEl.createEl("h2", { text: "Channel management" });
++		new Setting(containerEl)
++			.setName("Auto-enable imported channels")
++			.setDesc(
++				"When importing from Are.na, new channel mappings start enabled",
++			)
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.autoEnableImportedChannels)
++					.onChange(async (value) => {
++						this.plugin.settings.autoEnableImportedChannels = value;
++						await this.plugin.saveSettings();
++					}),
++			);
++
++		new Setting(containerEl)
++			.setName("Import my channels")
++			.setDesc(
++				"Fetch your Are.na channels and create missing mappings with default folders",
++			)
++			.addButton((btn) =>
++				btn.setButtonText("Import my channels").setCta().onClick(async () => {
++					try {
++						const result = await this.plugin.importMyChannelsMappings();
++						new Notice(
++							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
++						);
++						this.display();
++					} catch (err) {
++						new Notice(`Import my channels failed: ${(err as Error).message}`);
++					}
++				}),
++			);
++
++		new Setting(containerEl)
++			.setName("Backup channel mappings")
++			.setDesc("Save current channel mappings to a backup JSON file in your vault")
++			.addButton((btn) =>
++				btn.setButtonText("Backup now").onClick(async () => {
++					try {
++						const path = await this.plugin.backupChannelMappings();
++						new Notice(`Channel mappings backed up to ${path}`);
++					} catch (err) {
++						new Notice(`Backup failed: ${(err as Error).message}`);
++					}
++				}),
++			);
++
++		new Setting(containerEl)
++			.setName("Restore latest backup")
++			.setDesc("Replace current mappings with the most recent backup file")
++			.addButton((btn) =>
++				btn.setButtonText("Restore latest").onClick(async () => {
++					try {
++						const path =
++							await this.plugin.restoreLatestChannelMappingsBackup();
++						new Notice(`Restored channel mappings from ${path}`);
++						this.display();
++					} catch (err) {
++						new Notice(`Restore failed: ${(err as Error).message}`);
++					}
++				}),
++			);
++
++		new Setting(containerEl)
++			.setName("Reset channel mappings")
++			.setDesc("Remove all channel mappings from settings")
++			.addButton((btn) =>
++				btn
++					.setButtonText("Reset mappings")
++					.setWarning()
++					.onClick(async () => {
++						const ok = window.confirm(
++							"Reset all channel mappings? This can be undone by restoring a backup.",
++						);
++						if (!ok) return;
++						await this.plugin.resetChannelMappings();
++						new Notice("Channel mappings reset.");
++						this.display();
++					}),
++			);
+ 
+ 		containerEl.createEl("h2", { text: "Channel mappings" });
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:49Z)**_
+
+Settings UI is now wired end-to-end. I’m updating README so the new channel management workflow is documented clearly (`import`, `backup`, `restore`, `reset`) and then I’ll run tests/build.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ - Channel mappings (`channel slug` -> `local folder`)
+   Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
++- Channel management tools:
++  `Import my channels` (bulk-create mappings from Are.na),
++  `Auto-enable imported channels` toggle (for granular manual control),
++  `Backup channel mappings`,
++  `Restore latest backup`,
++  `Reset channel mappings`
+ - Block class exclusion filter (skip Image, Media, etc.)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: f8b7cf
+Wall time: 1.0014 seconds
+Process running with session ID 13268
+Original token count: 399
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled
+    ✓ handles a link block (1 ms)
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode (1 ms)
+    ✓ handles an attachment block
+    ✓ falls back to Block ID when title is null (1 ms)
+    ✓ adds optional banner frontmatter field when enabled
+    ✓ supports display-first banner priority (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title
+    ✓ handles content without front-matter (1 ms)
+  computeHash
+    ✓ returns a 16-char hex string
+    ✓ is deterministic
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged (1 ms)
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:58Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 95f181
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 389
+Output:
+-----------------|---------|----------|---------|---------|------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+-----------------|---------|----------|---------|---------|------------------------------------------
+All files        |    8.07 |    15.53 |    4.32 |    8.53 |                                          
+ api.ts          |       0 |        0 |       0 |       0 | 1-388                                    
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                     
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                    
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                    
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                    
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-484                                    
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-543                                    
+ types.ts        |     100 |      100 |     100 |     100 |                                          
+ utils.ts        |    82.5 |    50.34 |    90.9 |   84.61 | 74,96,99,152-155,159-162,172-175,187-199 
+-----------------|---------|----------|---------|---------|------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        1.454 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:50:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 0e55a5
+Wall time: 1.0022 seconds
+Process running with session ID 88595
+Original token count: 32
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:51:02Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: e9d5c5
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17
+Output:
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:51:11Z)**_
+
+This is a strong workflow upgrade, and it’s now implemented end-to-end.
+
+What you can do now in Settings:
+1. `Import my channels` button:
+   Creates missing mappings from your Are.na account (fills slug/title/id, default folder behavior).
+2. `Auto-enable imported channels` toggle:
+   If `on`, imported mappings are enabled immediately.
+   If `off`, imported mappings are added disabled for granular manual control.
+3. `Backup channel mappings` button:
+   Writes JSON backups to `Are.na/channel-mapping-backups/`.
+4. `Restore latest backup` button:
+   Replaces current mappings from the newest backup file.
+5. `Reset channel mappings` button:
+   Clears all mappings (with confirmation prompt).
+
+Default folder behavior (already aligned with your earlier request) still applies:
+- Blank local folder => `Are.na/<channel-slug>`
+- Explicit folder => custom path is used
+
+Updated files:
+- [src/main.ts](/home/frost/Are.na-Importer/src/main.ts)
+- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [src/api.ts](/home/frost/Are.na-Importer/src/api.ts)
+- [src/types.ts](/home/frost/Are.na-Importer/src/types.ts)
+- [src/utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+
+Validation:
+- `npm test -- --runInBand` passed
+- `npm run build` passed
+- Zip artifact: `dist/Are.na-Importer-1.0.0.zip`
+
+---
+
+_**User (2026-03-31 00:56:17Z)**_
+
+we are only getting the first 100 results to import per channel.... i dont see any banner properties, i dont see any embeded images anywhere.... and no pdfs downloaded from a channel with tons of pdfs
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:56:37Z)**_
+
+You’re absolutely right to call this out; that behavior is not acceptable. I’m treating this as a bug pass now, starting with pagination (the first-100 limit is likely the root cause of missing PDFs/images), then I’ll make banner + image embedding defaults more obvious so they actually appear without extra friction.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:56:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ 	async getAllChannelBlocksWithProgress(
+ 		slug: string,
+ 		onPage: (currentPage: number, totalPages: number) => void,
+ 	): Promise<ArenaBlock[]> {
+ 		const blocks: ArenaBlock[] = [];
+ 		const seenBlockIds = new Set<number>();
+ 		let pageNumber = 1;
+ 		let hasMore = true;
+-		let totalPagesEstimate = 1;
++		let reportedTotalPages: number | null = null;
+ 		let consecutiveErrors = 0;
+ 		const MAX_CONSECUTIVE_ERRORS = 3;
+ 
+ 		while (hasMore) {
+ 			try {
+@@
+ 				const page = await this.getChannelContents(slug, pageNumber);
+ 				consecutiveErrors = 0;
+ 
+-				if (page.total_pages && page.total_pages > totalPagesEstimate) {
+-					totalPagesEstimate = page.total_pages;
++				if (page.total_pages && page.total_pages > 0) {
++					reportedTotalPages = page.total_pages;
+ 				}
+ 
+-				if (page.length && page.length > 0) {
+-					totalPagesEstimate = Math.max(
+-						totalPagesEstimate,
+-						Math.ceil(page.length / PER_PAGE),
+-					);
+-				}
+-
+ 				let newBlocksCount = 0;
+ 				for (const block of page.contents) {
+ 					if (!seenBlockIds.has(block.id)) {
+ 						seenBlockIds.add(block.id);
+ 						blocks.push(block);
+ 						newBlocksCount++;
+ 					}
+ 				}
+ 
+-				onPage(pageNumber, totalPagesEstimate);
++				onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
+ 
+ 				const emptyPage = page.contents.length === 0;
+ 				const lastPageByCount = page.contents.length < PER_PAGE;
+-				const lastPageByTotal = pageNumber >= totalPagesEstimate;
++				const lastPageByTotal =
++					reportedTotalPages !== null &&
++					pageNumber >= reportedTotalPages;
+ 				const duplicatePage =
+ 					newBlocksCount === 0 && page.contents.length > 0;
+@@
+ 					if (this.debug) {
+ 						console.log(
+ 							`[arena-sync] Stopping pagination for ${slug}: ` +
+-								`page=${pageNumber}, totalPages=${totalPagesEstimate}, ` +
++								`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
+ 								`blocksOnPage=${page.contents.length}, ` +
+ 								`newBlocks=${newBlocksCount}, ` +
+ 								`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
+ 						);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:57:00Z)**_
+
+I patched the pagination bug that can cap imports at exactly 100 blocks per channel. I’m running tests/build now, and then I’ll give you a quick targeted checklist to verify PDFs/images/banner output on the same problematic channel.
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:57:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand && npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand && npm run build'
+Chunk ID: 57807a
+Wall time: 1.0016 seconds
+Process running with session ID 36961
+Original token count: 404
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block (1 ms)
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode
+    ✓ handles an attachment block
+    ✓ falls back to Block ID when title is null (1 ms)
+    ✓ adds optional banner frontmatter field when enabled
+    ✓ supports display-first banner priority (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title (1 ms)
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string (1 ms)
+    ✓ is deterministic (5 ms)
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters (1 ms)
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs (1 ms)
+    ✓ leaves external URLs unchanged
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:57:04Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand && npm run build'
+Chunk ID: 15e824
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 437
+Output:
+-----------------|---------|----------|---------|---------|------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                        
+-----------------|---------|----------|---------|---------|------------------------------------------
+All files        |    8.09 |     15.3 |    4.32 |    8.54 |                                          
+ api.ts          |       0 |        0 |       0 |       0 | 1-383                                    
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                     
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                    
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                    
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                    
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-484                                    
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-543                                    
+ types.ts        |     100 |      100 |     100 |     100 |                                          
+ utils.ts        |    82.5 |    50.34 |    90.9 |   84.61 | 74,96,99,152-155,159-162,172-175,187-199 
+-----------------|---------|----------|---------|---------|------------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        1.27 s
+Ran all test suites.
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 00:57:12Z)**_
+
+You found a real bug, and I fixed it.
+
+**What was wrong**
+- Pagination logic could stop at exactly 100 blocks, so only page 1 imported for some channels.
+
+**What I changed**
+- Fixed channel pagination in [api.ts](/home/frost/Are.na-Importer/src/api.ts) so it keeps fetching until the true last page.
+- Rebuilt successfully; new zip is at `dist/Are.na-Importer-1.0.0.zip`.
+
+**Why this likely affected everything you saw**
+- If only first 100 blocks imported, you’d miss:
+  - later PDFs
+  - later image blocks
+  - notes where banner frontmatter would appear
+
+**For banner + embedded images specifically**
+- Banner field is still optional by design:
+  - enable `Banner frontmatter field` in settings
+  - choose `banner` field name and priority
+- Embedded images in body:
+  - set `Image handling` to `Embed reference` (or `Download to vault` for local `![[...]]` embeds)
+
+**Next step**
+- Re-run import for `rad-readings` (non-preview), then check the sync summary modal for:
+  - total created/updated count > 100
+  - asset downloads count
+  - any errors list
+
+If PDFs still don’t download after this pagination fix, send me one sample block URL from that channel and I’ll trace that exact attachment path quickly.
+
+---
+
+_**User (2026-03-31 01:18:18Z)**_
+
+rad-readings imported sucess!  ok a few things.... can we import block descriptions, if they exist, into frontmatter... and could we optionally place channel indexs into the channel folder, named exactly as the folder is named... for compatability with Folder Note plugin? could we also optionally import all comments for blocks?  ALSO.... this is a stretch, on Are.na when you hover over a channel block (a block that is just a link to another channel) a little preview pops up that shows a small selection of blocks from the channel being linked to... is it possible to grab an image like that and use it as the notes banner/body image?  ALSO, can we import a list of all other channels that the block appears in? it is listed in the channel block as: This channel appears in
+A Library, [I] library gardens, Designing Design, text snippets, A LOT OF…, 📚📑bookmarked🔖📚, ▤ Bookshelves, What is Philosophy?, Read , INPUTTING, lists of lists of list, THE LIBRARY OF LIGHT, lil library, explorations in thoughts, my free lil library, stuff to come back to, A Library of Libraries, drop off, channelworthy, article/essay tbr, per-l: Books + Read, cool stuff, .commonplace block, personal library, library ✶⋆.˚  ... can we list those connections in a section of the note body as clickable external links?  ....  ALSO, blocks have this info shown at the top (for instance this is what rad.readings has):  
+
+Info
+
+/// Library of books, *zines, documents... Interesting words and places to find them ///
+
+Started
+    about 2 years ago
+Modified
+    about 1 year ago
+Length
+    717
+Followers
+    94
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:18:43Z)**_
+
+This is a fantastic feature set, and we can absolutely build most of it cleanly. I’m implementing it as optional settings so default sync stays fast, while power features (comments, connected channels, channel preview images, folder-note index naming) can be turned on when you want richer notes.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:18:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,180p' src/sync-engine.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,180p' src/sync-engine.ts"
+Chunk ID: de2ec2
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1026
+Output:
+import { App, normalizePath, TFile, Vault } from "obsidian";
+import { ArenaApi } from "./api";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaSyncSettings,
+	ChannelMapping,
+	ImportProgress,
+	SyncOptions,
+	SyncRecord,
+	SyncResult,
+} from "./types";
+import {
+	blockFileName as utilsBlockFileName,
+	blockToMarkdown,
+	computeHash,
+	resolveChannelFolder,
+	resolveAttachmentBaseFolder,
+	sanitiseFilename,
+} from "./utils";
+import { unifiedDiff } from "./diff";
+
+type ProgressHandler = (progress: ImportProgress) => void;
+
+export class SyncEngine {
+	private api: ArenaApi;
+	private readonly settings: ArenaSyncSettings;
+	private vault: Vault;
+	private onProgress?: ProgressHandler;
+
+	constructor(
+		app: App,
+		api: ArenaApi,
+		settings: ArenaSyncSettings,
+		onProgress?: ProgressHandler,
+	) {
+		this.api = api;
+		this.settings = settings;
+		this.vault = app.vault;
+		this.onProgress = onProgress;
+	}
+
+	async syncAll(options: SyncOptions = {}): Promise<SyncResult> {
+		const dryRun = options.dryRun === true;
+		const aggregate: SyncResult = {
+			created: 0,
+			updated: 0,
+			deleted: 0,
+			moved: 0,
+			skipped: 0,
+			downloaded: 0,
+			dryRun,
+			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
+			errors: [],
+			duration: 0,
+		};
+		const start = Date.now();
+
+		for (const mapping of this.settings.channelMappings) {
+			if (!mapping.enabled) continue;
+			try {
+				const result = await this.syncChannel(mapping, options);
+				aggregate.created += result.created;
+				aggregate.updated += result.updated;
+				aggregate.deleted += result.deleted;
+				aggregate.moved += result.moved;
+				aggregate.skipped += result.skipped;
+				aggregate.downloaded += result.downloaded;
+				aggregate.actions.push(...result.actions);
+				aggregate.moves.push(...result.moves);
+				aggregate.fileDiffs.push(...result.fileDiffs);
+				aggregate.missingPaths.push(...result.missingPaths);
+				aggregate.errors.push(...result.errors);
+			} catch (err) {
+				aggregate.errors.push({
+					blockId: null,
+					channelSlug: mapping.channelSlug,
+					message: (err as Error).message,
+					recoverable: false,
+				});
+			}
+		}
+
+		await this.updateMasterOverview(aggregate, dryRun);
+
+		aggregate.duration = Date.now() - start;
+		return aggregate;
+	}
+
+	async syncChannel(
+		mapping: ChannelMapping,
+		options: SyncOptions = {},
+	): Promise<SyncResult> {
+		const dryRun = options.dryRun === true;
+		const result: SyncResult = {
+			created: 0,
+			updated: 0,
+			deleted: 0,
+			moved: 0,
+			skipped: 0,
+			downloaded: 0,
+			dryRun,
+			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
+			errors: [],
+			duration: 0,
+		};
+		const start = Date.now();
+		const channel = await this.api.getChannel(mapping.channelSlug);
+
+		if (!dryRun) {
+			mapping.channelId = channel.id;
+			mapping.channelTitle = channel.title;
+		}
+
+		await this.pull(mapping, channel, result, dryRun);
+
+		if (!dryRun) {
+			mapping.lastSyncedAt = new Date().toISOString();
+		}
+
+		result.duration = Date.now() - start;
+		return result;
+	}
+
+	private async pull(
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<void> {
+		const channelFolder = resolveChannelFolder(mapping);
+		const blocks = await this.api.getAllChannelBlocksWithProgress(
+			mapping.channelSlug,
+			(currentPage, totalPages) => {
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "pages",
+					current: currentPage,
+					total: totalPages,
+				});
+			},
+		);
+
+		if (!dryRun) {
+			await this.ensureFolder(channelFolder);
+		}
+
+		const importedPaths: string[] = [];
+		const importedBlockIds: number[] = [];
+		for (let i = 0; i < blocks.length; i++) {
+			const block = blocks[i];
+			this.onProgress?.({
+				channelSlug: mapping.channelSlug,
+				phase: "blocks",
+				current: i + 1,
+				total: blocks.length,
+			});
+
+			if (this.shouldExclude(block)) {
+				result.skipped++;
+				continue;
+			}
+
+			try {
+				const path = await this.pullBlock(
+					block,
+					mapping,
+					channel,
+					result,
+					dryRun,
+				);
+				importedPaths.push(path);
+				importedBlockIds.push(block.id);
+			} catch (err) {
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:18:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' src/types.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' src/types.ts"
+Chunk ID: 66f580
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1095
+Output:
+/**
+ * Are.na API type definitions
+ */
+
+export interface ArenaUser {
+	id: number;
+	slug: string;
+	username: string;
+	first_name: string;
+	last_name: string;
+	avatar: string;
+	channel_count: number;
+}
+
+export interface ArenaBlock {
+	id: number;
+	title: string | null;
+	content: string | null;
+	content_html: string | null;
+	description: string | null;
+	description_html: string | null;
+	source: { url: string; title: string } | null;
+	image: {
+		filename: string;
+		content_type: string;
+		original: { url: string };
+		display: { url: string };
+		thumb: { url: string };
+	} | null;
+	attachment: {
+		file_name: string;
+		file_size: number;
+		url: string;
+		content_type: string;
+		extension: string;
+	} | null;
+	class: string;
+	base_class: "Block";
+	created_at: string;
+	updated_at: string;
+	connected_at: string;
+	position: number;
+	user: ArenaUser;
+}
+
+export interface ArenaChannel {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	status: "closed" | "public" | "private";
+	user: ArenaUser;
+	contents: ArenaBlock[];
+	created_at: string;
+	updated_at: string;
+	metadata: {
+		description: string | null;
+	} | null;
+}
+
+export interface ArenaChannelListItem {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	status: "closed" | "public" | "private";
+	updated_at: string;
+}
+
+export interface ArenaPaginatedResponse<T> {
+	contents: T[];
+	length: number;
+	total_pages: number;
+	current_page: number;
+	per: number;
+}
+
+/**
+ * Plugin-specific types
+ */
+
+export type BlockNamingScheme = "title" | "id" | "title-id";
+export type ImageHandling = "embed" | "link" | "download";
+export type AttachmentHandling = "link" | "download";
+export type DownloadedAttachmentLinkStyle = "embed" | "link";
+export type AttachmentStorage = "channel" | "global" | "custom";
+export type BannerImagePriority = "thumb-first" | "display-first";
+
+export interface ChannelMapping {
+	channelSlug: string;
+	channelId: number;
+	channelTitle: string;
+	localFolder: string;
+	lastSyncedAt: string | null;
+	enabled: boolean;
+	attachmentStorageOverride?: AttachmentStorage | null;
+	customAttachmentFolderOverride?: string;
+	lastAttachmentBase?: string | null;
+}
+
+export interface SyncRecord {
+	blockId: number;
+	channelId: number;
+	localPath: string;
+	lastSyncedAt: string;
+	localHash: string;
+	remoteHash: string;
+}
+
+export interface SyncResult {
+	created: number;
+	updated: number;
+	deleted: number;
+	moved: number;
+	skipped: number;
+	downloaded: number;
+	dryRun: boolean;
+	actions: string[];
+	moves: MoveRecord[];
+	fileDiffs: FileDiff[];
+	missingPaths: string[];
+	errors: SyncError[];
+	duration: number;
+}
+
+export interface SyncOptions {
+	dryRun?: boolean;
+}
+
+export interface ImportProgress {
+	channelSlug: string;
+	phase: "pages" | "blocks";
+	current: number;
+	total: number;
+}
+
+export interface SyncError {
+	blockId: number | null;
+	channelSlug: string;
+	message: string;
+	recoverable: boolean;
+}
+
+export interface MoveRecord {
+	from: string;
+	to: string;
+}
+
+export interface FileDiff {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+	kind: "create" | "update" | "move" | "delete";
+}
+
+export interface ArenaSyncSettings {
+	apiToken: string;
+	syncInterval: number;
+	syncOnStartup: boolean;
+	autoEnableImportedChannels: boolean;
+	blockNaming: BlockNamingScheme;
+	bannerFieldEnabled: boolean;
+	bannerFieldName: string;
+	bannerImagePriority: BannerImagePriority;
+	imageHandling: ImageHandling;
+	attachmentHandling: AttachmentHandling;
+	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+	attachmentStorage: AttachmentStorage;
+	globalAttachmentFolder: string;
+	customAttachmentFolder: string;
+	channelMappings: ChannelMapping[];
+	syncRecords: SyncRecord[];
+	frontmatterEnabled: boolean;
+	excludeClasses: string[];
+	notifyOnSync: boolean;
+	debugLogging: boolean;
+}
+
+export const DEFAULT_SETTINGS: ArenaSyncSettings = {
+	apiToken: "",
+	syncInterval: 30,
+	syncOnStartup: false,
+	autoEnableImportedChannels: true,
+	blockNaming: "title",
+	bannerFieldEnabled: false,
+	bannerFieldName: "banner",
+	bannerImagePriority: "thumb-first",
+	imageHandling: "download",
+	attachmentHandling: "download",
+	downloadedAttachmentLinkStyle: "link",
+	attachmentStorage: "global",
+	globalAttachmentFolder: "Are.na/Attachments",
+	customAttachmentFolder: "",
+	channelMappings: [],
+	syncRecords: [],
+	frontmatterEnabled: true,
+	excludeClasses: [],
+	notifyOnSync: true,
+	debugLogging: false,
+};
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:18:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/utils.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/utils.ts"
+Chunk ID: 1314f7
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1617
+Output:
+import { createHash } from "crypto";
+import { normalizePath } from "obsidian";
+import type {
+	AttachmentStorage,
+	ArenaBlock,
+	ArenaSyncSettings,
+	ChannelMapping,
+} from "./types";
+
+export interface MarkdownContext {
+	channelSlug?: string;
+	channelTitle?: string;
+	assetPath?: string;
+}
+
+export function resolveChannelFolder(mapping: ChannelMapping): string {
+	const explicit = mapping.localFolder?.trim();
+	if (explicit) {
+		return normalizePath(explicit);
+	}
+	const slug = mapping.channelSlug?.trim();
+	return normalizePath(slug ? `Are.na/${slug}` : "Are.na");
+}
+
+function yamlQuote(value: string): string {
+	return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function resolveImageEmbedUrl(block: ArenaBlock): string | null {
+	if (!block.image) return null;
+	return (
+		block.image.display?.url ||
+		block.image.thumb?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
+function resolveBlockBannerUrlWithPriority(
+	block: ArenaBlock,
+	priority: "thumb-first" | "display-first",
+): string | null {
+	if (!block.image) return null;
+	if (priority === "display-first") {
+		return (
+			block.image.display?.url ||
+			block.image.thumb?.url ||
+			block.image.original?.url ||
+			null
+		);
+	}
+	return (
+		block.image.thumb?.url ||
+		block.image.display?.url ||
+		block.image.original?.url ||
+		null
+	);
+}
+
+export function normalizeArenaUrl(url: string): string {
+	if (!url) return url;
+	try {
+		const parsed = new URL(url);
+		if (parsed.hostname === "api.are.na") {
+			const path = parsed.pathname.replace(/^\/v2/, "");
+			const converted = path
+				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+				.replace(/^\/users\/([^/]+).*$/, "/user/$1");
+			return `https://www.are.na${converted}`;
+		}
+		return url;
+	} catch {
+		return url;
+	}
+}
+
+/**
+ * Convert an Are.na block into a Markdown string suitable for Obsidian.
+ */
+export function blockToMarkdown(
+	block: ArenaBlock,
+	settings: ArenaSyncSettings,
+	context: MarkdownContext = {}
+): string {
+	const parts: string[] = [];
+
+	if (settings.frontmatterEnabled) {
+		parts.push("---");
+		parts.push(`arena_id: ${block.id}`);
+		parts.push(`arena_url: ${yamlQuote(`https://www.are.na/block/${block.id}`)}`);
+		parts.push(`arena_class: ${yamlQuote(block.class)}`);
+		parts.push(`arena_created_at: ${yamlQuote(block.created_at)}`);
+		parts.push(`arena_updated_at: ${yamlQuote(block.updated_at)}`);
+		if (context.channelSlug) {
+			parts.push(`arena_channel_slug: ${yamlQuote(context.channelSlug)}`);
+		}
+		if (context.channelTitle) {
+			parts.push(`arena_channel_title: ${yamlQuote(context.channelTitle)}`);
+		}
+		if (block.source?.url) {
+			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
+		}
+		if (settings.bannerFieldEnabled) {
+			const bannerValue = resolveBlockBannerUrlWithPriority(
+				block,
+				settings.bannerImagePriority,
+			);
+			if (bannerValue) {
+				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
+				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
+			}
+		}
+		parts.push("---");
+		parts.push("");
+	}
+
+	const title = block.title ?? `Block ${block.id}`;
+	parts.push(`# ${title}`);
+	parts.push("");
+
+	switch (block.class) {
+		case "Text":
+			parts.push(block.content ?? "");
+			break;
+		case "Image":
+			if (block.image) {
+				const embedUrl = resolveImageEmbedUrl(block);
+				if (settings.imageHandling === "download") {
+					const ref = context.assetPath ?? block.image.filename;
+					parts.push(`![[${ref}]]`);
+				} else if (settings.imageHandling === "embed") {
+					if (embedUrl) {
+						parts.push(`![${title}](${embedUrl})`);
+					}
+				} else if (embedUrl) {
+					parts.push(`[${title}](${embedUrl})`);
+				}
+			}
+			break;
+		case "Link":
+			if (block.source?.url) {
+				const source = normalizeArenaUrl(block.source.url);
+				parts.push(`[${block.source.title || source}](${source})`);
+			}
+			if (block.description) {
+				parts.push("");
+				parts.push(block.description);
+			}
+			break;
+		case "Media":
+			if (block.source?.url) {
+				parts.push(`<${normalizeArenaUrl(block.source.url)}>`);
+			}
+			break;
+		case "Attachment":
+			if (block.attachment) {
+				if (context.assetPath && settings.attachmentHandling === "download") {
+					if (settings.downloadedAttachmentLinkStyle === "embed") {
+						parts.push(`![[${context.assetPath}]]`);
+					} else {
+						parts.push(`[[${context.assetPath}|${block.attachment.file_name}]]`);
+					}
+				} else {
+					parts.push(`[${block.attachment.file_name}](${block.attachment.url})`);
+				}
+			}
+			break;
+	}
+
+	if (block.description && block.class !== "Link") {
+		parts.push("");
+		parts.push("---");
+		parts.push("");
+		parts.push(block.description);
+	}
+
+	parts.push("");
+	return parts.join("\n");
+}
+
+export function resolveAttachmentBaseFolder(
+	settings: ArenaSyncSettings,
+	mapping: ChannelMapping
+): string {
+	
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:19:10Z)**_
+
+I’m moving ahead with a full implementation pass: richer block metadata (description/comments/connected channels), folder-note-compatible index naming, and channel-info sections in index notes. I’ll keep all heavy features optional so sync stays predictable unless you opt in.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:19:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+ export interface ArenaChannel {
+ 	id: number;
+ 	title: string;
+ 	slug: string;
+ 	length: number;
++	follower_count?: number;
++	followers_count?: number;
+ 	status: "closed" | "public" | "private";
+ 	user: ArenaUser;
+@@
+ export type AttachmentHandling = "link" | "download";
+ export type DownloadedAttachmentLinkStyle = "embed" | "link";
+ export type AttachmentStorage = "channel" | "global" | "custom";
+ export type BannerImagePriority = "thumb-first" | "display-first";
++export type ChannelIndexNoteStyle = "index" | "folder-name";
+@@
+ 	blockNaming: BlockNamingScheme;
+ 	bannerFieldEnabled: boolean;
+ 	bannerFieldName: string;
+ 	bannerImagePriority: BannerImagePriority;
++	includeBlockDescriptionFrontmatter: boolean;
++	includeBlockComments: boolean;
++	includeBlockConnectedChannels: boolean;
++	includeChannelBlockPreviewImage: boolean;
++	channelIndexNoteStyle: ChannelIndexNoteStyle;
+ 	imageHandling: ImageHandling;
+@@
+ 	blockNaming: "title",
+ 	bannerFieldEnabled: false,
+ 	bannerFieldName: "banner",
+ 	bannerImagePriority: "thumb-first",
++	includeBlockDescriptionFrontmatter: false,
++	includeBlockComments: false,
++	includeBlockConnectedChannels: false,
++	includeChannelBlockPreviewImage: false,
++	channelIndexNoteStyle: "index",
+ 	imageHandling: "download",
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:19:29Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+ export interface MarkdownContext {
+ 	channelSlug?: string;
+ 	channelTitle?: string;
+ 	assetPath?: string;
++	bannerImageUrl?: string;
++	bodyImageUrl?: string;
++	comments?: Array<{
++		author: string;
++		body: string;
++		createdAt?: string;
++	}>;
++	connectedChannels?: Array<{
++		title: string;
++		slug?: string;
++	}>;
+ }
+@@
+ 		if (block.source?.url) {
+ 			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
+ 		}
++		if (settings.includeBlockDescriptionFrontmatter && block.description) {
++			parts.push(`arena_description: ${yamlQuote(block.description)}`);
++		}
+ 		if (settings.bannerFieldEnabled) {
+-			const bannerValue = resolveBlockBannerUrlWithPriority(
+-				block,
+-				settings.bannerImagePriority,
+-			);
++			const bannerValue =
++				context.bannerImageUrl ||
++				resolveBlockBannerUrlWithPriority(
++					block,
++					settings.bannerImagePriority,
++				);
+ 			if (bannerValue) {
+ 				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
+ 				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
+ 			}
+ 		}
+@@
+ 	const title = block.title ?? `Block ${block.id}`;
+ 	parts.push(`# ${title}`);
+ 	parts.push("");
+ 
++	if (context.bodyImageUrl && block.class !== "Image") {
++		parts.push(`![${title}](${context.bodyImageUrl})`);
++		parts.push("");
++	}
++
+ 	switch (block.class) {
+@@
+ 	if (block.description && block.class !== "Link") {
+ 		parts.push("");
+ 		parts.push("---");
+ 		parts.push("");
+ 		parts.push(block.description);
+ 	}
++
++	if (context.connectedChannels && context.connectedChannels.length > 0) {
++		parts.push("");
++		parts.push("## This Block Also Appears In");
++		parts.push("");
++		for (const ch of context.connectedChannels) {
++			if (ch.slug) {
++				parts.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
++			} else {
++				parts.push(`- ${ch.title}`);
++			}
++		}
++	}
++
++	if (context.comments && context.comments.length > 0) {
++		parts.push("");
++		parts.push("## Comments");
++		parts.push("");
++		for (const comment of context.comments) {
++			const prefix = comment.createdAt
++				? `- **${comment.author}** (${comment.createdAt})`
++				: `- **${comment.author}**`;
++			parts.push(`${prefix}: ${comment.body}`);
++		}
++	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:19:42Z)**_
+
+I’m now patching the sync engine internals so enrichment is done once per block with caching, and index generation supports the folder-note filename mode plus channel info fields like description/started/modified/length/followers.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:20:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/sync-engine.ts`**
+
+```diff
+@@
+ export class SyncEngine {
+ 	private api: ArenaApi;
+ 	private readonly settings: ArenaSyncSettings;
+ 	private vault: Vault;
+ 	private onProgress?: ProgressHandler;
++	private blockDetailsCache = new Map<number, unknown>();
++	private channelPreviewCache = new Map<string, string | null>();
+@@
+ 	async syncChannel(
+ 		mapping: ChannelMapping,
+ 		options: SyncOptions = {},
+ 	): Promise<SyncResult> {
++		this.blockDetailsCache.clear();
++		this.channelPreviewCache.clear();
+ 		const dryRun = options.dryRun === true;
+@@
+ 		const markdown = blockToMarkdown(block, this.settings, {
+ 			channelSlug: channel.slug,
+ 			channelTitle: channel.title,
+ 			assetPath,
++			...(await this.buildBlockContext(block, channel.slug)),
+ 		});
+@@
+ 	private async updateChannelIndex(
+ 		mapping: ChannelMapping,
+ 		channel: ArenaChannel,
+ 		notePaths: string[],
+ 		dryRun: boolean,
+ 		result: SyncResult,
+ 	): Promise<void> {
+-		const indexPath = normalizePath(
+-			`${resolveChannelFolder(mapping)}/index.md`,
+-		);
++		const indexPath = this.channelIndexPath(mapping);
+ 		const sorted = [...notePaths].sort();
++		const channelDescription = channel.metadata?.description?.trim();
++		const followerCount =
++			channel.follower_count ??
++			channel.followers_count ??
++			null;
+ 		const lines: string[] = [
+ 			`# ${channel.title}`,
+ 			"",
++			"## Info",
++			"",
++		];
++		if (channelDescription) {
++			lines.push(channelDescription);
++			lines.push("");
++		}
++		lines.push(
+ 			`- Are.na: https://www.are.na/channel/${channel.slug}`,
++			`- Started: ${channel.created_at}`,
++			`- Modified: ${channel.updated_at}`,
+ 			`- Imported blocks: ${sorted.length}`,
+-			"",
+-			"## Notes",
+-		];
++			`- Length: ${channel.length}`,
++		);
++		if (typeof followerCount === "number") {
++			lines.push(`- Followers: ${followerCount}`);
++		}
++		lines.push("", "## Notes");
+@@
+ 		const lines: string[] = ["# Are.na Overview", "", "## Channels"];
+ 		for (const mapping of this.settings.channelMappings) {
+ 			if (!mapping.enabled) continue;
+ 			const title = mapping.channelTitle || mapping.channelSlug;
+-			const indexPath = normalizePath(
+-				`${resolveChannelFolder(mapping)}/index.md`,
+-			);
++			const indexPath = this.channelIndexPath(mapping);
+ 			lines.push(`- [[${indexPath}|${title}]]`);
+ 		}
+@@
+ 	private shouldExclude(block: ArenaBlock): boolean {
+ 		return this.settings.excludeClasses.includes(block.class);
+ 	}
++
++	private channelIndexPath(mapping: ChannelMapping): string {
++		const folder = resolveChannelFolder(mapping);
++		if (this.settings.channelIndexNoteStyle === "folder-name") {
++			const parts = folder.split("/").filter(Boolean);
++			const folderName = parts[parts.length - 1] || "index";
++			return normalizePath(`${folder}/${folderName}.md`);
++		}
++		return normalizePath(`${folder}/index.md`);
++	}
++
++	private async buildBlockContext(
++		block: ArenaBlock,
++		sourceChannelSlug: string,
++	): Promise<{
++		bannerImageUrl?: string;
++		bodyImageUrl?: string;
++		comments?: Array<{
++			author: string;
++			body: string;
++			createdAt?: string;
++		}>;
++		connectedChannels?: Array<{
++			title: string;
++			slug?: string;
++		}>;
++	}> {
++		const out: {
++			bannerImageUrl?: string;
++			bodyImageUrl?: string;
++			comments?: Array<{
++				author: string;
++				body: string;
++				createdAt?: string;
++			}>;
++			connectedChannels?: Array<{
++				title: string;
++				slug?: string;
++			}>;
++		} = {};
++
++		if (
++			this.settings.includeBlockComments ||
++			this.settings.includeBlockConnectedChannels
++		) {
++			const detail = await this.getBlockDetail(block.id);
++			if (detail && this.settings.includeBlockComments) {
++				const comments = this.extractComments(detail);
++				if (comments.length > 0) {
++					out.comments = comments;
++				}
++			}
++			if (detail && this.settings.includeBlockConnectedChannels) {
++				const channels = this.extractConnectedChannels(
++					detail,
++					sourceChannelSlug,
++				);
++				if (channels.length > 0) {
++					out.connectedChannels = channels;
++				}
++			}
++		}
++
++		if (this.settings.includeChannelBlockPreviewImage && block.class === "Channel") {
++			const slug = this.extractChannelSlugFromBlock(block);
++			if (slug) {
++				const previewUrl = await this.getChannelPreviewImage(slug);
++				if (previewUrl) {
++					out.bodyImageUrl = previewUrl;
++					out.bannerImageUrl = previewUrl;
++				}
++			}
++		}
++
++		return out;
++	}
++
++	private async getBlockDetail(id: number): Promise<unknown> {
++		if (this.blockDetailsCache.has(id)) {
++			return this.blockDetailsCache.get(id);
++		}
++		try {
++			const detail = await this.api.getBlock(id);
++			this.blockDetailsCache.set(id, detail);
++			return detail;
++		} catch {
++			this.blockDetailsCache.set(id, null);
++			return null;
++		}
++	}
++
++	private extractComments(detail: unknown): Array<{
++		author: string;
++		body: string;
++		createdAt?: string;
++	}> {
++		const obj = detail as Record<string, unknown>;
++		const raw = obj?.comments;
++		if (!Array.isArray(raw)) return [];
++		const comments: Array<{ author: string; body: string; createdAt?: string }> = [];
++		for (const item of raw) {
++			if (!item || typeof item !== "object") continue;
++			const c = item as Record<string, unknown>;
++			const body =
++				typeof c.body === "string"
++					? c.body
++					: typeof c.content === "string"
++						? c.content
++						: typeof c.comment === "string"
++							? c.comment
++							: "";
++			if (!body.trim()) continue;
++			const user = (c.user || {}) as Record<string, unknown>;
++			const author =
++				(typeof user.username === "string" && user.username) ||
++				(typeof user.slug === "string" && user.slug) ||
++				(typeof c.author === "string" && c.author) ||
++				"Unknown";
++			const createdAt =
++				typeof c.created_at === "string" ? c.created_at : undefined;
++			comments.push({ author, body: body.trim(), createdAt });
++		}
++		return comments;
++	}
++
++	private extractConnectedChannels(
++		detail: unknown,
++		sourceChannelSlug: string,
++	): Array<{ title: string; slug?: string }> {
++		const obj = detail as Record<string, unknown>;
++		const pools = [
++			obj.connected_by_channels,
++			obj.connected_channels,
++			obj.channels,
++			obj.appears_in_channels,
++		];
++		const bySlug = new Map<string, { title: string; slug?: string }>();
++		const byTitle = new Map<string, { title: string; slug?: string }>();
++		for (const pool of pools) {
++			if (!Array.isArray(pool)) continue;
++			for (const item of pool) {
++				if (!item || typeof item !== "object") continue;
++				const ch = item as Record<string, unknown>;
++				const slug =
++					typeof ch.slug === "string" && ch.slug.trim()
++						? ch.slug.trim()
++						: undefined;
++				const title =
++					typeof ch.title === "string" && ch.title.trim()
++						? ch.title.trim()
++						: slug || "Untitled";
++				if (slug && slug === sourceChannelSlug) continue;
++				const row = { title, slug };
++				if (slug) {
++					bySlug.set(slug, row);
++				} else {
++					byTitle.set(title.toLowerCase(), row);
++				}
++			}
++		}
++		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
++			a.title.localeCompare(b.title),
++		);
++	}
++
++	private extractChannelSlugFromBlock(block: ArenaBlock): string | null {
++		const sourceUrl = block.source?.url;
++		if (!sourceUrl) return null;
++		try {
++			const url = new URL(sourceUrl);
++			const match = url.pathname.match(/\/channel\/([^/]+)/);
++			return match?.[1] ? decodeURIComponent(match[1]) : null;
++		} catch {
++			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
++			return match?.[1] ? decodeURIComponent(match[1]) : null;
++		}
++	}
++
++	private async getChannelPreviewImage(slug: string): Promise<string | null> {
++		if (this.channelPreviewCache.has(slug)) {
++			return this.channelPreviewCache.get(slug) || null;
++		}
++		try {
++			const page = await this.api.getChannelContents(slug, 1);
++			for (const block of page.contents) {
++				if (block.class !== "Image" || !block.image) continue;
++				const url =
++					block.image.display?.url ||
++					block.image.thumb?.url ||
++					block.image.original?.url ||
++					null;
++				if (url) {
++					this.channelPreviewCache.set(slug, url);
++					return url;
++				}
++			}
++		} catch {
++			// best effort only
++		}
++		this.channelPreviewCache.set(slug, null);
++		return null;
++	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:20:29Z)**_
+
+Engine enrichment is in place. I’m now exposing all of this behind settings toggles/dropdowns so you can choose exactly how rich (and how heavy) imports should be.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:20:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ import type {
+ 	AttachmentHandling,
+ 	AttachmentStorage,
+ 	BannerImagePriority,
++	ChannelIndexNoteStyle,
+ 	BlockNamingScheme,
+ 	DownloadedAttachmentLinkStyle,
+ 	ImageHandling,
+ } from "./types";
+@@
+ 		new Setting(containerEl)
+ 			.setName("Banner frontmatter field")
+@@
+ 		if (this.plugin.settings.bannerFieldEnabled) {
+@@
+ 		}
++
++		new Setting(containerEl)
++			.setName("Block description in frontmatter")
++			.setDesc("Adds `arena_description` when block description exists")
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.includeBlockDescriptionFrontmatter)
++					.onChange(async (value) => {
++						this.plugin.settings.includeBlockDescriptionFrontmatter = value;
++						await this.plugin.saveSettings();
++					}),
++			);
++
++		new Setting(containerEl)
++			.setName("Import block comments")
++			.setDesc("Imports all block comments into a `Comments` section in notes")
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.includeBlockComments)
++					.onChange(async (value) => {
++						this.plugin.settings.includeBlockComments = value;
++						await this.plugin.saveSettings();
++					}),
++			);
++
++		new Setting(containerEl)
++			.setName("Import connected channels")
++			.setDesc(
++				"Imports channels where the block appears in a `This Block Also Appears In` section",
++			)
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.includeBlockConnectedChannels)
++					.onChange(async (value) => {
++						this.plugin.settings.includeBlockConnectedChannels = value;
++						await this.plugin.saveSettings();
++					}),
++			);
++
++		new Setting(containerEl)
++			.setName("Channel block preview image")
++			.setDesc(
++				"Best-effort: for Channel blocks, use linked channel preview image as note banner/body image",
++			)
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.includeChannelBlockPreviewImage)
++					.onChange(async (value) => {
++						this.plugin.settings.includeChannelBlockPreviewImage = value;
++						await this.plugin.saveSettings();
++					}),
++			);
++
++		new Setting(containerEl)
++			.setName("Channel index note naming")
++			.setDesc("Choose index note filename style for folder note compatibility")
++			.addDropdown((dd) =>
++				dd
++					.addOptions({
++						index: "index.md",
++						"folder-name": "match folder name",
++					} as Record<ChannelIndexNoteStyle, string>)
++					.setValue(this.plugin.settings.channelIndexNoteStyle)
++					.onChange(async (value) => {
++						this.plugin.settings.channelIndexNoteStyle =
++							value as ChannelIndexNoteStyle;
++						await this.plugin.saveSettings();
++					}),
++			);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:20:47Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ - Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
++- Optional block description in frontmatter (`arena_description`)
++- Optional import of block comments
++- Optional import of connected channels where block appears
++- Optional best-effort preview image for Channel blocks (banner/body image)
+ - Writes channel index notes for graph-friendly linking
++- Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+ - Writes a master overview note for all synced channels
+ - Shows a sync summary modal with diffs for updated files
+@@
+ - Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
++- Optional block enrichment toggles:
++  description in frontmatter, comments, connected channels, channel block preview image
+ - Image handling (`download`, `embed`, `link`)
+@@
+ - Channel mappings (`channel slug` -> `local folder`)
+   Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
++- Channel index note naming (`index.md`, `folder-name`)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__tests__/utils.test.ts`**
+
+```diff
+@@
+ 	it("adds optional banner frontmatter field when enabled", () => {
+@@
+ 		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
+ 	});
++
++	it("can include block description in frontmatter", () => {
++		const block = makeBlock({ description: "Short summary" });
++		const s = {
++			...settings,
++			includeBlockDescriptionFrontmatter: true,
++		};
++		const md = blockToMarkdown(block, s);
++		expect(md).toContain('arena_description: "Short summary"');
++	});
+ 
+ 	it("supports display-first banner priority", () => {
+@@
+ 		const md = blockToMarkdown(block, s);
+ 		expect(md).toContain('banner: "https://cdn.are.na/photo_display.jpg"');
+ 	});
++
++	it("renders comments and connected channels sections from context", () => {
++		const block = makeBlock({ class: "Channel", content: null });
++		const md = blockToMarkdown(block, settings, {
++			bodyImageUrl: "https://cdn.are.na/channel-preview.jpg",
++			connectedChannels: [
++				{ title: "A Library", slug: "a-library" },
++				{ title: "Read", slug: "read" },
++			],
++			comments: [
++				{
++					author: "testuser",
++					createdAt: "2026-03-30T00:00:00.000Z",
++					body: "Great channel",
++				},
++			],
++		});
++		expect(md).toContain("![Test Block](https://cdn.are.na/channel-preview.jpg)");
++		expect(md).toContain("## This Block Also Appears In");
++		expect(md).toContain("[A Library](https://www.are.na/channel/a-library)");
++		expect(md).toContain("## Comments");
++		expect(md).toContain("Great channel");
++	});
+ });
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:05Z)**_
+
+I’ve finished wiring the new options and test coverage for markdown rendering. I’m running lint/test/build now to catch any edge-case syntax or style issues before you pull this into your workflow.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint && npm test -- --runInBand && npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 84fa01
+Wall time: 1.0003 seconds
+Process running with session ID 32793
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:09Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 4bd9e9
+Wall time: 2.3982 seconds
+Process exited with code 0
+Original token count: 858
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled
+    ✓ handles a link block (1 ms)
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode
+    ✓ handles an attachment block
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled
+    ✓ can include block description in frontmatter
+    ✓ supports display-first banner priority (1 ms)
+    ✓ renders comments and connected channels sections from context (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title
+    ✓ handles content without front-matter (1 ms)
+  computeHash
+    ✓ returns a 16-char hex string
+    ✓ is deterministic
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank (1 ms)
+    ✓ uses explicit local folder when provided
+
+-----------------|---------|----------|---------|---------|----------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                      
+-----------------|---------|----------|---------|---------|----------------------------------------
+All files        |    8.86 |    14.56 |    3.93 |    9.36 |                                        
+ api.ts          |       0 |        0 |       0 |       0 | 1-383                                  
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                   
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                  
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                  
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                  
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-554                                  
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-764                                  
+ types.ts        |     100 |      100 |     100 |     100 |                                        
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245 
+-----------------|---------|----------|---------|---------|----------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        1.658 s
+Ran all test suites.
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:26Z)**_
+
+This is exactly the kind of “make it actually useful in daily use” feature pass I enjoy, and I implemented all of it with optional toggles so you can keep sync lean or make it rich.
+
+**Implemented**
+
+1. Block descriptions in frontmatter  
+- New setting: `Block description in frontmatter`  
+- Adds `arena_description` when a block has a description.
+
+2. Folder Note compatible channel index naming  
+- New setting: `Channel index note naming`  
+- Options:
+  - `index.md` (current behavior)
+  - `match folder name` (creates `<folder>/<foldername>.md`)
+
+3. Block comments import (optional)  
+- New setting: `Import block comments`  
+- Adds a `## Comments` section to notes.
+
+4. “This block appears in…” connected channels import (optional)  
+- New setting: `Import connected channels`  
+- Adds a `## This Block Also Appears In` section with clickable external links to Are.na channel URLs.
+
+5. Channel-block hover-preview style image (best effort, optional)  
+- New setting: `Channel block preview image`  
+- For `Channel` blocks, it tries to fetch a preview image from the linked channel and uses it as note body image + banner candidate.
+
+6. Channel info in index notes  
+- Channel index notes now include an `Info` section with:
+  - description (if present)
+  - started
+  - modified
+  - length
+  - followers (if API provides it)
+
+**Files updated**
+- [src/sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
+- [src/utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [src/types.ts](/home/frost/Are.na-Importer/src/types.ts)
+- [src/__tests__/utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+
+**Validation**
+- `npm run lint` passed
+- `npm test -- --runInBand` passed (`25/25`)
+- `npm run build` passed
+- package zip generated: `dist/Are.na-Importer-1.0.0.zip`
+
+If you want, next I can add one more option: “import comments/connected-channels only for new/updated blocks” to reduce API load on very large channels.
+
+---
+
+_**User (2026-03-31 01:21:27Z)**_
+
+possible to add that to index note body for channels?
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:36Z)**_
+
+Yep, we can do that. I’m adding a “This Channel Appears In” section directly in each channel index note body (best-effort from Are.na channel metadata), with clickable external links.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/sync-engine.ts`**
+
+```diff
+@@
+ 	private async updateChannelIndex(
+ 		mapping: ChannelMapping,
+ 		channel: ArenaChannel,
+ 		notePaths: string[],
+ 		dryRun: boolean,
+ 		result: SyncResult,
+ 	): Promise<void> {
+ 		const indexPath = this.channelIndexPath(mapping);
+ 		const sorted = [...notePaths].sort();
+ 		const channelDescription = channel.metadata?.description?.trim();
++		const appearsInChannels = this.extractChannelAppearsIn(channel);
+ 		const followerCount =
+ 			channel.follower_count ??
+ 			channel.followers_count ??
+ 			null;
+@@
+ 		if (typeof followerCount === "number") {
+ 			lines.push(`- Followers: ${followerCount}`);
+ 		}
++		if (appearsInChannels.length > 0) {
++			lines.push("");
++			lines.push("## This Channel Appears In");
++			lines.push("");
++			for (const ch of appearsInChannels) {
++				if (ch.slug) {
++					lines.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
++				} else {
++					lines.push(`- ${ch.title}`);
++				}
++			}
++		}
+ 		lines.push("", "## Notes");
+@@
+ 	private extractConnectedChannels(
+ 		detail: unknown,
+ 		sourceChannelSlug: string,
+ 	): Array<{ title: string; slug?: string }> {
+@@
+ 		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
+ 			a.title.localeCompare(b.title),
+ 		);
+ 	}
++
++	private extractChannelAppearsIn(
++		channel: ArenaChannel,
++	): Array<{ title: string; slug?: string }> {
++		const chObj = channel as unknown as Record<string, unknown>;
++		const pools = [
++			chObj.connected_by_channels,
++			chObj.connected_channels,
++			chObj.channels,
++			chObj.appears_in_channels,
++		];
++		const bySlug = new Map<string, { title: string; slug?: string }>();
++		const byTitle = new Map<string, { title: string; slug?: string }>();
++		for (const pool of pools) {
++			if (!Array.isArray(pool)) continue;
++			for (const item of pool) {
++				if (!item || typeof item !== "object") continue;
++				const row = item as Record<string, unknown>;
++				const slug =
++					typeof row.slug === "string" && row.slug.trim()
++						? row.slug.trim()
++						: undefined;
++				if (slug && slug === channel.slug) continue;
++				const title =
++					typeof row.title === "string" && row.title.trim()
++						? row.title.trim()
++						: slug || "Untitled";
++				if (slug) {
++					bySlug.set(slug, { title, slug });
++				} else {
++					byTitle.set(title.toLowerCase(), { title });
++				}
++			}
++		}
++		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
++			a.title.localeCompare(b.title),
++		);
++	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:51Z)**_
+
+I’ve added the section generation. I’m doing a quick build check to ensure no type/syntax issues, then I’ll summarize exactly how it behaves.
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 18264f
+Wall time: 1.0037 seconds
+Process running with session ID 97256
+Original token count: 32
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:21:54Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 154cbe
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17
+Output:
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 01:22:00Z)**_
+
+Yes, and it’s now added.
+
+Channel index notes now include a new section in the note body when data exists:
+
+- `## This Channel Appears In`
+- each connected channel listed as clickable external link to Are.na
+
+I implemented this in [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts), and verified build passes.  
+New package is ready at `dist/Are.na-Importer-1.0.0.zip`.
+
+If Are.na doesn’t return those connection arrays for a specific channel, the section is simply omitted (best-effort behavior).
+
+---
+
+_**User (2026-03-31 02:07:42Z)**_
+
+yes add it... and update the readme and all documentation to reflect any changes we have made today.
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:52Z)**_
+
+Perfect, I’ll do a documentation sweep now so the repo tells the full truth of what we shipped today. I’ll update `README` in detail and add a structured `CHANGELOG` entry covering new features, bug fixes, and behavior changes.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -1`</summary>
+```
+Command: /usr/bin/zsh -lc 'ls -1'
+Chunk ID: 3b304f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 63
+Output:
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+README.md
+SECURITY.md
+assets
+coverage
+dist
+esbuild.config.mjs
+jest.config.cjs
+main.js
+manifest.json
+node_modules
+package-lock.json
+package.json
+scripts
+src
+styles.css
+tsconfig.json
+version-bump.mjs
+versions.json
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,320p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,320p' README.md"
+Chunk ID: 4cf459
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1574
+Output:
+# Are.na Import for Obsidian
+
+Import Are.na channel content into your Obsidian vault as Markdown notes.
+
+This plugin is **one-way import only**: Are.na → Obsidian.
+
+> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+
+## What it does
+
+- Imports mapped Are.na channels into mapped vault folders
+- Creates Markdown files for Are.na blocks
+- Updates existing imported files when remote block content changes
+- Adds optional YAML frontmatter metadata
+- Manual import only (no background sync)
+- Supports dry-run preview commands
+- Downloads images and non-image attachments (including PDFs) when configured
+- Supports image embeds using Are.na display images in note body
+- Supports attachment storage in channel-local, global, or custom folders
+- Supports per-channel attachment storage overrides
+- Includes attachment migration preview + diff and migration history log
+- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+- Optional block description in frontmatter (`arena_description`)
+- Optional import of block comments
+- Optional import of connected channels where block appears
+- Optional best-effort preview image for Channel blocks (banner/body image)
+- Writes channel index notes for graph-friendly linking
+- Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+- Writes a master overview note for all synced channels
+- Shows a sync summary modal with diffs for updated files
+- Shows page/block progress in the status bar for large channels
+
+## What it does not do
+
+- ❌ Push from Obsidian back to Are.na (one-way import only)
+- ❌ Automatic deletion of local files when blocks are removed remotely
+- ❌ Background sync (manual only)
+
+## Rate Limiting
+
+Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+- **< 100 blocks**: Import completes in seconds
+- **100–1,000 blocks**: Import takes 1–5 minutes
+- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+
+If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+
+## Commands
+
+- `Import all channels now`
+- `Preview import (dry-run)`
+- `Import current channel`
+- `Preview current channel import (dry-run)`
+- `Open channel on Are.na`
+- `Preview attachment migration`
+- `Run attachment migration`
+
+## Settings
+
+- API token with verify action
+- Block file naming (`title`, `id`, `title-id`)
+- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
+- Optional block enrichment toggles:
+  description in frontmatter, comments, connected channels, channel block preview image
+- Image handling (`download`, `embed`, `link`)
+- Attachment handling (`download`, `link`)
+- Downloaded attachment render (`embed`, `link`)
+- Attachment storage (`with channel notes`, `global`, `custom`)
+- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
+- Global and custom attachment folder paths
+- Frontmatter toggle
+- Notifications toggle
+- Debug logging toggle
+- Channel mappings (`channel slug` -> `local folder`)
+  Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
+- Channel index note naming (`index.md`, `folder-name`)
+- Channel management tools:
+  `Import my channels` (bulk-create mappings from Are.na),
+  `Auto-enable imported channels` toggle (for granular manual control),
+  `Backup channel mappings`,
+  `Restore latest backup`,
+  `Reset channel mappings`
+- Block class exclusion filter (skip Image, Media, etc.)
+- Attachment migration preview + run controls
+
+## How import works
+
+1. The plugin reads each enabled channel mapping.
+2. It fetches channel metadata and all channel blocks from the Are.na API.
+3. Each block is rendered to Markdown and written to the mapped folder.
+4. Optional asset downloads are resolved and linked in notes.
+5. Existing files are overwritten when remote content changes.
+6. Channel index notes are regenerated with links to imported notes.
+7. A master overview note is regenerated with links to each channel index.
+8. A sync summary modal is displayed with diffs for updated files.
+9. Sync records and last-import timestamps are persisted in plugin data.
+
+## Installation
+
+1. Put `main.js`, `manifest.json`, and `styles.css` in:
+   `<your-vault>/.obsidian/plugins/arena-sync/`
+2. Enable the plugin in Obsidian Community Plugins.
+3. Open plugin settings and add:
+	- Are.na API token
+	- At least one channel mapping
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Build:
+
+```bash
+npm run build
+`
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' CHANGELOG.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' CHANGELOG.md"
+Chunk ID: c6118a
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1079
+Output:
+# Changelog
+
+All notable changes to **Are.na Sync for Obsidian** will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] — 2025-01-15
+
+### Added
+- **Pull sync**: Import Are.na channels as folders of Markdown notes (text, images, links, media, attachments).
+- **YAML front-matter**: Configurable metadata fields (`arena-id`, `arena-url`, `arena-class`, `arena-created-at`, `arena-updated-at`, `arena-channel-slug`, `arena-channel-title`, `arena-source-url`).
+- **Image handling**: Download to vault, Obsidian embed, or external link modes.
+- **Attachment handling**: Download or link PDFs and other non-image attachments with flexible storage options (channel-local, global, or custom folders).
+- **Auto-sync timer**: Configurable interval (default 30 min) with manual trigger via Command Palette and ribbon icon.
+- **Sync on startup**: Optional full sync when Obsidian launches.
+- **Channel mapping UI**: Map any number of Are.na channels to local vault folders with per-mapping enable/disable toggle.
+- **Commands**: Sync all channels · Sync current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+- **Status bar indicator**: Live sync progress with pagination and block-level updates for large channels.
+- **Dry-run mode**: Preview all changes before applying them.
+- **Channel index notes**: Auto-generated index files with links to all imported notes in a channel.
+- **Import history**: Transparent action logging in `Are.na/import-history.md` for audit trail.
+- **Rate-limit handling**: Automatic retry with exponential backoff for API rate limits (HTTP 429).
+- **Mobile support**: Works on Obsidian Mobile without external dependencies.
+- **Token verification**: One-click API token validation in settings.
+- **Debug logging**: Optional verbose console output for troubleshooting.
+- **Selective block exclusion**: Configure which block classes to skip during import (e.g., Image, Media).
+
+### Technical
+- TypeScript codebase with strict null checks and comprehensive type safety.
+- esbuild bundler for fast development and production builds.
+- Jest test suite with utilities for mock block data.
+- ESLint configuration for consistent code style.
+- GitHub Actions CI pipeline (lint, test, build on every push/PR).
+- Automated release workflow with changelog extraction and plugin packaging.
+- Comprehensive documentation (README, CONTRIBUTING, CHANGELOG, LICENSE).
+
+### Security
+- API tokens masked in settings UI (password input field).
+- Input validation for channel mappings (slug and folder path required).
+- Secure token verification with clear feedback.
+
+## [Unreleased]
+
+### Changed
+
+- Refactored plugin behavior to one-way import only (Are.na -> Obsidian).
+- Removed documentation references to push sync, two-way conflict flows, migration tooling, and preview mode.
+- Aligned command, settings, and feature docs with current runtime behavior.
+
+### Added
+
+- Dry-run preview commands for full import and current-channel import.
+- Attachment handling controls for link/download behavior.
+- Downloaded attachment rendering controls (embed or link).
+- Attachment storage location controls (channel-local, global folder, custom folder).
+- Binary asset downloading for images and non-image attachments (including PDFs).
+- Pagination and block-level progress updates in status bar for large channels.
+- Channel index note generation with links to imported notes.
+- Import action history logging (`Are.na/import-history.md`) for transparency.
+
+### Planned
+- Dataview-compatible front-matter presets
+- Drag-and-drop channel mapping UI
+- Selective block-class filtering per channel
+
+---
+
+
+
+---
+
+## Version history format
+
+Each release entry follows this structure:
+
+```
+## [X.Y.Z] — YYYY-MM-DD
+
+### Added      — new features
+### Changed    — changes in existing functionality
+### Deprecated — soon-to-be removed features
+### Removed    — removed features
+### Fixed      — bug fixes
+### Security   — vulnerability patches
+```
+
+[Unreleased]: https://github.com/yourusername/arena-sync-obsidian/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/yourusername/arena-sync-obsidian/releases/tag/v1.0.0
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' CONTRIBUTING.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' CONTRIBUTING.md"
+Chunk ID: 863513
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 270
+Output:
+# Contributing
+
+Thanks for contributing to `arena-sync-obsidian`.
+
+## Scope and product behavior
+
+This plugin is intentionally **one-way import only**:
+
+- Supported: Are.na -> Obsidian import
+- Out of scope: Obsidian -> Are.na push/sync
+
+Please keep changes aligned with that behavior unless maintainers explicitly decide otherwise.
+
+## Setup
+
+```bash
+git clone https://github.com/arena-sync/arena-sync-obsidian.git
+cd arena-sync-obsidian
+npm install
+```
+
+Development build:
+
+```bash
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+## Quality checks
+
+Before opening a PR:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+## Pull requests
+
+- Keep PRs focused and small when possible.
+- Update docs for behavior changes.
+- Add tests for behavior changes where practical.
+- Add an entry under `[Unreleased]` in `CHANGELOG.md`.
+
+## Coding notes
+
+- TypeScript with strict checks
+- Use `import type` for type-only imports
+- Avoid silent failures; propagate or log actionable errors
+- Preserve existing style and file structure unless a refactor is part of the change
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' SECURITY.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' SECURITY.md"
+Chunk ID: 94c10b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 852
+Output:
+# Security Policy
+
+## Reporting a Vulnerability
+
+If you discover a security vulnerability in Are.na Sync for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
+
+**Do not open a public GitHub issue for security vulnerabilities.**
+
+When reporting a vulnerability, please include:
+- A clear description of the vulnerability
+- Steps to reproduce it (if applicable)
+- Potential impact
+- Any suggested fixes or mitigations
+
+We will acknowledge your report within 48 hours and work with you to understand and address the issue.
+
+## Security Considerations
+
+### API Token Handling
+- **Storage**: API tokens are stored in Obsidian's plugin data directory, which is encrypted by Obsidian's security layer on desktop.
+- **Transmission**: Tokens are sent to Are.na's API over HTTPS only. Never transmitted over unencrypted connections.
+- **Display**: Tokens are masked in the settings UI using password-type input fields.
+- **Best Practice**: Treat your API token like a password. Never share it or commit it to version control.
+
+### Input Validation
+- Channel slugs and folder paths are validated to prevent directory traversal attacks.
+- File names are sanitized to remove dangerous characters before writing to disk.
+- API responses are validated before processing.
+
+### Data Handling
+- The plugin only fetches and stores data from Are.na channels you explicitly configure.
+- No telemetry or analytics data is collected.
+- No personal information is transmitted beyond what's necessary for the Are.na API.
+- Downloaded files are stored locally in your vault and not transmitted elsewhere.
+
+### Permissions
+- The plugin requires read/write access to your vault's file system.
+- The plugin requires network access to reach the Are.na API at `https://api.are.na`.
+- The plugin respects Obsidian's file system sandbox on mobile devices.
+
+## Out of Scope
+
+The following are **not** the responsibility of this plugin:
+
+- **Obsidian's internal security**: Obsidian handles encryption and security of the vault itself. Report Obsidian security issues to Obsidian directly.
+- **Are.na's API security**: Report security issues with Are.na's API or service to Are.na's security team.
+- **Network security**: We assume HTTPS connections are secure. Report network-level attacks to your ISP or network provider.
+- **User's system security**: We assume your computer and Obsidian installation are secure.
+
+## Supported Versions
+
+Only the latest version of Are.na Sync receives security updates. We recommend always updating to the latest version as soon as possible.
+
+## Security Practices
+
+This project follows these security practices:
+
+1. **Dependency Updates**: Development dependencies are kept reasonably up-to-date to patch known vulnerabilities.
+2. **Code Review**: All changes are reviewed before merging.
+3. **Type Safety**: Strict TypeScript checks help prevent entire classes of bugs.
+4. **Error Handling**: Errors are logged with context for debugging without exposing sensitive information.
+5. **Minimal Dependencies**: The plugin has zero production dependencies to minimize attack surface.
+
+## Changelog
+
+Security fixes will be clearly marked in the CHANGELOG.md with a `### Security` section.
+
+## Questions?
+
+If you have security-related questions that aren't vulnerabilities, feel free to open a discussion on GitHub or contact the maintainers.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:07:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat manifest.json`</summary>
+```
+Command: /usr/bin/zsh -lc 'cat manifest.json'
+Chunk ID: 31f04b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 79
+Output:
+{
+	"id": "Are.na-Importer",
+	"name": "Are.na Importer",
+	"version": "1.0.0",
+	"minAppVersion": "1.4.0",
+	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
+	"author": "frostmute",
+	"authorUrl": "https://github.com/frostmute/Are.na-Importer/",
+	"isDesktopOnly": false
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:02Z)**_
+
+I’m updating docs beyond README too, so contributors and release notes stay accurate: `README`, `CHANGELOG`, and `CONTRIBUTING` will all reflect the new channel-management + enrichment + index behaviors shipped today.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ ## What it does
+ 
+ - Imports mapped Are.na channels into mapped vault folders
++- Can bulk-import your channel list into mappings via `Import my channels`
+ - Creates Markdown files for Are.na blocks
+ - Updates existing imported files when remote block content changes
+ - Adds optional YAML frontmatter metadata
+@@
+ - Optional block description in frontmatter (`arena_description`)
+ - Optional import of block comments
+ - Optional import of connected channels where block appears
+ - Optional best-effort preview image for Channel blocks (banner/body image)
+ - Writes channel index notes for graph-friendly linking
++- Includes channel info in index notes (description, started, modified, length, followers when available)
++- Includes best-effort `This Channel Appears In` links in index notes
+ - Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+ - Writes a master overview note for all synced channels
+@@
+ ## Rate Limiting
+ 
+ Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+@@
+ If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+ Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
++Pagination imports all pages for large channels (not only the first 100 blocks).
+@@
+ ## How import works
+ 
+-1. The plugin reads each enabled channel mapping.
++1. You define mappings manually, or use `Import my channels` to auto-create mappings.
+ 2. It fetches channel metadata and all channel blocks from the Are.na API.
+ 3. Each block is rendered to Markdown and written to the mapped folder.
+-4. Optional asset downloads are resolved and linked in notes.
+-5. Existing files are overwritten when remote content changes.
+-6. Channel index notes are regenerated with links to imported notes.
+-7. A master overview note is regenerated with links to each channel index.
+-8. A sync summary modal is displayed with diffs for updated files.
+-9. Sync records and last-import timestamps are persisted in plugin data.
++4. Optional block enrichments can add frontmatter description, comments, connected channels, and channel-block preview images.
++5. Optional asset downloads are resolved and linked in notes.
++6. Existing files are overwritten when remote content changes.
++7. Channel index notes are regenerated with links to imported notes and channel info.
++8. A master overview note is regenerated with links to each channel index.
++9. A sync summary modal is displayed with diffs for updated files.
++10. Sync records and last-import timestamps are persisted in plugin data.
+@@
+ ### Assets aren't downloading
+ - Images and PDFs only download if "Image handling" or "Attachment handling" is set to "Download to vault"
+ - Check that attachment storage folder is writable
+ - Check disk space
++
++### I only see first 100 blocks
++- Update to the latest build; pagination now imports all pages.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CHANGELOG.md`**
+
+```diff
+@@
+ ## [Unreleased]
+ 
+-### Changed
+-
+-- Refactored plugin behavior to one-way import only (Are.na -> Obsidian).
+-- Removed documentation references to push sync, two-way conflict flows, migration tooling, and preview mode.
+-- Aligned command, settings, and feature docs with current runtime behavior.
+-
+ ### Added
+ 
+-- Dry-run preview commands for full import and current-channel import.
+-- Attachment handling controls for link/download behavior.
+-- Downloaded attachment rendering controls (embed or link).
+-- Attachment storage location controls (channel-local, global folder, custom folder).
+-- Binary asset downloading for images and non-image attachments (including PDFs).
+-- Pagination and block-level progress updates in status bar for large channels.
+-- Channel index note generation with links to imported notes.
+-- Import action history logging (`Are.na/import-history.md`) for transparency.
++- Sync summary modal with per-file diff viewer.
++- Master overview note generation (`Are.na/overview.md`).
++- Attachment migration system: preview modal, dry-run diffs, execution, and migration history log.
++- Per-channel attachment storage overrides.
++- Channel management tools in settings:
++  - `Import my channels` (bulk-create mappings from Are.na account)
++  - `Auto-enable imported channels` toggle (granular manual control)
++  - `Backup channel mappings`
++  - `Restore latest backup`
++  - `Reset channel mappings`
++- Optional banner frontmatter field for Obsidian Banners plugin compatibility:
++  - enable/disable toggle
++  - custom field name
++  - banner image source priority (`thumb-first` / `display-first`)
++- Optional block enrichment features:
++  - import block description into frontmatter (`arena_description`)
++  - import block comments into note body
++  - import connected channels where block appears, with clickable external links
++  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
++- Channel index enhancements:
++  - folder-note compatible index filename mode (`index.md` or `<folder-name>.md`)
++  - `Info` section with description, started, modified, length, followers (when available)
++  - best-effort `This Channel Appears In` section with clickable external links
++- Build packaging script that outputs `dist/<plugin-id>-<version>.zip` without relying on system `zip`.
+ 
+-### Planned
+-- Dataview-compatible front-matter presets
+-- Drag-and-drop channel mapping UI
+-- Selective block-class filtering per channel
++### Changed
++
++- Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
++- Mapping folder is now optional in settings UI; explicit folders still override default behavior.
++- API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
++
++### Fixed
++
++- Fixed pagination edge case where some channels could stop after the first 100 blocks.
++- Fixed packaging failures in environments without a system `zip` binary.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:29Z)**_
+
+I’ve updated README and changelog; I’m now making a quick `CONTRIBUTING` touch so build/package expectations and doc-update rules stay aligned with the new workflow.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CONTRIBUTING.md`**
+
+```diff
+@@
+ Production build:
+ 
+ ```bash
+ npm run build
+ ```
++
++Build output includes:
++- `main.js` in repo root
++- `dist/<plugin-id>-<version>.zip` packaged release artifact
+@@
+ - Update docs for behavior changes.
+ - Add tests for behavior changes where practical.
+ - Add an entry under `[Unreleased]` in `CHANGELOG.md`.
++- Keep settings help text and README feature/setting lists in sync.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint && npm test -- --runInBand && npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 9866e4
+Wall time: 1.0019 seconds
+Process running with session ID 90487
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:40Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 207ef9
+Wall time: 1.7046 seconds
+Process exited with code 0
+Original token count: 865
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled
+    ✓ handles a link block (1 ms)
+    ✓ handles an image block with external link (1 ms)
+    ✓ embeds image blocks using Are.na display image in embed mode
+    ✓ handles an attachment block (1 ms)
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled (1 ms)
+    ✓ can include block description in frontmatter
+    ✓ supports display-first banner priority
+    ✓ renders comments and connected channels sections from context (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title
+    ✓ handles content without front-matter (5 ms)
+  computeHash
+    ✓ returns a 16-char hex string
+    ✓ is deterministic (1 ms)
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme (1 ms)
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged (1 ms)
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+
+-----------------|---------|----------|---------|---------|----------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                      
+-----------------|---------|----------|---------|---------|----------------------------------------
+All files        |    8.68 |    14.06 |     3.9 |    9.18 |                                        
+ api.ts          |       0 |        0 |       0 |       0 | 1-383                                  
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                   
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                  
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                  
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                  
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-554                                  
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-815                                  
+ types.ts        |     100 |      100 |     100 |     100 |                                        
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245 
+-----------------|---------|----------|---------|---------|----------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        1.389 s
+Ran all test suites.
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:08:49Z)**_
+
+Great call, and this repo is now fully documented for the changes we made today.
+
+**Implemented + documented**
+- Channel index notes now include `This Channel Appears In` links (best-effort when Are.na provides those connections).
+- README updated to reflect:
+  - full-page pagination fix (not just first 100 blocks)
+  - block enrichment options (description/comments/connected channels/channel-block preview images)
+  - channel index enhancements (info section + folder-note naming mode + appears-in links)
+  - channel management tools (import/reset/backup/restore mappings)
+  - build packaging output zip
+- CHANGELOG `Unreleased` rewritten with clear `Added / Changed / Fixed` entries for everything shipped today.
+- CONTRIBUTING updated to reflect build outputs and doc-sync expectations.
+
+**Docs touched**
+- [README.md](/home/frost/Are.na-Importer/README.md)
+- [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
+- [CONTRIBUTING.md](/home/frost/Are.na-Importer/CONTRIBUTING.md)
+
+**Verification**
+- `npm run lint` passed
+- `npm test -- --runInBand` passed
+- `npm run build` passed
+- package artifact: `dist/Are.na-Importer-1.0.0.zip`
+
+If you want, next I can do a final wording polish pass so naming is consistently `Are.na Importer` (vs legacy `Are.na Sync`) everywhere in docs/UI.
+
+---
+
+_**User (2026-03-31 02:40:05Z)**_
+
+do a final wording polish pass so naming is consistently Are.na Importer (vs legacy Are.na Sync) everywhere in docs/UI.  ... also, just give the entire repo a once-over for polish, consistancy and professioinalism....  also, the settings menu for the plugin in obsidian; can we clean it up and format it better? maybe more detailed explanations somehow?
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
+
+Love this request. I’m going to do this in three passes: first fix naming consistency (`Are.na Importer`) across docs/UI text, then refine settings layout/copy for clarity, then do a final repo polish sweep for professionalism and consistency.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Are\.na Sync|arena-sync|Sync all channels now|Sync current channel|sync" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md src manifest.json styles.css .github -g"*.md" -g"*.ts" -g"*.json" -g"*.css" -g"*.yml"`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"Are\\.na Sync|arena-sync|Sync all channels now|Sync current channel|sync\" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md src manifest.json styles.css .github -g\"*.md\" -g\"*.ts\" -g\"*.json\" -g\"*.css\" -g\"*.yml\""
+Chunk ID: 01b6e9
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 3814
+Output:
+SECURITY.md:5:If you discover a security vulnerability in Are.na Sync for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
+SECURITY.md:52:Only the latest version of Are.na Sync receives security updates. We recommend always updating to the latest version as soon as possible.
+CONTRIBUTING.md:3:Thanks for contributing to `arena-sync-obsidian`.
+CONTRIBUTING.md:10:- Out of scope: Obsidian -> Are.na push/sync
+CONTRIBUTING.md:17:git clone https://github.com/arena-sync/arena-sync-obsidian.git
+CONTRIBUTING.md:18:cd arena-sync-obsidian
+CONTRIBUTING.md:54:- Keep settings help text and README feature/setting lists in sync.
+styles.css:2:   Are.na Sync for Obsidian — Plugin Styles
+styles.css:7:.arena-sync-status {
+styles.css:15:.arena-sync-status .sync-icon {
+styles.css:20:.arena-sync-status.is-syncing {
+styles.css:24:.arena-sync-status.is-syncing .sync-icon {
+styles.css:28:.arena-sync-status.has-errors {
+styles.css:39:.arena-sync-settings h1 {
+styles.css:43:.arena-sync-settings h2 {
+styles.css:50:.arena-sync-mapping {
+styles.css:58:.arena-sync-mapping .mapping-header {
+styles.css:65:.arena-sync-mapping .mapping-header .mapping-title {
+styles.css:70:.arena-sync-mapping .mapping-header .mapping-badge {
+styles.css:78:.arena-sync-mapping .mapping-details {
+styles.css:86:.arena-sync-mapping .mapping-details .label {
+styles.css:92:.arena-sync-mapping.is-disabled {
+styles.css:98:.arena-sync-conflict-modal .conflict-file {
+styles.css:106:.arena-sync-conflict-modal .conflict-timestamps {
+styles.css:114:.arena-sync-conflict-modal .conflict-actions {
+styles.css:123:.arena-sync-notice {
+styles.css:129:.arena-sync-notice .notice-title {
+styles.css:133:.arena-sync-notice .notice-stats {
+styles.css:140:.arena-sync-summary-modal .arena-sync-summary-stats {
+styles.css:144:.arena-sync-summary-duration {
+styles.css:149:.arena-sync-summary-modal ul {
+styles.css:154:.arena-sync-diff {
+styles.css:166:.arena-sync-diff-list {
+styles.css:173:.arena-sync-diff-row {
+styles.css:184:.arena-sync-diff-path {
+styles.css:192:.arena-sync-migration-modal .arena-sync-migration-section {
+styles.css:200:.arena-sync-migration-path {
+styles.css:205:.arena-sync-migration-counts {
+CHANGELOG.md:3:All notable changes to **Are.na Sync for Obsidian** will be documented in this file.
+CHANGELOG.md:11:- **Pull sync**: Import Are.na channels as folders of Markdown notes (text, images, links, media, attachments).
+CHANGELOG.md:15:- **Auto-sync timer**: Configurable interval (default 30 min) with manual trigger via Command Palette and ribbon icon.
+CHANGELOG.md:16:- **Sync on startup**: Optional full sync when Obsidian launches.
+CHANGELOG.md:18:- **Commands**: Sync all channels · Sync current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+CHANGELOG.md:19:- **Status bar indicator**: Live sync progress with pagination and block-level updates for large channels.
+CHANGELOG.md:104:[Unreleased]: https://github.com/yourusername/arena-sync-obsidian/compare/v1.0.0...HEAD
+CHANGELOG.md:105:[1.0.0]: https://github.com/yourusername/arena-sync-obsidian/releases/tag/v1.0.0
+README.md:7:> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+README.md:16:- Manual import only (no background sync)
+README.md:32:- Writes a master overview note for all synced channels
+README.md:33:- Shows a sync summary modal with diffs for updated files
+README.md:40:- ❌ Background sync (manual only)
+README.md:101:9. A sync summary modal is displayed with diffs for updated files.
+README.md:107:   `<your-vault>/.obsidian/plugins/arena-sync/`
+README.md:164:- Manually trigger with Command Palette: `Sync all channels now`
+.github/release-template.md:1:# 🚀 Are.na Sync for Obsidian v{{VERSION}}
+.github/release-template.md:11:2. Search for **"Are.na Sync"**.
+.github/release-template.md:16:2. Copy them to `<your-vault>/.obsidian/plugins/arena-sync/`.
+.github/release-template.md:34:See the [project board](https://github.com/arena-sync/arena-sync-obsidian/projects/1) for upcoming work, or [open an issue](https://github.com/arena-sync/arena-sync-obsidian/issues/new/choose) to request a feature.
+.github/release-template.md:36:**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/arena-sync/arena-sync-obsidian/compare/v{{PREV_VERSION}}...v{{VERSION}})
+.github/PULL_REQUEST_TEMPLATE.md:24:<!-- If this changes the UI or sync b
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/settings-tab.ts"
+Chunk ID: 78e3c8
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1966
+Output:
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import type ArenaSyncPlugin from "./main";
+import type {
+	AttachmentHandling,
+	AttachmentStorage,
+	BannerImagePriority,
+	ChannelIndexNoteStyle,
+	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
+	ImageHandling,
+} from "./types";
+
+export class ArenaSyncSettingTab extends PluginSettingTab {
+	plugin: ArenaSyncPlugin;
+
+	constructor(app: App, plugin: ArenaSyncPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
+
+		containerEl.createEl("h1", { text: "Are.na Import" });
+		containerEl.createEl("p", {
+			text: "One-way import from Are.na into this vault.",
+			cls: "setting-item-description",
+		});
+
+		containerEl.createEl("h2", { text: "Authentication" });
+		new Setting(containerEl)
+			.setName("API token")
+			.setDesc(
+				"Generate a token at https://dev.are.na/oauth/applications",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
+					.setValue(this.plugin.settings.apiToken)
+					.onChange(async (value) => {
+						this.plugin.settings.apiToken = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
+			.addButton((btn) =>
+				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
+					const ok = await this.plugin.api.verifyToken();
+					new Notice(ok ? "Token is valid" : "Invalid token");
+				}),
+			);
+
+		containerEl.createEl("h2", { text: "Content rendering" });
+		new Setting(containerEl)
+			.setName("Block file naming")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						title: "Block title",
+						id: "Block ID",
+						"title-id": "Title (ID)",
+					} as Record<BlockNamingScheme, string>)
+					.setValue(this.plugin.settings.blockNaming)
+					.onChange(async (value) => {
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Banner frontmatter field")
+			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.bannerFieldEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.bannerFieldEnabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.bannerFieldEnabled) {
+			new Setting(containerEl)
+				.setName("Banner field name")
+				.setDesc("Frontmatter key used for banner URL")
+				.addText((text) =>
+					text
+						.setPlaceholder("banner")
+						.setValue(this.plugin.settings.bannerFieldName)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerFieldName =
+								value.trim() || "banner";
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName("Banner image source priority")
+				.setDesc("Choose thumbnail or display image as preferred banner URL")
+				.addDropdown((dd) =>
+					dd
+						.addOptions({
+							"thumb-first": "Thumb first",
+							"display-first": "Display first",
+						} as Record<BannerImagePriority, string>)
+						.setValue(this.plugin.settings.bannerImagePriority)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerImagePriority =
+								value as BannerImagePriority;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		new Setting(containerEl)
+			.setName("Block description in frontmatter")
+			.setDesc("Adds `arena_description` when block description exists")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockDescriptionFrontmatter)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockDescriptionFrontmatter = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import block comments")
+			.setDesc("Imports all block comments into a `Comments` section in notes")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockComments)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockComments = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import connected channels")
+			.setDesc(
+				"Imports channels where the block appears in a `This Block Also Appears In` section",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockConnectedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockConnectedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setNam
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,620p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '260,620p' src/settings-tab.ts"
+Chunk ID: 820383
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2194
+Output:
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Global attachment folder")
+			.setDesc("Used when storage location is Global folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na/Attachments")
+					.setValue(this.plugin.settings.globalAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.globalAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Custom attachment folder")
+			.setDesc("Used when storage location is Custom folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Path/In/Vault")
+					.setValue(this.plugin.settings.customAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.customAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Add frontmatter")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.frontmatterEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.frontmatterEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Exclude block classes")
+			.setDesc(
+				"Comma-separated list of block types to skip (e.g., Image, Media)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Image, Media")
+					.setValue(this.plugin.settings.excludeClasses.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.excludeClasses = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		containerEl.createEl("h2", { text: "Notifications and logging" });
+		new Setting(containerEl)
+			.setName("Show notifications")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.notifyOnSync)
+					.onChange(async (value) => {
+						this.plugin.settings.notifyOnSync = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+			toggle
+				.setValue(this.plugin.settings.debugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.debugLogging = value;
+					await this.plugin.saveSettings();
+				}),
+		);
+
+		containerEl.createEl("h2", { text: "Channel management" });
+		new Setting(containerEl)
+			.setName("Auto-enable imported channels")
+			.setDesc(
+				"When importing from Are.na, new channel mappings start enabled",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoEnableImportedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.autoEnableImportedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import my channels")
+			.setDesc(
+				"Fetch your Are.na channels and create missing mappings with default folders",
+			)
+			.addButton((btn) =>
+				btn.setButtonText("Import my channels").setCta().onClick(async () => {
+					try {
+						const result = await this.plugin.importMyChannelsMappings();
+						new Notice(
+							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
+						);
+						this.display();
+					} catch (err) {
+						new Notice(`Import my channels failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Backup channel mappings")
+			.setDesc("Save current channel mappings to a backup JSON file in your vault")
+			.addButton((btn) =>
+				btn.setButtonText("Backup now").onClick(async () => {
+					try {
+						const path = await this.plugin.backupChannelMappings();
+						new Notice(`Channel mappings backed up to ${path}`);
+					} catch (err) {
+						new Notice(`Backup failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Restore latest backup")
+			.setDesc("Replace current mappings with the most recent backup file")
+			.addButton((btn) =>
+				btn.setButtonText("Restore latest").onClick(async () => {
+					try {
+						const path =
+							await this.plugin.restoreLatestChannelMappingsBackup();
+						new Notice(`Restored channel mappings from ${path}`);
+						this.display();
+					} catch (err) {
+						new Notice(`Restore failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Reset channel mappings")
+			.setDesc("Remove all channel mappings from settings")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Reset mappings")
+					.setWarning()
+					.onClick(async () => {
+						const ok = window.confirm(
+							"Reset all channel mappings? This can be undone by restoring a backup.",
+						);
+						if (!ok) return;
+						await this.plugin.resetChannelMappings();
+						new N
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:24Z)**_
+
+I found a bunch of legacy naming in docs/templates too, so I’m including `.github` docs in the polish pass (not just README/UI) to keep contributor-facing text consistent and professional.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' .github/release-template.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' .github/release-template.md"
+Chunk ID: 2f0700
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 245
+Output:
+# 🚀 Are.na Sync for Obsidian v{{VERSION}}
+
+{{RELEASE_NOTES}}
+
+---
+
+## Installation
+
+### Community Plugins (recommended)
+1. Open **Settings → Community plugins → Browse**.
+2. Search for **"Are.na Sync"**.
+3. Click **Update** (or **Install** + **Enable** for first-time users).
+
+### Manual install
+1. Download `main.js`, `manifest.json`, and `styles.css` from the assets below.
+2. Copy them to `<your-vault>/.obsidian/plugins/arena-sync/`.
+3. Reload Obsidian.
+
+---
+
+## Checksums
+
+```
+SHA-256
+main.js       {{HASH_MAIN}}
+manifest.json {{HASH_MANIFEST}}
+styles.css    {{HASH_STYLES}}
+```
+
+---
+
+## What's next?
+
+See the [project board](https://github.com/arena-sync/arena-sync-obsidian/projects/1) for upcoming work, or [open an issue](https://github.com/arena-sync/arena-sync-obsidian/issues/new/choose) to request a feature.
+
+**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/arena-sync/arena-sync-obsidian/compare/v{{PREV_VERSION}}...v{{VERSION}})
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' .github/ISSUE_TEMPLATE/bug_report.yml`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' .github/ISSUE_TEMPLATE/bug_report.yml"
+Chunk ID: 51b3a4
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 508
+Output:
+name: 🐛 Bug Report
+description: Something isn't working as expected
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below so we can reproduce and fix the issue.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: "Find this in Settings → Community plugins → Are.na Sync"
+      placeholder: "e.g. 1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version
+      description: "Find this in Settings → About"
+      placeholder: "e.g. 1.5.8"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - iOS
+        - Android
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "When I sync my channel, the plugin..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      value: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs
+      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Sync → Debug logging** for verbose output."
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Screenshots, screen recordings, or anything else that helps.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' .github/PROJECT_BOARD.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' .github/PROJECT_BOARD.md"
+Chunk ID: 348938
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1140
+Output:
+# Project Board Structure
+
+Use this file to bootstrap a GitHub Projects board for **Are.na Sync for Obsidian**.
+Create the board at: https://github.com/arena-sync/arena-sync-obsidian/projects/new
+
+---
+
+## Board: Are.na Sync Roadmap
+
+**View**: Table + Board (Kanban)
+
+### Columns (Status)
+
+| Column | Purpose |
+|---|---|
+| 📥 Backlog | Ideas and requests not yet scoped |
+| 🔍 Triage | New issues awaiting prioritisation |
+| 📐 Scoped | Accepted, requirements defined, ready for work |
+| 🚧 In Progress | Actively being worked on |
+| 👀 In Review | PR open, awaiting review |
+| ✅ Done | Merged and released |
+
+### Custom Fields
+
+| Field | Type | Options |
+|---|---|---|
+| Priority | Single select | 🔴 Critical · 🟠 High · 🟡 Medium · 🟢 Low |
+| Effort | Single select | XS (< 1h) · S (1–4h) · M (1–2d) · L (3–5d) · XL (1w+) |
+| Area | Single select | Sync Engine · API · UI/Settings · Docs · CI/CD · Testing |
+| Milestone | Iteration | v1.0 · v1.1 · v1.2 · v2.0 |
+
+---
+
+## v1.0 — Launch (current release)
+
+All items below are **Done ✅** as of v1.0.0.
+
+- [x] Pull sync: channels → Markdown notes
+- [x] Push sync: notes → Are.na blocks
+- [x] Two-way sync with conflict resolution
+- [x] YAML front-matter with Are.na metadata
+- [x] Image download / embed / link modes
+- [x] Auto-sync timer + manual trigger
+- [x] Settings tab with channel mapping UI
+- [x] Commands: sync all, sync channel, push note, open on Are.na
+- [x] Status bar indicator
+- [x] Mobile support
+- [x] CI pipeline (lint, test, build)
+- [x] Automated release workflow
+- [x] README, CHANGELOG, CONTRIBUTING, LICENSE
+- [x] Issue & PR templates
+- [x] Hero images + demo GIF script
+
+---
+
+## v1.1 — Quality of Life
+
+| # | Title | Priority | Effort | Area |
+|---|---|---|---|---|
+| 1 | Selective block-class filter per channel | 🟡 Medium | S | Sync Engine |
+| 2 | Dataview-compatible front-matter presets | 🟡 Medium | S | Sync Engine |
+| 3 | Drag-and-drop channel mapping reorder | 🟢 Low | M | UI/Settings |
+| 4 | Sync progress modal with per-block status | 🟠 High | M | UI/Settings |
+| 5 | Rate-limit handling with exponential backoff | 🟠 High | S | API |
+| 6 | Dry-run mode (preview changes before applying) | 🟡 Medium | M | Sync Engine |
+| 7 | Obsidian URI handler for deep-linking synced notes | 🟢 Low | S | UI/Settings |
+| 8 | Localisation (i18n) for settings UI | 🟢 Low | M | UI/Settings |
+
+---
+
+## v1.2 — Power Features
+
+| # | Title | Priority | Effort | Area |
+|---|---|---|---|---|
+| 9 | Webhook listener for real-time Are.na updates | 🟠 High | L | API |
+| 10 | Tag / metadata mapping (Are.na connections → Obsidian tags) | 🟠 High | M | Sync Engine |
+| 11 | Selective sync (pick individual blocks, not whole channels) | 🟡 Medium | M | Sync Engine |
+| 12 | Bulk channel import wizard | 🟡 Medium | M | UI/Settings |
+| 13 | Export sync log to file for debugging | 🟢 Low | S | Testing |
+| 14 | End-to-end integration test suite | 🟠 High | L | Testing |
+
+---
+
+## v2.0 — Next Generation
+
+| # | Title | Priority | Effort | Area |
+|---|---|---|---|---|
+| 15 | Collaborative sync (multiple vaults, same channel) | 🔴 Critical | XL | Sync Engine |
+| 16 | Visual channel browser inside Obsidian | 🟠 High | XL | UI/Settings |
+| 17 | Image OCR → searchable text blocks | 🟡 Medium | L | Sync Engine |
+| 18 | Graph view integration (channel connections as links) | 🟠 High | L | UI/Settings |
+| 19 | Are.na search from command palette | 🟡 Medium | M | API |
+| 20 | Plugin settings sync via Are.na channel | 🟢 Low | M | Sync Engine |
+
+---
+
+## Labels
+
+Create these labels in the repository to match board categories:
+
+```
+bug           #d73a4a   Something isn't working
+enhancement   #a2eeef   New feature or request
+documentation #0075ca   Improvements or additions to documentation
+good first issue #7057ff  Good for newcomers
+help wanted   #008672   Extra attention is needed
+triage        #e4e669   Needs prioritisation
+sync-engine   #1d76db   Core sync logic
+api           #5319e7   Are.na API client
+ui            #f9d0c4   Settings and UI changes
+ci-cd         #bfd4f2   CI/CD and tooling
+testing       #c5def5   Test suite
+duplicate     #cfd3d7   This issue or pull request already exists
+wontfix       #ffffff   This will not be worked on
+```
+
+---
+
+## Automations (recommended)
+
+1. **Auto-add**: New issues → 🔍 Triage column
+2. **Auto-move**: PR opened → 👀 In Review
+3. **Auto-move**: PR merged → ✅ Done
+4. **Auto-close**: Issues in ✅ Done for 7 days → close issue
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:35Z)**_
+
+I’m now doing the UI polish pass directly in `settings-tab.ts`: clearer section headers, quick-start guidance, cleaner mapping labels, and more explicit descriptions/tradeoffs for each advanced option. Then I’ll harmonize `Are.na Importer` wording in notices/commands/docs.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:40:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Are\.na Import:|Are\.na Import " src/main.ts src/settings-tab.ts README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"Are\\.na Import:|Are\\.na Import \" src/main.ts src/settings-tab.ts README.md"
+Chunk ID: c561ad
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 163
+Output:
+README.md:1:# Are.na Import for Obsidian
+src/main.ts:167:			new Notice("Are.na Import is already running...");
+src/main.ts:175:			new Notice("Are.na Import: Please set your API token in settings.");
+src/main.ts:183:				"Are.na Import: No valid channels configured (check that channel slug is not empty).",
+src/main.ts:200:			new Notice(`Are.na Import failed: ${(err as Error).message}`);
+src/main.ts:209:			new Notice("Are.na Import is already running...");
+src/main.ts:295:			? "Are.na Import preview"
+src/main.ts:348:		const title = `Are.na Import ${label} Summary`;
+src/main.ts:485:			new Notice("Are.na Import migration is already running...");
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ export class ArenaSyncSettingTab extends PluginSettingTab {
+ 	plugin: ArenaSyncPlugin;
+@@
+ 	display(): void {
+ 		const { containerEl } = this;
+ 		containerEl.empty();
+ 		containerEl.addClass("arena-sync-settings");
+ 
+-		containerEl.createEl("h1", { text: "Are.na Import" });
+-		containerEl.createEl("p", {
+-			text: "One-way import from Are.na into this vault.",
++		containerEl.createEl("h1", { text: "Are.na Importer" });
++		containerEl.createEl("p", {
++			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
++			cls: "setting-item-description",
++		});
++		containerEl.createEl("p", {
++			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+ 			cls: "setting-item-description",
+ 		});
+ 
+-		containerEl.createEl("h2", { text: "Authentication" });
++		this.renderSectionHeader(
++			containerEl,
++			"Authentication",
++			"Connect your Are.na account for read-only import access.",
++		);
+ 		new Setting(containerEl)
+ 			.setName("API token")
+ 			.setDesc(
+ 				"Generate a token at https://dev.are.na/oauth/applications",
+@@
+-		containerEl.createEl("h2", { text: "Content rendering" });
++		this.renderSectionHeader(
++			containerEl,
++			"Content rendering",
++			"Configure note format, metadata, and enrichment behavior.",
++		);
+ 		new Setting(containerEl)
+ 			.setName("Block file naming")
++			.setDesc("Choose how imported block note filenames are generated.")
+ 			.addDropdown((dd) =>
+@@
+ 		new Setting(containerEl)
+ 			.setName("Banner frontmatter field")
+ 			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Image handling")
+-			.setDesc("How image blocks are rendered")
++			.setDesc(
++				"`Download` stores locally; `Embed` uses Are.na image URL; `Link` adds external URL.",
++			)
+ 			.addDropdown((dd) =>
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment handling")
+-			.setDesc("For PDFs and other non-image attachments")
++			.setDesc("Control how PDFs and other non-image files are rendered.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Downloaded attachment render")
+-			.setDesc("When attachments are downloaded locally")
++			.setDesc("For downloaded attachments: render as wiki-link or embed.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment storage location")
++			.setDesc("Choose where downloaded files are stored in your vault.")
+ 			.addDropdown((dd) =>
+@@
+ 		new Setting(containerEl)
+ 			.setName("Add frontmatter")
++			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
+ 			.addToggle((toggle) =>
+@@
+ 		new Setting(containerEl)
+ 			.setName("Exclude block classes")
+ 			.setDesc(
+ 				"Comma-separated list of block types to skip (e.g., Image, Media)",
+ 			)
+@@
+-		containerEl.createEl("h2", { text: "Notifications and logging" });
++		this.renderSectionHeader(
++			containerEl,
++			"Notifications and logging",
++			"Control sync notices and troubleshooting output.",
++		);
+@@
+-		containerEl.createEl("h2", { text: "Channel management" });
++		this.renderSectionHeader(
++			containerEl,
++			"Channel management",
++			"Bulk-manage mappings and safely back up or restore configuration.",
++		);
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import my channels")
+ 			.setDesc(
+-				"Fetch your Are.na channels and create missing mappings with default folders",
++				"Fetch all your Are.na channels and create missing mappings (default folder: Are.na/<slug>).",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Reset channel mappings")
+-			.setDesc("Remove all channel mappings from settings")
++			.setDesc("Remove all mappings from settings (recommended after creating a backup).")
+@@
+-		containerEl.createEl("h2", { text: "Channel mappings" });
++		this.renderSectionHeader(
++			containerEl,
++			"Channel mappings",
++			"Each enabled mapping imports one Are.na channel into one vault folder.",
++		);
+ 		new Setting(containerEl)
+ 			.setName("Add channel")
+@@
+-		containerEl.createEl("h2", { text: "Attachment migration" });
++		this.renderSectionHeader(
++			containerEl,
++			"Attachment migration",
++			"Use this when changing attachment storage strategy to move files and update embeds safely.",
++		);
+@@
+ 	private renderMapping(containerEl: HTMLElement, index: number): void {
+ 		const mapping = this.plugin.settings.channelMappings[index];
+ 		const wrapper = containerEl.createDiv({ cls: "arena-sync-mapping" });
+@@
+ 			)
+ 			.addText((text) =>
+ 				text
+-					.setPlaceholder("channel-slug")
++					.setPlaceholder("Are.na channel slug")
+ 					.setValue(mapping.channelSlug)
+@@
+ 			.addText((text) =>
+ 				text
+-					.setPlaceholder("Vault/Folder")
++					.setPlaceholder("Optional: custom vault folder (default Are.na/<slug>)")
+ 					.setValue(mapping.localFolder)
+@@
+ 		if (mapping.attachmentStorageOverride === "custom") {
+@@
+ 		}
+ 	}
++
++	private renderSectionHeader(
++		containerEl: HTMLElement,
++		title: string,
++		description: string,
++	): void {
++		containerEl.createEl("h2", { text: title });
++		containerEl.createEl("p", {
++			text: description,
++			cls: "setting-item-description",
++		});
++	}
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/main.ts`**
+
+```diff
+@@
+ 		if (this.isSyncing) {
+-			new Notice("Are.na Import is already running...");
++			new Notice("Are.na Importer is already running...");
+ 			return;
+ 		}
+@@
+-			new Notice("Are.na Import: Please set your API token in settings.");
++			new Notice("Are.na Importer: Please set your API token in settings.");
+@@
+ 			new Notice(
+-				"Are.na Import: No valid channels configured (check that channel slug is not empty).",
++				"Are.na Importer: No valid channels configured (check that channel slug is not empty).",
+ 			);
+@@
+-			new Notice(`Are.na Import failed: ${(err as Error).message}`);
++			new Notice(`Are.na Importer failed: ${(err as Error).message}`);
+@@
+ 		if (this.isSyncing) {
+-			new Notice("Are.na Import is already running...");
++			new Notice("Are.na Importer is already running...");
+ 			return;
+ 		}
+@@
+ 		const prefix = result.dryRun
+-			? "Are.na Import preview"
+-			: "Are.na Import";
++			? "Are.na Importer preview"
++			: "Are.na Importer";
+@@
+-		const title = `Are.na Import ${label} Summary`;
++		const title = `Are.na Importer ${label} Summary`;
+@@
+ 		if (this.isMigrating) {
+-			new Notice("Are.na Import migration is already running...");
++			new Notice("Are.na Importer migration is already running...");
+ 			return;
+ 		}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:19Z)**_
+
+I’ve polished the settings UI copy and section structure. Next I’m doing a broad wording consistency pass in docs/templates (`README`, `SECURITY`, `CONTRIBUTING`, `CHANGELOG`, `.github`) so naming and instructions are uniformly professional.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+-# Are.na Import for Obsidian
++# Are.na Importer for Obsidian
+@@
+-- Manually trigger with Command Palette: `Sync all channels now`
++- Manually trigger with Command Palette: `Import all channels now`
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ 1. Put `main.js`, `manifest.json`, and `styles.css` in:
+-   `<your-vault>/.obsidian/plugins/arena-sync/`
++   `<your-vault>/.obsidian/plugins/Are.na-Importer/`
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:29Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `SECURITY.md`**
+
+```diff
+@@
+-If you discover a security vulnerability in Are.na Sync for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
++If you discover a security vulnerability in Are.na Importer for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
+@@
+-Only the latest version of Are.na Sync receives security updates. We recommend always updating to the latest version as soon as possible.
++Only the latest version of Are.na Importer receives security updates. We recommend always updating to the latest version as soon as possible.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CONTRIBUTING.md`**
+
+```diff
+@@
+-Thanks for contributing to `arena-sync-obsidian`.
++Thanks for contributing to `Are.na-Importer`.
+@@
+-git clone https://github.com/arena-sync/arena-sync-obsidian.git
+-cd arena-sync-obsidian
++git clone https://github.com/frostmute/Are.na-Importer.git
++cd Are.na-Importer
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CHANGELOG.md`**
+
+```diff
+@@
+-All notable changes to **Are.na Sync for Obsidian** will be documented in this file.
++All notable changes to **Are.na Importer for Obsidian** will be documented in this file.
+@@
+-[Unreleased]: https://github.com/yourusername/arena-sync-obsidian/compare/v1.0.0...HEAD
+-[1.0.0]: https://github.com/yourusername/arena-sync-obsidian/releases/tag/v1.0.0
++[Unreleased]: https://github.com/frostmute/Are.na-Importer/compare/v1.0.0...HEAD
++[1.0.0]: https://github.com/frostmute/Are.na-Importer/releases/tag/v1.0.0
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:47Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `.github/release-template.md`**
+
+```diff
+@@
+-# 🚀 Are.na Sync for Obsidian v{{VERSION}}
++# 🚀 Are.na Importer for Obsidian v{{VERSION}}
+@@
+ 1. Open **Settings → Community plugins → Browse**.
+-2. Search for **"Are.na Sync"**.
++2. Search for **"Are.na Importer"**.
+ 3. Click **Update** (or **Install** + **Enable** for first-time users).
+@@
+ 1. Download `main.js`, `manifest.json`, and `styles.css` from the assets below.
+-2. Copy them to `<your-vault>/.obsidian/plugins/arena-sync/`.
++2. Copy them to `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
+ 3. Reload Obsidian.
+@@
+-See the [project board](https://github.com/arena-sync/arena-sync-obsidian/projects/1) for upcoming work, or [open an issue](https://github.com/arena-sync/arena-sync-obsidian/issues/new/choose) to request a feature.
++See the [project board](https://github.com/frostmute/Are.na-Importer/projects/1) for upcoming work, or [open an issue](https://github.com/frostmute/Are.na-Importer/issues/new/choose) to request a feature.
+ 
+-**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/arena-sync/arena-sync-obsidian/compare/v{{PREV_VERSION}}...v{{VERSION}})
++**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/frostmute/Are.na-Importer/compare/v{{PREV_VERSION}}...v{{VERSION}})
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `.github/ISSUE_TEMPLATE/bug_report.yml`**
+
+```diff
+@@
+       label: Plugin version
+-      description: "Find this in Settings → Community plugins → Are.na Sync"
++      description: "Find this in Settings → Community plugins → Are.na Importer"
+@@
+       label: Console logs
+-      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Sync → Debug logging** for verbose output."
++      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Importer → Debug logging** for verbose output."
+       render: shell
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:41:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Delete: `.github/PROJECT_BOARD.md`**
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:07Z)**_
+
+I found `.github/PROJECT_BOARD.md` had outdated and contradictory product statements (including two-way sync). I removed it and I’m replacing it with a clean, current roadmap document aligned with today’s importer behavior.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Add: `.github/PROJECT_BOARD.md`**
+
+```diff
++# Project Board Structure
++
++Use this file to bootstrap a GitHub Projects board for **Are.na Importer for Obsidian**.
++Create the board at: https://github.com/frostmute/Are.na-Importer/projects/new
++
++---
++
++## Board: Are.na Importer Roadmap
++
++**View**: Table + Board (Kanban)
++
++### Columns (Status)
++
++| Column | Purpose |
++|---|---|
++| 📥 Backlog | Ideas and requests not yet scoped |
++| 🔍 Triage | New issues awaiting prioritization |
++| 📐 Scoped | Accepted, requirements defined, ready for implementation |
++| 🚧 In Progress | Actively being worked on |
++| 👀 In Review | PR open, awaiting review |
++| ✅ Done | Merged and released |
++
++### Custom Fields
++
++| Field | Type | Options |
++|---|---|---|
++| Priority | Single select | 🔴 Critical · 🟠 High · 🟡 Medium · 🟢 Low |
++| Effort | Single select | XS (< 1h) · S (1–4h) · M (1–2d) · L (3–5d) · XL (1w+) |
++| Area | Single select | Import Engine · API · UI/Settings · Docs · CI/CD · Testing |
++| Milestone | Iteration | v1.0 · v1.1 · v1.2 |
++
++---
++
++## Current Product Scope (authoritative)
++
++- One-way import only: **Are.na -> Obsidian**
++- Deterministic and idempotent file generation
++- Manual, user-initiated sync (no background sync)
++- Optional dry-run preview + diff viewer
++- Attachment storage modes + migration tooling
++
++Out of scope for current line:
++- Push from Obsidian back to Are.na
++- Two-way conflict resolution
++
++---
++
++## v1.1 — Quality and Clarity
++
++| # | Title | Priority | Effort | Area |
++|---|---|---|---|---|
++| 1 | Settings UX refinement and onboarding copy | 🟠 High | M | UI/Settings |
++| 2 | Richer automated tests for sync engine and migration flows | 🟠 High | L | Testing |
++| 3 | Import performance profiling for large channels | 🟡 Medium | M | Import Engine |
++| 4 | Better error classification and actionable notices | 🟠 High | M | API |
++| 5 | Optional dataview-friendly frontmatter presets | 🟡 Medium | S | Import Engine |
++| 6 | Mapping export/import improvements (choose backup file) | 🟢 Low | S | UI/Settings |
++
++---
++
++## v1.2 — Power Features
++
++| # | Title | Priority | Effort | Area |
++|---|---|---|---|---|
++| 7 | Selective sync (per-channel include/exclude controls) | 🟠 High | L | Import Engine |
++| 8 | Connected graph export helpers for Obsidian graph workflows | 🟡 Medium | M | Import Engine |
++| 9 | End-to-end import fixtures for regression testing | 🟠 High | L | Testing |
++| 10 | Optional template hooks for generated notes | 🟡 Medium | M | UI/Settings |
++
++---
++
++## Labels
++
++Create these labels in the repository to match board categories:
++
++```
++bug             #d73a4a   Something isn't working
++enhancement     #a2eeef   New feature or request
++documentation   #0075ca   Improvements or additions to documentation
++good first issue #7057ff  Good for newcomers
++help wanted     #008672   Extra attention is needed
++triage          #e4e669   Needs prioritization
++import-engine   #1d76db   Core import logic
++api             #5319e7   Are.na API client
++ui              #f9d0c4   Settings and UI changes
++ci-cd           #bfd4f2   CI/CD and tooling
++testing         #c5def5   Test suite
++duplicate       #cfd3d7   This issue or pull request already exists
++wontfix         #ffffff   This will not be worked on
++```
++
++---
++
++## Automations (recommended)
++
++1. Auto-add: new issues -> 🔍 Triage
++2. Auto-move: PR opened -> 👀 In Review
++3. Auto-move: PR merged -> ✅ Done
++4. Auto-close: issues in ✅ Done for 7 days -> close issue
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:32Z)**_
+
+I also spotted historical release notes that still claimed push/two-way sync; I’m cleaning those up so no official doc contradicts the current one-way importer scope.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CHANGELOG.md`**
+
+```diff
+@@
+ - **Attachment handling**: Download or link PDFs and other non-image attachments with flexible storage options (channel-local, global, or custom folders).
+-- **Auto-sync timer**: Configurable interval (default 30 min) with manual trigger via Command Palette and ribbon icon.
+-- **Sync on startup**: Optional full sync when Obsidian launches.
++- **Manual import flow**: Command-driven import with explicit user control.
+ - **Channel mapping UI**: Map any number of Are.na channels to local vault folders with per-mapping enable/disable toggle.
+-- **Commands**: Sync all channels · Sync current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+-- **Status bar indicator**: Live sync progress with pagination and block-level updates for large channels.
++- **Commands**: Import all channels · Import current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
++- **Status bar indicator**: Live import progress with pagination and block-level updates for large channels.
+@@
+-- **Import history**: Transparent action logging in `Are.na/import-history.md` for audit trail.
++- **Import history**: Transparent action logging in `Are.na/import-history.md` for audit trail.
+@@
+ ### Security
+ - API tokens masked in settings UI (password input field).
+-- Input validation for channel mappings (slug and folder path required).
++- Input validation for channel mappings (slug required, folder optional with deterministic default).
+ - Secure token verification with clear feedback.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Are\.na Sync|arena-sync-obsidian|/plugins/arena-sync|Settings → Are\.na Sync|Sync all channels now|push sync|two-way" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md .github src/main.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"Are\\.na Sync|arena-sync-obsidian|/plugins/arena-sync|Settings → Are\\.na Sync|Sync all channels now|push sync|two-way\" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md .github src/main.ts"
+Chunk ID: f86f66
+Wall time: 0.0000 seconds
+Process exited with code 1
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Are\.na Import(?!er)" src README.md CHANGELOG.md .github CONTRIBUTING.md SECURITY.md --pcre2`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"Are\\.na Import(?"'!er)" src README.md CHANGELOG.md .github CONTRIBUTING.md SECURITY.md --pcre2'
+Chunk ID: b42508
+Wall time: 0.0000 seconds
+Process exited with code 1
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:47Z)**_
+
+I’ve completed the naming pass across docs/UI and removed stale/contradictory legacy wording. I’m running lint/test/build now to make sure the settings refactor and copy updates are fully clean.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint && npm test -- --runInBand && npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 02d423
+Wall time: 1.0019 seconds
+Process running with session ID 92299
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:42:52Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="write_stdin"><details>
+<summary>Tool use: **write_stdin**</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint && npm test -- --runInBand && npm run build'
+Chunk ID: 4a9b33
+Wall time: 2.1386 seconds
+Process exited with code 0
+Original token count: 863
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block
+    ✓ handles an image block with external link
+    ✓ embeds image blocks using Are.na display image in embed mode (1 ms)
+    ✓ handles an attachment block
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled
+    ✓ can include block description in frontmatter (1 ms)
+    ✓ supports display-first banner priority
+    ✓ renders comments and connected channels sections from context (1 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title (1 ms)
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string (6 ms)
+    ✓ is deterministic
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters (1 ms)
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme (1 ms)
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs
+    ✓ leaves external URLs unchanged
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+
+-----------------|---------|----------|---------|---------|----------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                      
+-----------------|---------|----------|---------|---------|----------------------------------------
+All files        |    8.66 |    14.06 |    3.89 |    9.16 |                                        
+ api.ts          |       0 |        0 |       0 |       0 | 1-383                                  
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                   
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                  
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                  
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                  
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-599                                  
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-815                                  
+ types.ts        |     100 |      100 |     100 |     100 |                                        
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245 
+-----------------|---------|----------|---------|---------|----------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        1.624 s
+Ran all test suites.
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:43:07Z)**_
+
+This was a really worthwhile polish pass, and it’s now in a much more professional state end-to-end.
+
+**What I completed**
+
+1. Naming consistency: `Are.na Importer` everywhere (docs + UI copy)
+- Updated user-facing text in notices, headings, and templates.
+- Removed legacy `Are.na Sync` wording across docs and issue/release templates.
+
+2. Settings UI cleanup and better explanations
+- Refined section structure with clearer headings and context paragraphs.
+- Added quick-start guidance at the top.
+- Improved descriptions for advanced toggles (tradeoffs and outcomes).
+- Improved channel mapping field labels/placeholders for clarity.
+
+3. Documentation consistency/professionalism sweep
+- Updated `README` to reflect current behavior and latest features.
+- Updated `CHANGELOG` wording and fixed outdated references/links.
+- Updated `CONTRIBUTING` setup/build details and doc-sync expectations.
+- Updated `.github` templates and roadmap doc to match current one-way importer scope.
+
+**Key files updated**
+- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
+- [src/main.ts](/home/frost/Are.na-Importer/src/main.ts)
+- [README.md](/home/frost/Are.na-Importer/README.md)
+- [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
+- [CONTRIBUTING.md](/home/frost/Are.na-Importer/CONTRIBUTING.md)
+- [SECURITY.md](/home/frost/Are.na-Importer/SECURITY.md)
+- [.github/release-template.md](/home/frost/Are.na-Importer/.github/release-template.md)
+- [.github/ISSUE_TEMPLATE/bug_report.yml](/home/frost/Are.na-Importer/.github/ISSUE_TEMPLATE/bug_report.yml)
+- [.github/PROJECT_BOARD.md](/home/frost/Are.na-Importer/.github/PROJECT_BOARD.md)
+
+**Verification**
+- `npm run lint` passed
+- `npm test -- --runInBand` passed
+- `npm run build` passed
+- package artifact: `dist/Are.na-Importer-1.0.0.zip`
+
+If you want, I can do one more ultra-final polish: normalize tone and punctuation in every settings description to a strict style guide (same sentence length/capitalization cadence).
+
+---
+
+_**User (2026-03-31 02:47:34Z)**_
+
+# Context from my IDE setup:
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+do one more ultra-final polish: normalize tone and punctuation in every settings description to a strict style guide (same sentence length/capitalization cadence).... and use this readme as an example of the look we are going for... again the following readme is provided as a style/formatting example for how we want our readme to look like:
+
+<h1 align="center">
+  <a name="logo" href="https://www.vCloudInfo.com/tag/iot"><img src="https://raw.githubusercontent.com/CCOSTAN/Home-AssistantConfig/master/x_profile.png" alt="Bear Stone Smart Home" width="200"></a>
+  <br>
+  Bear Stone Smart Home Documentation
+</h1>
+<h4 align="center">Be sure to :star: my configuration repo so you can keep up to date on any daily progress!</h4>
+
+<div align="center">
+
+[![X Follow](https://img.shields.io/static/v1?label=talk&message=3k&color=blue&logo=twitter&style=for-the-badge)](https://x.com/ccostan)
+[![YouTube Subscribe](https://img.shields.io/youtube/channel/subscribers/UC301G8JJFzY0BZ_0lshpKpQ?label=VIEW&logo=Youtube&logoColor=%23DF5D44&style=for-the-badge)](https://www.youtube.com/vCloudInfo?sub_confirmation=1)
+[![GitHub Stars](https://img.shields.io/github/stars/CCOSTAN/Home-AssistantConfig?label=STARS&logo=Github&style=for-the-badge)](https://github.com/CCOSTAN) <br>
+[![HA Version Badge](https://raw.githubusercontent.com/ccostan/home-assistantconfig/master/ha-version-badge.svg)](https://github.com/CCOSTAN/Home-AssistantConfig/blob/master/config/.HA_VERSION)
+[![Last Commit](https://img.shields.io/github/last-commit/CCOSTAN/Home-AssistantConfig.svg?style=plastic)](https://github.com/CCOSTAN/Home-AssistantConfig/commits/master)
+[![Commit Activity](https://img.shields.io/github/commit-activity/y/CCOSTAN/Home-AssistantConfig.svg?style=plastic)](https://github.com/CCOSTAN/Home-AssistantConfig/commits/master)
+
+</div>
+
+Live, personal Home Assistant configuration shared for **browsing and inspiration**. This is not a turnkey clone-and-run setup; borrow ideas, adapt entity IDs/secrets, and test in your own environment.
+
+### Quick navigation
+- You are here: `/` (root repo guide)
+- [Blog](https://www.vcloudinfo.com) | [Issues](https://github.com/CCOSTAN/Home-AssistantConfig/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) | [Diagram](config/www/custom_ui/floorplan/images/branding/Bear-Stone-Docker-Diagram.jpg) | [YouTube](https://youtube.com/vCloudInfo)
+- Config readmes: [Config index](config/README.md) | [Packages](config/packages/README.md) | [Automations](config/automation/README.md) | [Scripts](config/script/README.md) | [Scenes](config/scene/README.md) | [Sounds](config/sounds/README.md) | [Package triggers](config/packages/triggers/README.md)
+- Codex skills (optional): [codex_skills](codex_skills)
+
+![Home Assistant header](https://i.imgur.com/vjDH1LJ.png)
+
+### What this repo is (and isn't)
+- A live record of how my smart home runs, with real-world automations, scripts, and scenes.
+- A place to reverse-engineer patterns, not a deployment guide. If you reuse snippets, adjust entities, secrets, and services to fit your setup.
+- Issues double as a changelog and design history; browse them for rationale behind changes.
+
+### Repo layout and files you won't see
+- Reusable config lives under `config/` (see the quick navigation paths above).
+- Runtime artifacts are hidden by `.gitignore` and won't show up on GitHub (e.g., `home-assistant_v2.db*`, logs, `deps/`, `.venv/`, backups). Look at the YAML and scripts for the actual logic and regenerate your own `secrets.yaml`.
+
+### Platform
+- Runs on Docker/compose today; this README is a browsing guide, not a how-to-install. Current HA version is tracked in `config/.HA_VERSION` (see the badge above).
+- Camera ingest path (current): `wyze-bridge` runs on `docker_10` and Frigate runs on `docker_14`, consuming Wyze RTSP via `192.168.10.10:8554` for stability.
+
+### Featured examples to start with
+- Alarm and perimeter monitoring: [config/packages/alarm.yaml](config/packages/alarm.yaml)
+- Garage routines and entry lighting: [config/packages/garadget.yaml](config/packages/garadget.yaml), [config/automation/garage_entry_light.yaml](config/automation/garage_entry_light.yaml)
+- Holiday/front-of-house color scenes: [config/scene/monthly_colors.yaml](config/scene/monthly_colors.yaml), [config/script/monthly_color_scene.yaml](config/script/monthly_color_scene.yaml)
+- Dash-button triggers for quick actions: [config/automation/dash_buttons.yaml](config/automation/dash_buttons.yaml)
+- PC lock/unlock-driven lighting via HASS.Agent: [config/packages/hass_agent_homepc.yaml](config/packages/hass_agent_homepc.yaml)
+- Seasonal cuckoo clock with October and Christmas sound packs: [config/automation/System/CucKoo_Clock.yaml](config/automation/System/CucKoo_Clock.yaml)
+- Garage arrival and entry helpers: [config/packages/garadget.yaml](config/packages/garadget.yaml)
+- Battery and solar awareness: [config/packages/powerwall.yaml](config/packages/powerwall.yaml)
+- Presence-aware office comfort: [config/packages/office_motion.yaml](config/packages/office_motion.yaml)
+- Weather-aware lighting: [config/automation/dark_rainy_day.yaml](config/automation/dark_rainy_day.yaml)
+
+### Network diagram
+![Smart Home Diagram](config/www/custom_ui/floorplan/images/branding/Bear-Stone-Docker-Diagram.jpg)
+
+**Docker add-ons & utilities**
+| Container | Repo/Docs | Purpose |
+| --- | --- | --- |
+| Home Assistant Time Machine | [saihgupr/HomeAssistantTimeMachine](https://github.com/saihgupr/HomeAssistantTimeMachine) | Browse/diff/restore HA YAML (Lovelace, automations, scripts, ESPHome, packages) against existing backups. Blog walkthrough: [Time Machine for dashboards](https://www.vcloudinfo.com/2025/12/home-assistant-time-machine-dashboards.html). |
+| Duplicati | [duplicati/duplicati](https://github.com/duplicati/duplicati) | Off-box, versioned backups for HA config and media; docker config backups land in OneDrive. |
+| Dozzle | [amir20/dozzle](https://github.com/amir20/dozzle) | Lightweight Docker log viewer (useful for quick tailing across the homelab stacks). |
+| Cloudflared | [cloudflare/cloudflared](https://hub.docker.com/r/cloudflare/cloudflared) | Secure tunnel/edge access to Home Assistant without opening inbound ports. |
+| WordPress | [wordpress](https://hub.docker.com/_/wordpress) | Hosts [vCloudInfo.com](https://www.vcloudinfo.com) for docs, how-tos, videos, and long-form writeups that accompany this config. |
+
+### Gear tied to real automations (affiliate links)
+Only listing hardware that appears in active packages/automations here.
+https://amzn.to/48jVzZ3
+| Device | What it drives (friendly name -> file) | Buy |
+| --- | --- | --- |
+| Garadget garage door controller | Garage doors: open/close, reflection alerts - [garadget package](config/packages/garadget.yaml) | [![Buy](https://img.shields.io/badge/Buy-Garadget-orange?logo=amazon)](https://amzn.to/2jQLpVQ) |
+| August smart lock | Front-door lock control + status - [august package](config/packages/august.yaml) | [![Buy](https://img.shields.io/badge/Buy-August%20Lock-orange?logo=amazon)](https://amzn.to/48jVzZ3) |
+| Phyn Plus water shutoff | Leak detection + auto shutoff - [phynplus package](config/packages/phynplus.yaml) | [![Buy](https://img.shields.io/badge/Buy-Phyn%20Plus-orange?logo=amazon)](https://amzn.to/2Zy3sbJ) |
+| Rachio sprinkler controller | Rain-skips and seasonal watering - [rachio package](config/packages/rachio.yaml) | [![Buy](https://img.shields.io/badge/Buy-Rachio-orange?logo=amazon)](https://amzn.to/2eoPKBW) |
+| Tesla Powerwall 2 | Grid-outage alerts + load-shed automations - [powerwall package](config/packages/powerwall.yaml) | [![Buy](https://img.shields.io/badge/Buy-Powerwall-orange?logo=tesla)](https://amzn.to/3UM4BZ5) |
+| NodeMCU motion sensor | Office motion lighting - [office_motion package](config/packages/office_motion.yaml) | [![Buy](https://img.shields.io/badge/Buy-Motion%20Node-orange?logo=amazon)](https://amzn.to/2oUgj5i) |
+| Raspberry Pi 3 + Aeon Z-Wave stick | Z-Wave backbone for door/hall sensors - [garage entry helper](config/automation/garage_entry_light.yaml) | [![Pi](https://img.shields.io/badge/Buy-Pi%203-orange?logo=raspberrypi)](https://amzn.to/2e3DOBY) [![Z-Wave](https://img.shields.io/badge/Buy-Z--Wave%20Stick-orange?logo=zwave)](https://amzn.to/2eAiAP0) |
+| Roku streaming device | TV presence -> scenes/lighting - [roku package](config/packages/roku.yaml) | [![Buy](https://img.shields.io/badge/Buy-Roku-orange?logo=roku)](https://amzn.to/2Ctp8cr) |
+| Amazon Dash Button | Quick actions (office lamp toggle) - [dash buttons automation](config/automation/dash_buttons.yaml) | [![Buy](https://img.shields.io/badge/Buy-Dash%20Button-orange?logo=amazon)](https://amzn.to/2dPKZhM) |
+| Amazon Echo Show | Front door camera pop-up when the August lock unlocks - [august package](config/packages/august.yaml) | [![Buy](https://img.shields.io/badge/Buy-Echo%20Show-orange?logo=amazon)](https://amzn.to/4ptA3YO) |
+| Dreame/Neato vacuum | Cleaning schedules + notifications - [vacuum package](config/packages/vacuum.yaml) | [![Buy](https://img.shields.io/badge/Buy-Vacuum-orange?logo=amazon)](https://amzn.to/4f7NpFP) |
+| Flux/LED strip controller | Monthly color scenes for exterior - [monthly color scene](config/script/monthly_color_scene.yaml) | [![Buy](https://img.shields.io/badge/Buy-LED%20Controller-orange?logo=amazon)](https://amzn.to/2jUBSBE) |
+| Etekcity/433MHz outlet | Accent lighting relays - [garage entry helper](config/automation/garage_entry_light.yaml) | [![Buy](https://img.shields.io/badge/Buy-433MHz%20Outlet-orange?logo=amazon)](https://amzn.to/2efNoBP) |
+
+### Gear and affiliate links
+- Browsing or purchasing through the affiliate links above helps support this project; thanks!
+- Full gear list: https://www.vcloudinfo.com/gear-list
+
+**All of my configuration files are tested against the most stable version of home-assistant.**
+
+<a name="bottom" href="https://github.com/CCOSTAN/Home-AssistantConfig#logo"><img align="right" border="0" src="https://raw.githubusercontent.com/CCOSTAN/Home-AssistantConfig/master/config/www/custom_ui/floorplan/images/branding/up_arrow.png" width="25" ></a>
+
+**Still have questions on my Config?** <br>
+**Message me on X :** [![Follow CCostan](https://img.shields.io/twitter/follow/CCostan)](https://www.x.com/ccostan)
+
+<p align="center">
+<a target="_blank" href="https://www.buymeacoffee.com/vCloudInfo"><img src="https://www.buymeacoffee.com/assets/img/BMC-btn-logo.svg" alt="Buy me a coffee"><span style="margin-left:5px">You can buy me a coffee</span></a><a target="_blank" href="https://www.buymeacoffee.com/vCloudInfo"><img src="https://www.buymeacoffee.com/assets/img/BMC-btn-logo.svg" alt="Buy me a coffee"></a>
+<br>
+<a href="https://eepurl.com/dmXFYz"><img align="center" border="0" src="https://raw.githubusercontent.com/CCOSTAN/Home-AssistantConfig/master/config/www/custom_ui/floorplan/images/branding/email_link.png" height="50" ></a><br>
+<a href="https://www.vCloudInfo.com/p/affiliate-disclosure.html">
+Affiliate Disclosure
+</a></p>
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:47:42Z)**_
+
+This is a great finishing pass request, and your style example is super clear. I’m going to apply a strict style guide across settings descriptions first (consistent sentence cadence, punctuation, and tone), then restyle your `README.md` structure/copy to match that polished “documentation-forward” look while keeping your project’s identity.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:47:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,320p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,320p' README.md"
+Chunk ID: 15bc2f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1729
+Output:
+# Are.na Importer for Obsidian
+
+Import Are.na channel content into your Obsidian vault as Markdown notes.
+
+This plugin is **one-way import only**: Are.na → Obsidian.
+
+> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+
+## What it does
+
+- Imports mapped Are.na channels into mapped vault folders
+- Can bulk-import your channel list into mappings via `Import my channels`
+- Creates Markdown files for Are.na blocks
+- Updates existing imported files when remote block content changes
+- Adds optional YAML frontmatter metadata
+- Manual import only (no background sync)
+- Supports dry-run preview commands
+- Downloads images and non-image attachments (including PDFs) when configured
+- Supports image embeds using Are.na display images in note body
+- Supports attachment storage in channel-local, global, or custom folders
+- Supports per-channel attachment storage overrides
+- Includes attachment migration preview + diff and migration history log
+- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+- Optional block description in frontmatter (`arena_description`)
+- Optional import of block comments
+- Optional import of connected channels where block appears
+- Optional best-effort preview image for Channel blocks (banner/body image)
+- Writes channel index notes for graph-friendly linking
+- Includes channel info in index notes (description, started, modified, length, followers when available)
+- Includes best-effort `This Channel Appears In` links in index notes
+- Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+- Writes a master overview note for all synced channels
+- Shows a sync summary modal with diffs for updated files
+- Shows page/block progress in the status bar for large channels
+
+## What it does not do
+
+- ❌ Push from Obsidian back to Are.na (one-way import only)
+- ❌ Automatic deletion of local files when blocks are removed remotely
+- ❌ Background sync (manual only)
+
+## Rate Limiting
+
+Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+- **< 100 blocks**: Import completes in seconds
+- **100–1,000 blocks**: Import takes 1–5 minutes
+- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+
+If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+Pagination imports all pages for large channels (not only the first 100 blocks).
+
+## Commands
+
+- `Import all channels now`
+- `Preview import (dry-run)`
+- `Import current channel`
+- `Preview current channel import (dry-run)`
+- `Open channel on Are.na`
+- `Preview attachment migration`
+- `Run attachment migration`
+
+## Settings
+
+- API token with verify action
+- Block file naming (`title`, `id`, `title-id`)
+- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
+- Optional block enrichment toggles:
+  description in frontmatter, comments, connected channels, channel block preview image
+- Image handling (`download`, `embed`, `link`)
+- Attachment handling (`download`, `link`)
+- Downloaded attachment render (`embed`, `link`)
+- Attachment storage (`with channel notes`, `global`, `custom`)
+- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
+- Global and custom attachment folder paths
+- Frontmatter toggle
+- Notifications toggle
+- Debug logging toggle
+- Channel mappings (`channel slug` -> `local folder`)
+  Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
+- Channel index note naming (`index.md`, `folder-name`)
+- Channel management tools:
+  `Import my channels` (bulk-create mappings from Are.na),
+  `Auto-enable imported channels` toggle (for granular manual control),
+  `Backup channel mappings`,
+  `Restore latest backup`,
+  `Reset channel mappings`
+- Block class exclusion filter (skip Image, Media, etc.)
+- Attachment migration preview + run controls
+
+## How import works
+
+1. You define mappings manually, or use `Import my channels` to auto-create mappings.
+2. It fetches channel metadata and all channel blocks from the Are.na API.
+3. Each block is rendered to Markdown and written to the mapped folder.
+4. Optional block enrichments can add frontmatter description, comments, connected channels, and channel-block preview images.
+5. Optional asset downloads are resolved and linked in notes.
+6. Existing files are overwritten when remote content changes.
+7. Channel index notes are regenerated with links to imported notes and channel info.
+8. A master overview note is regenerated with
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:47:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/settings-tab.ts"
+Chunk ID: 6ac39c
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1969
+Output:
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import type ArenaSyncPlugin from "./main";
+import type {
+	AttachmentHandling,
+	AttachmentStorage,
+	BannerImagePriority,
+	ChannelIndexNoteStyle,
+	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
+	ImageHandling,
+} from "./types";
+
+export class ArenaSyncSettingTab extends PluginSettingTab {
+	plugin: ArenaSyncPlugin;
+
+	constructor(app: App, plugin: ArenaSyncPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
+
+		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("p", {
+			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
+			cls: "setting-item-description",
+		});
+		containerEl.createEl("p", {
+			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+			cls: "setting-item-description",
+		});
+
+		this.renderSectionHeader(
+			containerEl,
+			"Authentication",
+			"Connect your Are.na account for read-only import access.",
+		);
+		new Setting(containerEl)
+			.setName("API token")
+			.setDesc(
+				"Generate a token at https://dev.are.na/oauth/applications",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
+					.setValue(this.plugin.settings.apiToken)
+					.onChange(async (value) => {
+						this.plugin.settings.apiToken = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
+			.addButton((btn) =>
+				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
+					const ok = await this.plugin.api.verifyToken();
+					new Notice(ok ? "Token is valid" : "Invalid token");
+				}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Content rendering",
+			"Configure note format, metadata, and enrichment behavior.",
+		);
+		new Setting(containerEl)
+			.setName("Block file naming")
+			.setDesc("Choose how imported block note filenames are generated.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						title: "Block title",
+						id: "Block ID",
+						"title-id": "Title (ID)",
+					} as Record<BlockNamingScheme, string>)
+					.setValue(this.plugin.settings.blockNaming)
+					.onChange(async (value) => {
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Banner frontmatter field")
+			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.bannerFieldEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.bannerFieldEnabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.bannerFieldEnabled) {
+			new Setting(containerEl)
+				.setName("Banner field name")
+				.setDesc("Frontmatter key used for banner URL")
+				.addText((text) =>
+					text
+						.setPlaceholder("banner")
+						.setValue(this.plugin.settings.bannerFieldName)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerFieldName =
+								value.trim() || "banner";
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName("Banner image source priority")
+				.setDesc("Choose thumbnail or display image as preferred banner URL")
+				.addDropdown((dd) =>
+					dd
+						.addOptions({
+							"thumb-first": "Thumb first",
+							"display-first": "Display first",
+						} as Record<BannerImagePriority, string>)
+						.setValue(this.plugin.settings.bannerImagePriority)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerImagePriority =
+								value as BannerImagePriority;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		new Setting(containerEl)
+			.setName("Block description in frontmatter")
+			.setDesc("Adds `arena_description` when block description exists")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockDescriptionFrontmatter)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockDescriptionFrontmatter = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import block comments")
+			.setDesc("Imports all block comments into a `Comments` section in notes")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockComments)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockComments = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import connected ch
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:47:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,680p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '260,680p' src/settings-tab.ts"
+Chunk ID: 15e0e0
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2522
+Output:
+
+		new Setting(containerEl)
+			.setName("Attachment storage location")
+			.setDesc("Choose where downloaded files are stored in your vault.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					} as Record<AttachmentStorage, string>)
+					.setValue(this.plugin.settings.attachmentStorage)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentStorage =
+							value as AttachmentStorage;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Global attachment folder")
+			.setDesc("Used when storage location is Global folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na/Attachments")
+					.setValue(this.plugin.settings.globalAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.globalAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Custom attachment folder")
+			.setDesc("Used when storage location is Custom folder")
+			.addText((text) =>
+				text
+					.setPlaceholder("Path/In/Vault")
+					.setValue(this.plugin.settings.customAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.customAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Add frontmatter")
+			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.frontmatterEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.frontmatterEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Exclude block classes")
+			.setDesc(
+				"Comma-separated list of block types to skip (e.g., Image, Media)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Image, Media")
+					.setValue(this.plugin.settings.excludeClasses.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.excludeClasses = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Notifications and logging",
+			"Control sync notices and troubleshooting output.",
+		);
+		new Setting(containerEl)
+			.setName("Show notifications")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.notifyOnSync)
+					.onChange(async (value) => {
+						this.plugin.settings.notifyOnSync = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+			toggle
+				.setValue(this.plugin.settings.debugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.debugLogging = value;
+					await this.plugin.saveSettings();
+				}),
+		);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Channel management",
+			"Bulk-manage mappings and safely back up or restore configuration.",
+		);
+		new Setting(containerEl)
+			.setName("Auto-enable imported channels")
+			.setDesc(
+				"When importing from Are.na, new channel mappings start enabled",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoEnableImportedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.autoEnableImportedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import my channels")
+			.setDesc(
+				"Fetch all your Are.na channels and create missing mappings (default folder: Are.na/<slug>).",
+			)
+			.addButton((btn) =>
+				btn.setButtonText("Import my channels").setCta().onClick(async () => {
+					try {
+						const result = await this.plugin.importMyChannelsMappings();
+						new Notice(
+							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
+						);
+						this.display();
+					} catch (err) {
+						new Notice(`Import my channels failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Backup channel mappings")
+			.setDesc("Save current channel mappings to a backup JSON file in your vault")
+			.addButton((btn) =>
+				btn.setButtonText("Backup now").onClick(async () => {
+					try {
+						const path = await this.plugin.backupChannelMappings();
+						new Notice(`Channel mappings backed up to ${path}`);
+					} catch (err) {
+						new Notice(`Backup failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Restore latest backup")
+			.setDesc("Replace current mappings with the most recent backup file")
+			.addButton((btn) =>
+				
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:47:50Z)**_
+
+I’m now enforcing a strict copy style in settings descriptions: sentence case, one clear action/outcome per line, and consistent terminal punctuation. After that I’ll ship a cleaner README layout modeled after your example’s visual rhythm.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 			.setName("API token")
+ 			.setDesc(
+-				"Generate a token at https://dev.are.na/oauth/applications",
++				"Generate a token at https://dev.are.na/oauth/applications.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Banner frontmatter field")
+-			.setDesc("Add optional banner URL field for Obsidian Banners plugin")
++			.setDesc("Add an optional banner URL field for the Obsidian Banners plugin.")
+@@
+ 			new Setting(containerEl)
+ 				.setName("Banner field name")
+-				.setDesc("Frontmatter key used for banner URL")
++				.setDesc("Set the frontmatter key used for the banner URL.")
+@@
+ 			new Setting(containerEl)
+ 				.setName("Banner image source priority")
+-				.setDesc("Choose thumbnail or display image as preferred banner URL")
++				.setDesc("Choose whether thumbnail or display image is preferred.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Block description in frontmatter")
+-			.setDesc("Adds `arena_description` when block description exists")
++			.setDesc("Add `arena_description` when a block description is available.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import block comments")
+-			.setDesc("Imports all block comments into a `Comments` section in notes")
++			.setDesc("Import block comments into a `Comments` section in each note.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import connected channels")
+ 			.setDesc(
+-				"Imports channels where the block appears in a `This Block Also Appears In` section",
++				"Import channels where the block appears into a dedicated note section.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Channel block preview image")
+ 			.setDesc(
+-				"Best-effort: for Channel blocks, use linked channel preview image as note banner/body image",
++				"For Channel blocks, use a best-effort linked channel preview image.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Channel index note naming")
+-			.setDesc("Choose index note filename style for folder note compatibility")
++			.setDesc("Choose index filename style for Folder Note compatibility.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment handling")
+-			.setDesc("Control how PDFs and other non-image files are rendered.")
++			.setDesc("Choose how PDFs and other non-image files are rendered.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment storage location")
+-			.setDesc("Choose where downloaded files are stored in your vault.")
++			.setDesc("Choose where downloaded files are stored in your vault.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Global attachment folder")
+-			.setDesc("Used when storage location is Global folder")
++			.setDesc("Use this path when storage location is set to Global folder.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Custom attachment folder")
+-			.setDesc("Used when storage location is Custom folder")
++			.setDesc("Use this path when storage location is set to Custom folder.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Exclude block classes")
+ 			.setDesc(
+-				"Comma-separated list of block types to skip (e.g., Image, Media)",
++				"Enter a comma-separated list of block classes to skip (for example, Image, Media).",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Auto-enable imported channels")
+ 			.setDesc(
+-				"When importing from Are.na, new channel mappings start enabled",
++				"When importing channels, create new mappings in enabled state.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Backup channel mappings")
+-			.setDesc("Save current channel mappings to a backup JSON file in your vault")
++			.setDesc("Save current channel mappings to a backup JSON file in your vault.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Restore latest backup")
+-			.setDesc("Replace current mappings with the most recent backup file")
++			.setDesc("Replace current mappings with the most recent backup file.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Reset channel mappings")
+-			.setDesc("Remove all mappings from settings (recommended after creating a backup).")
++			.setDesc("Remove all mappings from settings. Create a backup first.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Add channel")
+ 			.setDesc(
+-				"Map an Are.na channel slug to a local folder (default: Are.na/<channel-slug>)",
++				"Map an Are.na channel slug to a local folder. Default: Are.na/<channel-slug>.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Preview migration")
+-			.setDesc("Dry-run preview with diffs")
++			.setDesc("Run a dry preview and inspect planned file diffs.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Run migration")
+-			.setDesc("Move attachments and update embeds")
++			.setDesc("Move attachments and update embeds to new paths.")
+@@
+ 		new Setting(wrapper)
+ 			.setName("Attachment storage override")
+-			.setDesc("Override attachment location for this channel")
++			.setDesc("Override attachment storage location for this channel.")
+@@
+ 			new Setting(wrapper)
+ 				.setName("Channel custom attachment folder")
+-				.setDesc("Overrides the global custom folder for this channel")
++				.setDesc("Override the global custom folder path for this channel.")
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+I’m doing the ultra-final pass now: I’ll verify the latest settings wording changes compile cleanly, then polish the README to match the stronger style cadence you shared while keeping it professional and plugin-appropriate. After edits, I’ll run lint, tests, and build again so we can confirm everything is production-ready.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Command: /usr/bin/zsh -lc 'git status --short'
+Chunk ID: 7b8833
+Wall time: 0.0471 seconds
+Process exited with code 0
+Original token count: 110
+Output:
+ M .github/ISSUE_TEMPLATE/bug_report.yml
+ M .github/PROJECT_BOARD.md
+ M .github/release-template.md
+ M .specstory/history/2026-03-30_22-18-45Z-deterministic-idempotent-user-controlled.md
+ M .specstory/statistics.json
+ M CHANGELOG.md
+ M CONTRIBUTING.md
+ M README.md
+ M SECURITY.md
+ M src/__tests__/utils.test.ts
+ M src/api.ts
+ M src/main.ts
+ M src/migration.ts
+ M src/settings-tab.ts
+ M src/sync-engine.ts
+ M src/types.ts
+ M src/utils.ts
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Are\.na Sync|arena-sync-obsidian|/plugins/arena-sync|Settings → Are\.na Sync|Sync all channels now|push sync|two-way" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md .github src || true`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"Are\\.na Sync|arena-sync-obsidian|/plugins/arena-sync|Settings → Are\\.na Sync|Sync all channels now|push sync|two-way\" README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md .github src || true"
+Chunk ID: c41c75
+Wall time: 0.0304 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/settings-tab.ts"
+Chunk ID: 64811c
+Wall time: 0.0440 seconds
+Process exited with code 0
+Original token count: 1966
+Output:
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import type ArenaSyncPlugin from "./main";
+import type {
+	AttachmentHandling,
+	AttachmentStorage,
+	BannerImagePriority,
+	ChannelIndexNoteStyle,
+	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
+	ImageHandling,
+} from "./types";
+
+export class ArenaSyncSettingTab extends PluginSettingTab {
+	plugin: ArenaSyncPlugin;
+
+	constructor(app: App, plugin: ArenaSyncPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
+
+		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("p", {
+			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
+			cls: "setting-item-description",
+		});
+		containerEl.createEl("p", {
+			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+			cls: "setting-item-description",
+		});
+
+		this.renderSectionHeader(
+			containerEl,
+			"Authentication",
+			"Connect your Are.na account for read-only import access.",
+		);
+		new Setting(containerEl)
+			.setName("API token")
+			.setDesc(
+				"Generate a token at https://dev.are.na/oauth/applications.",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
+					.setValue(this.plugin.settings.apiToken)
+					.onChange(async (value) => {
+						this.plugin.settings.apiToken = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
+			.addButton((btn) =>
+				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
+					const ok = await this.plugin.api.verifyToken();
+					new Notice(ok ? "Token is valid" : "Invalid token");
+				}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Content rendering",
+			"Configure note format, metadata, and enrichment behavior.",
+		);
+		new Setting(containerEl)
+			.setName("Block file naming")
+			.setDesc("Choose how imported block note filenames are generated.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						title: "Block title",
+						id: "Block ID",
+						"title-id": "Title (ID)",
+					} as Record<BlockNamingScheme, string>)
+					.setValue(this.plugin.settings.blockNaming)
+					.onChange(async (value) => {
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Banner frontmatter field")
+			.setDesc("Add an optional banner URL field for the Obsidian Banners plugin.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.bannerFieldEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.bannerFieldEnabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.bannerFieldEnabled) {
+			new Setting(containerEl)
+				.setName("Banner field name")
+				.setDesc("Set the frontmatter key used for the banner URL.")
+				.addText((text) =>
+					text
+						.setPlaceholder("banner")
+						.setValue(this.plugin.settings.bannerFieldName)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerFieldName =
+								value.trim() || "banner";
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName("Banner image source priority")
+				.setDesc("Choose whether thumbnail or display image is preferred.")
+				.addDropdown((dd) =>
+					dd
+						.addOptions({
+							"thumb-first": "Thumb first",
+							"display-first": "Display first",
+						} as Record<BannerImagePriority, string>)
+						.setValue(this.plugin.settings.bannerImagePriority)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerImagePriority =
+								value as BannerImagePriority;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		new Setting(containerEl)
+			.setName("Block description in frontmatter")
+			.setDesc("Add `arena_description` when a block description is available.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockDescriptionFrontmatter)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockDescriptionFrontmatter = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import block comments")
+			.setDesc("Import block comments into a `Comments` section in each note.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeBlockComments)
+					.onChange(async (value) => {
+						this.plugin.settings.includeBlockComments = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '261,620p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '261,620p' src/settings-tab.ts"
+Chunk ID: dd59ed
+Wall time: 0.0464 seconds
+Process exited with code 0
+Original token count: 2544
+Output:
+		new Setting(containerEl)
+			.setName("Attachment storage location")
+			.setDesc("Choose where downloaded files are stored in your vault.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						channel: "With channel notes",
+						global: "Global folder",
+						custom: "Custom folder",
+					} as Record<AttachmentStorage, string>)
+					.setValue(this.plugin.settings.attachmentStorage)
+					.onChange(async (value) => {
+						this.plugin.settings.attachmentStorage =
+							value as AttachmentStorage;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Global attachment folder")
+			.setDesc("Use this path when storage location is set to Global folder.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na/Attachments")
+					.setValue(this.plugin.settings.globalAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.globalAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Custom attachment folder")
+			.setDesc("Use this path when storage location is set to Custom folder.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Path/In/Vault")
+					.setValue(this.plugin.settings.customAttachmentFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.customAttachmentFolder =
+							value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Add frontmatter")
+			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.frontmatterEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.frontmatterEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Exclude block classes")
+			.setDesc(
+				"Enter a comma-separated list of block classes to skip (for example, Image, Media).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Image, Media")
+					.setValue(this.plugin.settings.excludeClasses.join(", "))
+					.onChange(async (value) => {
+						this.plugin.settings.excludeClasses = value
+							.split(",")
+							.map((s) => s.trim())
+							.filter((s) => s.length > 0);
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Notifications and logging",
+			"Control sync notices and troubleshooting output.",
+		);
+		new Setting(containerEl)
+			.setName("Show notifications")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.notifyOnSync)
+					.onChange(async (value) => {
+						this.plugin.settings.notifyOnSync = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+			toggle
+				.setValue(this.plugin.settings.debugLogging)
+				.onChange(async (value) => {
+					this.plugin.settings.debugLogging = value;
+					await this.plugin.saveSettings();
+				}),
+		);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Channel management",
+			"Bulk-manage mappings and safely back up or restore configuration.",
+		);
+		new Setting(containerEl)
+			.setName("Auto-enable imported channels")
+			.setDesc(
+				"When importing channels, create new mappings in enabled state.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.autoEnableImportedChannels)
+					.onChange(async (value) => {
+						this.plugin.settings.autoEnableImportedChannels = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Import my channels")
+			.setDesc(
+				"Fetch all your Are.na channels and create missing mappings (default folder: Are.na/<slug>).",
+			)
+			.addButton((btn) =>
+				btn.setButtonText("Import my channels").setCta().onClick(async () => {
+					try {
+						const result = await this.plugin.importMyChannelsMappings();
+						new Notice(
+							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
+						);
+						this.display();
+					} catch (err) {
+						new Notice(`Import my channels failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Backup channel mappings")
+			.setDesc("Save current channel mappings to a backup JSON file in your vault.")
+			.addButton((btn) =>
+				btn.setButtonText("Backup now").onClick(async () => {
+					try {
+						const path = await this.plugin.backupChannelMappings();
+						new Notice(`Channel mappings backed up to ${path}`);
+					} catch (err) {
+						new Notice(`Backup failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Restore latest backup")
+			.setDesc("Replace current mappings with the m
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,280p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,280p' README.md"
+Chunk ID: dbec1b
+Wall time: 0.0420 seconds
+Process exited with code 0
+Original token count: 1729
+Output:
+# Are.na Importer for Obsidian
+
+Import Are.na channel content into your Obsidian vault as Markdown notes.
+
+This plugin is **one-way import only**: Are.na → Obsidian.
+
+> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+
+## What it does
+
+- Imports mapped Are.na channels into mapped vault folders
+- Can bulk-import your channel list into mappings via `Import my channels`
+- Creates Markdown files for Are.na blocks
+- Updates existing imported files when remote block content changes
+- Adds optional YAML frontmatter metadata
+- Manual import only (no background sync)
+- Supports dry-run preview commands
+- Downloads images and non-image attachments (including PDFs) when configured
+- Supports image embeds using Are.na display images in note body
+- Supports attachment storage in channel-local, global, or custom folders
+- Supports per-channel attachment storage overrides
+- Includes attachment migration preview + diff and migration history log
+- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+- Optional block description in frontmatter (`arena_description`)
+- Optional import of block comments
+- Optional import of connected channels where block appears
+- Optional best-effort preview image for Channel blocks (banner/body image)
+- Writes channel index notes for graph-friendly linking
+- Includes channel info in index notes (description, started, modified, length, followers when available)
+- Includes best-effort `This Channel Appears In` links in index notes
+- Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+- Writes a master overview note for all synced channels
+- Shows a sync summary modal with diffs for updated files
+- Shows page/block progress in the status bar for large channels
+
+## What it does not do
+
+- ❌ Push from Obsidian back to Are.na (one-way import only)
+- ❌ Automatic deletion of local files when blocks are removed remotely
+- ❌ Background sync (manual only)
+
+## Rate Limiting
+
+Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+- **< 100 blocks**: Import completes in seconds
+- **100–1,000 blocks**: Import takes 1–5 minutes
+- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+
+If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+Pagination imports all pages for large channels (not only the first 100 blocks).
+
+## Commands
+
+- `Import all channels now`
+- `Preview import (dry-run)`
+- `Import current channel`
+- `Preview current channel import (dry-run)`
+- `Open channel on Are.na`
+- `Preview attachment migration`
+- `Run attachment migration`
+
+## Settings
+
+- API token with verify action
+- Block file naming (`title`, `id`, `title-id`)
+- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
+- Optional block enrichment toggles:
+  description in frontmatter, comments, connected channels, channel block preview image
+- Image handling (`download`, `embed`, `link`)
+- Attachment handling (`download`, `link`)
+- Downloaded attachment render (`embed`, `link`)
+- Attachment storage (`with channel notes`, `global`, `custom`)
+- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
+- Global and custom attachment folder paths
+- Frontmatter toggle
+- Notifications toggle
+- Debug logging toggle
+- Channel mappings (`channel slug` -> `local folder`)
+  Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
+- Channel index note naming (`index.md`, `folder-name`)
+- Channel management tools:
+  `Import my channels` (bulk-create mappings from Are.na),
+  `Auto-enable imported channels` toggle (for granular manual control),
+  `Backup channel mappings`,
+  `Restore latest backup`,
+  `Reset channel mappings`
+- Block class exclusion filter (skip Image, Media, etc.)
+- Attachment migration preview + run controls
+
+## How import works
+
+1. You define mappings manually, or use `Import my channels` to auto-create mappings.
+2. It fetches channel metadata and all channel blocks from the Are.na API.
+3. Each block is rendered to Markdown and written to the mapped folder.
+4. Optional block enrichments can add frontmatter description, comments, connected channels, and channel-block preview images.
+5. Optional asset downloads are resolved and linked in notes.
+6. Existing files are overwritten when remote content changes.
+7. Channel index notes are regenerated with links to imported notes and channel info.
+8. A master overview note is regenerated with
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:48:54Z)**_
+
+I’ve confirmed naming consistency is clean now, and I’m moving into the final copy-edit pass: I’ll standardize every settings description to one strict sentence style (including missing descriptions), then give the README a full structure/tone polish modeled on your example’s clarity and cadence.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:34Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Authentication",
+-			"Connect your Are.na account for read-only import access.",
++			"Connect your Are.na account for read-only import access.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("API token")
+ 			.setDesc(
+-				"Generate a token at https://dev.are.na/oauth/applications.",
++				"Use a personal token from https://dev.are.na/oauth/applications.",
+ 			)
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Content rendering",
+-			"Configure note format, metadata, and enrichment behavior.",
++			"Configure note format, metadata, and enrichment behavior.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("Block file naming")
+-			.setDesc("Choose how imported block note filenames are generated.")
++			.setDesc("Choose the filename format for imported block notes.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Banner frontmatter field")
+-			.setDesc("Add an optional banner URL field for the Obsidian Banners plugin.")
++			.setDesc("Add an optional banner URL frontmatter field for the Banners plugin.")
+@@
+ 			new Setting(containerEl)
+ 				.setName("Banner field name")
+-				.setDesc("Set the frontmatter key used for the banner URL.")
++				.setDesc("Set the frontmatter key that stores the banner URL.")
+@@
+ 			new Setting(containerEl)
+ 				.setName("Banner image source priority")
+-				.setDesc("Choose whether thumbnail or display image is preferred.")
++				.setDesc("Choose whether thumbnail or display image is used first.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Block description in frontmatter")
+-			.setDesc("Add `arena_description` when a block description is available.")
++			.setDesc("Add `arena_description` when a block description is available.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import block comments")
+-			.setDesc("Import block comments into a `Comments` section in each note.")
++			.setDesc("Import block comments into a `Comments` section in each note.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import connected channels")
+ 			.setDesc(
+-				"Import channels where the block appears into a dedicated note section.",
++				"Import channels where the block appears into a dedicated note section.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Channel block preview image")
+ 			.setDesc(
+-				"For Channel blocks, use a best-effort linked channel preview image.",
++				"For Channel blocks, use a best-effort linked channel preview image.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Channel index note naming")
+-			.setDesc("Choose index filename style for Folder Note compatibility.")
++			.setDesc("Choose the channel index filename style for Folder Note compatibility.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Image handling")
+ 			.setDesc(
+-				"`Download` stores locally; `Embed` uses Are.na image URL; `Link` adds external URL.",
++				"Choose how image blocks are rendered: `Download`, `Embed`, or `Link`.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment handling")
+-			.setDesc("Choose how PDFs and other non-image files are rendered.")
++			.setDesc("Choose how PDFs and other non-image files are rendered.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Downloaded attachment render")
+-			.setDesc("For downloaded attachments: render as wiki-link or embed.")
++			.setDesc("Choose whether downloaded attachments are rendered as links or embeds.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Attachment storage location")
+-			.setDesc("Choose where downloaded files are stored in your vault.")
++			.setDesc("Choose where downloaded files are stored in your vault.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Global attachment folder")
+-			.setDesc("Use this path when storage location is set to Global folder.")
++			.setDesc("Use this path when attachment storage location is set to `Global folder`.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Custom attachment folder")
+-			.setDesc("Use this path when storage location is set to Custom folder.")
++			.setDesc("Use this path when attachment storage location is set to `Custom folder`.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Add frontmatter")
+-			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
++			.setDesc("Include Are.na metadata fields in YAML frontmatter.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Exclude block classes")
+ 			.setDesc(
+-				"Enter a comma-separated list of block classes to skip (for example, Image, Media).",
++				"Enter a comma-separated list of block classes to skip, for example `Image, Media`.",
+ 			)
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Notifications and logging",
+-			"Control sync notices and troubleshooting output.",
++			"Control notices and troubleshooting output.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("Show notifications")
++			.setDesc("Show notices for import progress, completion, and failures.")
+ 			.addToggle((toggle) =>
+@@
+-		new Setting(containerEl).setName("Debug logging").addToggle((toggle) =>
+-			toggle
+-				.setValue(this.plugin.settings.debugLogging)
+-				.onChange(async (value) => {
+-					this.plugin.settings.debugLogging = value;
+-					await this.plugin.saveSettings();
+-				}),
+-		);
++		new Setting(containerEl)
++			.setName("Debug logging")
++			.setDesc("Log detailed import activity to the developer console.")
++			.addToggle((toggle) =>
++				toggle
++					.setValue(this.plugin.settings.debugLogging)
++					.onChange(async (value) => {
++						this.plugin.settings.debugLogging = value;
++						await this.plugin.saveSettings();
++					}),
++			);
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Channel management",
+-			"Bulk-manage mappings and safely back up or restore configuration.",
++			"Bulk-manage mappings and safely back up or restore configuration.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("Auto-enable imported channels")
+ 			.setDesc(
+-				"When importing channels, create new mappings in enabled state.",
++				"When importing channels, create new mappings in the enabled state.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Import my channels")
+ 			.setDesc(
+-				"Fetch all your Are.na channels and create missing mappings (default folder: Are.na/<slug>).",
++				"Fetch all your Are.na channels and create missing mappings using `Are.na/<slug>` by default.",
+ 			)
+@@
+ 		new Setting(containerEl)
+ 			.setName("Backup channel mappings")
+-			.setDesc("Save current channel mappings to a backup JSON file in your vault.")
++			.setDesc("Save current channel mappings to a JSON backup file in your vault.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Restore latest backup")
+-			.setDesc("Replace current mappings with the most recent backup file.")
++			.setDesc("Replace current mappings with the most recent backup file.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Reset channel mappings")
+-			.setDesc("Remove all mappings from settings. Create a backup first.")
++			.setDesc("Remove all mappings from settings. Create a backup first.")
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Channel mappings",
+-			"Each enabled mapping imports one Are.na channel into one vault folder.",
++			"Each enabled mapping imports one Are.na channel into one vault folder.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("Add channel")
+ 			.setDesc(
+-				"Map an Are.na channel slug to a local folder. Default: Are.na/<channel-slug>.",
++				"Map an Are.na channel slug to a local folder. Default: `Are.na/<channel-slug>`.",
+ 			)
+@@
+ 		this.renderSectionHeader(
+ 			containerEl,
+ 			"Attachment migration",
+-			"Use this when changing attachment storage strategy to move files and update embeds safely.",
++			"Use this when changing attachment storage strategy to move files and update embeds safely.",
+ 		);
+ 		new Setting(containerEl)
+ 			.setName("Preview migration")
+-			.setDesc("Run a dry preview and inspect planned file diffs.")
++			.setDesc("Run a dry preview and inspect planned file diffs.")
+@@
+ 		new Setting(containerEl)
+ 			.setName("Run migration")
+-			.setDesc("Move attachments and update embeds to new paths.")
++			.setDesc("Move attachments and update embeds to new paths.")
+@@
+ 		new Setting(wrapper)
+ 			.setName(`Mapping #${index + 1}`)
+ 			.setDesc(
+ 				mapping.lastSyncedAt
+-					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}`
+-					: "Never imported",
++					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}.`
++					: "Never imported.",
+ 			)
+@@
+ 					.setPlaceholder("Optional: custom vault folder (default Are.na/<slug>)")
++					.setPlaceholder("Optional custom vault folder (default: Are.na/<slug>)")
+ 					.setValue(mapping.localFolder)
+@@
+ 		new Setting(wrapper)
+ 			.setName("Attachment storage override")
+-			.setDesc("Override attachment storage location for this channel.")
++			.setDesc("Override the attachment storage location for this channel.")
+@@
+ 			new Setting(wrapper)
+ 				.setName("Channel custom attachment folder")
+-				.setDesc("Override the global custom folder path for this channel.")
++				.setDesc("Override the global custom folder path for this channel.")
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:36Z)**_
+
+I finished the settings copy normalization and added missing descriptions for notification/debug options. I’m quickly checking for any accidental duplicate lines from the patch, then I’ll do the README polish rewrite.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "setPlaceholder\(" src/settings-tab.ts && sed -n '430,560p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"setPlaceholder\\(\" src/settings-tab.ts && sed -n '430,560p' src/settings-tab.ts"
+Chunk ID: 47207d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1060
+Output:
+47:				text.setPlaceholder("Enter your Are.na token")
+109:						.setPlaceholder("banner")
+285:					.setPlaceholder("Are.na/Attachments")
+299:					.setPlaceholder("Path/In/Vault")
+327:					.setPlaceholder("Image, Media")
+521:					.setPlaceholder("Are.na channel slug")
+535:					.setPlaceholder("Optional: custom vault folder (default Are.na/<slug>)")
+536:					.setPlaceholder("Optional custom vault folder (default: Are.na/<slug>)")
+588:						.setPlaceholder("Path/In/Vault")
+						new Notice(`Restore failed: ${(err as Error).message}`);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Reset channel mappings")
+			.setDesc("Remove all mappings from settings. Create a backup first.")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Reset mappings")
+					.setWarning()
+					.onClick(async () => {
+						const ok = window.confirm(
+							"Reset all channel mappings? This can be undone by restoring a backup.",
+						);
+						if (!ok) return;
+						await this.plugin.resetChannelMappings();
+						new Notice("Channel mappings reset.");
+						this.display();
+					}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Channel mappings",
+			"Each enabled mapping imports one Are.na channel into one vault folder.",
+		);
+		new Setting(containerEl)
+			.setName("Add channel")
+			.setDesc(
+				"Map an Are.na channel slug to a local folder. Default: `Are.na/<channel-slug>`.",
+			)
+			.addButton((btn) =>
+				btn.setButtonText("+ Add mapping").onClick(async () => {
+					this.plugin.settings.channelMappings.push({
+						channelSlug: "",
+						channelId: 0,
+						channelTitle: "",
+						localFolder: "",
+						lastSyncedAt: null,
+						enabled: true,
+						attachmentStorageOverride: null,
+						customAttachmentFolderOverride: "",
+						lastAttachmentBase: null,
+					});
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		for (let i = 0; i < this.plugin.settings.channelMappings.length; i++) {
+			this.renderMapping(containerEl, i);
+		}
+
+		this.renderSectionHeader(
+			containerEl,
+			"Attachment migration",
+			"Use this when changing attachment storage strategy to move files and update embeds safely.",
+		);
+		new Setting(containerEl)
+			.setName("Preview migration")
+			.setDesc("Run a dry preview and inspect planned file diffs.")
+			.addButton((btn) =>
+				btn.setButtonText("Preview").onClick(async () => {
+					await this.plugin.checkForMigrationPrompt(true);
+				}),
+			);
+		new Setting(containerEl)
+			.setName("Run migration")
+			.setDesc("Move attachments and update embeds to new paths.")
+			.addButton((btn) =>
+				btn.setButtonText("Run").setCta().onClick(async () => {
+					await this.plugin.runMigration();
+				}),
+			);
+	}
+
+	private renderMapping(containerEl: HTMLElement, index: number): void {
+		const mapping = this.plugin.settings.channelMappings[index];
+		const wrapper = containerEl.createDiv({ cls: "arena-sync-mapping" });
+
+		new Setting(wrapper)
+			.setName(`Mapping #${index + 1}`)
+			.setDesc(
+				mapping.lastSyncedAt
+					? `Last imported ${new Date(mapping.lastSyncedAt).toLocaleString()}.`
+					: "Never imported.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Are.na channel slug")
+					.setValue(mapping.channelSlug)
+					.onChange(async (v) => {
+						const trimmed = v.trim();
+						if (!trimmed) {
+							new Notice("Channel slug cannot be empty");
+							return;
+						}
+						mapping.channelSlug = trimmed;
+						await this.plugin.saveSettings();
+					}),
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Optional: custom vault folder (default Are.na/<slug>)")
+					.setPlaceholder("Optional custom vault folder (default: Are.na/<slug>)")
+					.setValue(mapping.localFolder)
+					.onChange(async (v) => {
+						mapping.localFolder = v.trim();
+						await this.plugin.saveSettings();
+					}),
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(mapping.enabled).onChange(async (v) => {
+					mapping.enabled = v;
+					await this.plugin.saveSettings();
+				}),
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Remove")
+					.setWarning()
+					.onClick(async () => {
+						this.plugin.settings.channelMappings.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		new Setting(wrapper)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat manifest.json`</summary>
+```
+Command: /usr/bin/zsh -lc 'cat manifest.json'
+Chunk ID: 2d37d3
+Wall time: 0.0104 seconds
+Process exited with code 0
+Original token count: 79
+Output:
+{
+	"id": "Are.na-Importer",
+	"name": "Are.na Importer",
+	"version": "1.0.0",
+	"minAppVersion": "1.4.0",
+	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
+	"author": "frostmute",
+	"authorUrl": "https://github.com/frostmute/Are.na-Importer/",
+	"isDesktopOnly": false
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -1 .github/workflows 2>/dev/null || true`</summary>
+```
+Command: /usr/bin/zsh -lc 'ls -1 .github/workflows 2>/dev/null || true'
+Chunk ID: db4a3e
+Wall time: 0.0105 seconds
+Process exited with code 0
+Original token count: 5
+Output:
+ci.yml
+release.yml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:49Z)**_
+
+I found one small duplicate placeholder line in the settings form and will remove it now. Right after that, I’ll replace README with a cleaner centered-header + quick-navigation layout to match the style direction you gave.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:49:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 			.addText((text) =>
+ 				text
+-					.setPlaceholder("Optional: custom vault folder (default Are.na/<slug>)")
+ 					.setPlaceholder("Optional custom vault folder (default: Are.na/<slug>)")
+ 					.setValue(mapping.localFolder)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+-# Are.na Importer for Obsidian
+-
+-Import Are.na channel content into your Obsidian vault as Markdown notes.
+-
+-This plugin is **one-way import only**: Are.na → Obsidian.
+-
+-> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+-
+-## What it does
+-
+-- Imports mapped Are.na channels into mapped vault folders
+-- Can bulk-import your channel list into mappings via `Import my channels`
+-- Creates Markdown files for Are.na blocks
+-- Updates existing imported files when remote block content changes
+-- Adds optional YAML frontmatter metadata
+-- Manual import only (no background sync)
+-- Supports dry-run preview commands
+-- Downloads images and non-image attachments (including PDFs) when configured
+-- Supports image embeds using Are.na display images in note body
+-- Supports attachment storage in channel-local, global, or custom folders
+-- Supports per-channel attachment storage overrides
+-- Includes attachment migration preview + diff and migration history log
+-- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+-- Optional block description in frontmatter (`arena_description`)
+-- Optional import of block comments
+-- Optional import of connected channels where block appears
+-- Optional best-effort preview image for Channel blocks (banner/body image)
+-- Writes channel index notes for graph-friendly linking
+-- Includes channel info in index notes (description, started, modified, length, followers when available)
+-- Includes best-effort `This Channel Appears In` links in index notes
+-- Optional channel index naming mode (`index.md` or folder-name note for Folder Note plugin)
+-- Writes a master overview note for all synced channels
+-- Shows a sync summary modal with diffs for updated files
+-- Shows page/block progress in the status bar for large channels
+-
+-## What it does not do
+-
+-- ❌ Push from Obsidian back to Are.na (one-way import only)
+-- ❌ Automatic deletion of local files when blocks are removed remotely
+-- ❌ Background sync (manual only)
+-
+-## Rate Limiting
+-
+-Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+-- **< 100 blocks**: Import completes in seconds
+-- **100–1,000 blocks**: Import takes 1–5 minutes
+-- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+-
+-If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+-Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+-Pagination imports all pages for large channels (not only the first 100 blocks).
+-
+-## Commands
+-
+-- `Import all channels now`
+-- `Preview import (dry-run)`
+-- `Import current channel`
+-- `Preview current channel import (dry-run)`
+-- `Open channel on Are.na`
+-- `Preview attachment migration`
+-- `Run attachment migration`
+-
+-## Settings
+-
+-- API token with verify action
+-- Block file naming (`title`, `id`, `title-id`)
+-- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
+-- Optional block enrichment toggles:
+-  description in frontmatter, comments, connected channels, channel block preview image
+-- Image handling (`download`, `embed`, `link`)
+-- Attachment handling (`download`, `link`)
+-- Downloaded attachment render (`embed`, `link`)
+-- Attachment storage (`with channel notes`, `global`, `custom`)
+-- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
+-- Global and custom attachment folder paths
+-- Frontmatter toggle
+-- Notifications toggle
+-- Debug logging toggle
+-- Channel mappings (`channel slug` -> `local folder`)
+-  Default channel folder is `Are.na/<channel-slug>` when local folder is left blank
+-- Channel index note naming (`index.md`, `folder-name`)
+-- Channel management tools:
+-  `Import my channels` (bulk-create mappings from Are.na),
+-  `Auto-enable imported channels` toggle (for granular manual control),
+-  `Backup channel mappings`,
+-  `Restore latest backup`,
+-  `Reset channel mappings`
+-- Block class exclusion filter (skip Image, Media, etc.)
+-- Attachment migration preview + run controls
+-
+-## How import works
+-
+-1. You define mappings manually, or use `Import my channels` to auto-create mappings.
+-2. It fetches channel metadata and all channel blocks from the Are.na API.
+-3. Each block is rendered to Markdown and written to the mapped folder.
+-4. Optional block enrichments can add frontmatter description, comments, connected channels, and channel-block preview images.
+-5. Optional asset downloads are resolved and linked in notes.
+-6. Existing files are overwritten when remote content changes.
+-7. Channel index notes are regenerated with links to imported notes and channel info.
+-8. A master overview note is regenerated with links to each channel index.
+-9. A sync summary modal is displayed with diffs for updated files.
+-10. Sync records and last-import timestamps are persisted in plugin data.
+-
+-## Installation
+-
+-1. Put `main.js`, `manifest.json`, and `styles.css` in:
+-   `<your-vault>/.obsidian/plugins/Are.na-Importer/`
+-2. Enable the plugin in Obsidian Community Plugins.
+-3. Open plugin settings and add:
+-	- Are.na API token
+-	- At least one channel mapping
+-
+-## Development
+-
+-```bash
+-npm install
+-npm run dev
+-```
+-
+-Build:
+-
+-```bash
+-npm run build
+-```
+-
+-This produces:
+-
+-- `main.js` in the repo root
+-- `dist/<plugin-id>-<version>.zip` containing `main.js`, `manifest.json`, and `styles.css`
+-
+-Tests:
+-
+-```bash
+-npm test
+-```
+-
+-Lint:
+-
+-```bash
+-npm run lint
+-```
+-
+-## Security
+-
+-- **API tokens** are masked in the settings UI and stored securely in Obsidian's plugin data directory.
+-- **No telemetry**: This plugin does not collect any usage data.
+-- **No external requests**: Only Are.na API calls are made (no tracking pixels, analytics, etc.).
+-
+-See [SECURITY.md](SECURITY.md) for detailed security information.
+-
+-## Troubleshooting
+-
+-### Import fails with "Invalid API token"
+-1. Generate a new token at https://dev.are.na/oauth/applications
+-2. Paste it in settings and click "Verify"
+-3. Ensure the token has at least `read` scope
+-
+-### Import is slow or times out
+-- Large channels (1,000+ blocks) may take 10+ minutes due to API rate limits
+-- Check debug logging in settings to see progress
+-- Try importing smaller channels first
+-
+-### Files aren't updating
+-- Manually trigger with Command Palette: `Import all channels now`
+-- Check that channel mappings are enabled (toggle in settings)
+-
+-### Assets aren't downloading
+-- Images and PDFs only download if "Image handling" or "Attachment handling" is set to "Download to vault"
+-- Check that attachment storage folder is writable
+-- Check disk space
+-
+-### I only see first 100 blocks
+-- Update to the latest build; pagination now imports all pages.
+-
+-For more help, enable "Debug logging" in settings and check the browser console (`Ctrl/Cmd + Shift + I`).
+-
+-## License
+-
+-MIT
++<h1 align="center">Are.na Importer for Obsidian</h1>
++<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
++
++<div align="center">
++
++One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run previews • User-controlled output
++
++</div>
++
++Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
++
++## Quick Navigation
++
++- Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
++- CI and releases: [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
++- Planning and reporting: [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
++
++## What This Plugin Is (and Is Not)
++
++- It is a deterministic importer from Are.na to Obsidian.
++- It is vault-first, manual, and transparent.
++- It is not a two-way sync engine.
++- It does not run background sync jobs.
++- It does not auto-delete local notes when remote blocks disappear.
++
++## Feature Highlights
++
++### Import Engine
++
++- Imports mapped Are.na channels into mapped vault folders.
++- Supports full pagination for large channels (not limited to the first 100 blocks).
++- Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
++- Shows status bar progress for channels and block pages.
++
++### Deterministic Writing
++
++- Writes stable Markdown notes for blocks.
++- Rewrites existing notes when remote block content changes.
++- Writes channel index notes and a master overview note.
++- Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
++
++### Block Enrichment (Optional)
++
++- Banner frontmatter field for Banners plugin compatibility (`enabled`, custom key, source priority).
++- Block description in frontmatter (`arena_description`).
++- Block comments in a dedicated `Comments` section.
++- Connected channel list (`This block appears in`) with external links.
++- Best-effort preview image for Channel blocks.
++
++### Attachments and Media
++
++- Image handling modes: `download`, `embed`, `link`.
++- Non-image attachment handling modes: `download`, `link`.
++- Downloaded attachment rendering: `link` or `embed`.
++- Storage modes: channel-local, global folder, custom folder.
++- Per-channel storage overrides.
++- Migration tools with preview, diff, execution, and history logging.
++
++### Channel Management
++
++- `Import my channels` to bulk-create mappings from your Are.na account.
++- `Auto-enable imported channels` toggle for granular control.
++- Backup, restore, and reset tools for channel mappings.
++- Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
++
++## Commands
++
++- `Import all channels now`
++- `Preview import (dry-run)`
++- `Import current channel`
++- `Preview current channel import (dry-run)`
++- `Open channel on Are.na`
++- `Preview attachment migration`
++- `Run attachment migration`
++
++## Settings Overview
++
++- API token with verify action.
++- Block file naming (`title`, `id`, `title-id`).
++- Banner frontmatter options (`enabled`, field name, image source priority).
++- Optional enrichments (description, comments, connected channels, channel preview image).
++- Image and attachment rendering controls.
++- Attachment storage controls (global defaults and per-channel overrides).
++- Frontmatter, notifications, and debug logging toggles.
++- Channel mapping management and migration actions.
++
++## How Import Works
++
++1. Create mappings manually or use `Import my channels`.
++2. Run `Import all channels now` or a dry-run preview command.
++3. The plugin fetches channel metadata and all paginated blocks from Are.na.
++4. It normalizes each block into deterministic Markdown output.
++5. It compares planned output against existing vault files.
++6. It writes updated notes, indexes, and overview files.
++7. It shows a sync summary with diffs for changed files.
++8. It records import state and timestamps in plugin data.
++
++## Installation
++
++1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
++2. Enable **Are.na Importer** in Obsidian Community Plugins.
++3. Open settings and add your API token.
++4. Add at least one channel mapping, or run `Import my channels`.
++
++## Development
++
++```bash
++npm install
++npm run dev
++```
++
++Build:
++
++```bash
++npm run build
++```
++
++Build output:
++
++- `main.js` in the repository root.
++- `dist/<plugin-id>-<version>.zip` with `main.js`, `manifest.json`, and `styles.css`.
++
++Quality checks:
++
++```bash
++npm run lint
++npm test
++```
++
++## Security
++
++- API tokens are masked in the UI and stored in Obsidian plugin data.
++- The plugin collects no telemetry.
++- External requests are limited to Are.na API and direct file URLs required for configured downloads.
++
++For details, see [SECURITY.md](SECURITY.md).
++
++## Troubleshooting
++
++### Invalid API token
++
++1. Generate a token at <https://dev.are.na/oauth/applications>.
++2. Paste it into settings and click `Verify`.
++3. Ensure the token includes read access.
++
++### Slow imports or timeouts
++
++- Large channels can take several minutes due to API rate limits and pagination.
++- Enable debug logging to monitor progress.
++- Start with a smaller channel to verify configuration.
++
++### Notes are not updating
++
++- Run `Import all channels now` from the Command Palette.
++- Confirm the channel mapping is enabled in settings.
++
++### Assets are not downloading
++
++- Set image or attachment handling to `Download to vault`.
++- Confirm attachment folders are valid and writable.
++- Verify disk space.
++
++### Only 100 blocks imported
++
++- Use the latest build; pagination imports all pages.
++
++## License
++
++MIT
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
+
+README is now restructured in the stronger centered/sectioned style and aligned to Are.na Importer language. I’m running lint, tests, and build next to confirm the final copy pass didn’t introduce any regressions.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint'
+Chunk ID: fef554
+Wall time: 2.3236 seconds
+Process exited with code 0
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: fd8f67
+Wall time: 3.0267 seconds
+Process exited with code 0
+Original token count: 824
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (3 ms)
+    ✓ omits front-matter when disabled (3 ms)
+    ✓ handles a link block (1 ms)
+    ✓ handles an image block with external link (1 ms)
+    ✓ embeds image blocks using Are.na display image in embed mode (6 ms)
+    ✓ handles an attachment block (1 ms)
+    ✓ falls back to Block ID when title is null
+    ✓ adds optional banner frontmatter field when enabled (2 ms)
+    ✓ can include block description in frontmatter
+    ✓ supports display-first banner priority (1 ms)
+    ✓ renders comments and connected channels sections from context (2 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title
+    ✓ handles content without front-matter (1 ms)
+  computeHash
+    ✓ returns a 16-char hex string (10 ms)
+    ✓ is deterministic
+    ✓ differs for different inputs (1 ms)
+  sanitiseFilename
+    ✓ replaces forbidden characters
+    ✓ collapses whitespace
+  blockFileName
+    ✓ title scheme
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts api block URLs to web URLs (1 ms)
+    ✓ leaves external URLs unchanged
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided (5 ms)
+
+-----------------|---------|----------|---------|---------|----------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                      
+-----------------|---------|----------|---------|---------|----------------------------------------
+All files        |    8.66 |    14.06 |    3.89 |    9.16 |                                        
+ api.ts          |       0 |        0 |       0 |       0 | 1-383                                  
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                   
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                  
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                  
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                  
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-603                                  
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-815                                  
+ types.ts        |     100 |      100 |     100 |     100 |                                        
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245 
+-----------------|---------|----------|---------|---------|----------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        2.322 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 526ac0
+Wall time: 2.4407 seconds
+Process exited with code 0
+Original token count: 49
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:50:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- src/settings-tab.ts README.md | sed -n '1,260p'`</summary>
+```
+Command: /usr/bin/zsh -lc "git diff -- src/settings-tab.ts README.md | sed -n '1,260p'"
+Chunk ID: 29a596
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2787
+Output:
+diff --git a/README.md b/README.md
+index 1ea1bf6..0fc4367 100644
+--- a/README.md
++++ b/README.md
+@@ -1,45 +1,67 @@
+-# Are.na Import for Obsidian
++<h1 align="center">Are.na Importer for Obsidian</h1>
++<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
+ 
+-Import Are.na channel content into your Obsidian vault as Markdown notes.
++<div align="center">
+ 
+-This plugin is **one-way import only**: Are.na → Obsidian.
++One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run previews • User-controlled output
+ 
+-> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
++</div>
+ 
+-## What it does
++Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+ 
+-- Imports mapped Are.na channels into mapped vault folders
+-- Creates Markdown files for Are.na blocks
+-- Updates existing imported files when remote block content changes
+-- Adds optional YAML frontmatter metadata
+-- Manual import only (no background sync)
+-- Supports dry-run preview commands
+-- Downloads images and non-image attachments (including PDFs) when configured
+-- Supports image embeds using Are.na display images in note body
+-- Supports attachment storage in channel-local, global, or custom folders
+-- Supports per-channel attachment storage overrides
+-- Includes attachment migration preview + diff and migration history log
+-- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
+-- Writes channel index notes for graph-friendly linking
+-- Writes a master overview note for all synced channels
+-- Shows a sync summary modal with diffs for updated files
+-- Shows page/block progress in the status bar for large channels
++## Quick Navigation
+ 
+-## What it does not do
++- Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
++- CI and releases: [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
++- Planning and reporting: [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+ 
+-- ❌ Push from Obsidian back to Are.na (one-way import only)
+-- ❌ Automatic deletion of local files when blocks are removed remotely
+-- ❌ Background sync (manual only)
++## What This Plugin Is (and Is Not)
+ 
+-## Rate Limiting
++- It is a deterministic importer from Are.na to Obsidian.
++- It is vault-first, manual, and transparent.
++- It is not a two-way sync engine.
++- It does not run background sync jobs.
++- It does not auto-delete local notes when remote blocks disappear.
+ 
+-Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
+-- **< 100 blocks**: Import completes in seconds
+-- **100–1,000 blocks**: Import takes 1–5 minutes
+-- **1,000+ blocks**: Import may take 10+ minutes due to pagination
++## Feature Highlights
+ 
+-If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
+-Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
++### Import Engine
++
++- Imports mapped Are.na channels into mapped vault folders.
++- Supports full pagination for large channels (not limited to the first 100 blocks).
++- Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
++- Shows status bar progress for channels and block pages.
++
++### Deterministic Writing
++
++- Writes stable Markdown notes for blocks.
++- Rewrites existing notes when remote block content changes.
++- Writes channel index notes and a master overview note.
++- Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
++
++### Block Enrichment (Optional)
++
++- Banner frontmatter field for Banners plugin compatibility (`enabled`, custom key, source priority).
++- Block description in frontmatter (`arena_description`).
++- Block comments in a dedicated `Comments` section.
++- Connected channel list (`This block appears in`) with external links.
++- Best-effort preview image for Channel blocks.
++
++### Attachments and Media
++
++- Image handling modes: `download`, `embed`, `link`.
++- Non-image attachment handling modes: `download`, `link`.
++- Downloaded attachment rendering: `link` or `embed`.
++- Storage modes: channel-local, global folder, custom folder.
++- Per-channel storage overrides.
++- Migration tools with preview, 
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:51:05Z)**_
+
+Completed. I applied the ultra-final polish pass and verified everything still builds cleanly.
+
+### Updated
+- Normalized settings copy in [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts) to a stricter, consistent style:
+  - sentence-case tone
+  - consistent punctuation
+  - clearer action/outcome wording
+  - added missing descriptions for `Show notifications` and `Debug logging`
+- Reworked [README.md](/home/frost/Are.na-Importer/README.md) to match the style direction you shared:
+  - centered title/tagline presentation
+  - cleaner quick navigation
+  - tighter, more professional section cadence
+  - consistent naming as **Are.na Importer** throughout
+
+### Validation
+- `npm run lint` ✅
+- `npm test -- --runInBand` ✅ (all tests pass; existing `ts-jest` interop warning still appears but does not fail)
+- `npm run build` ✅
+- Package produced: `/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip`
+
+
+
+---
+
+_**User (2026-03-31 02:56:35Z)**_
+
+# Context from my IDE setup:
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+the are.na token should actually come from: https://www.are.na/developers/personal-access-tokens
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:39Z)**_
+
+Great catch. I’ll update every token reference to the personal access token URL you shared and run a quick sanity check so docs/UI stay consistent.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "dev\.are\.na/oauth/applications|token" README.md src SECURITY.md CONTRIBUTING.md CHANGELOG.md .github || true`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"dev\\.are\\.na/oauth/applications|token\" README.md src SECURITY.md CONTRIBUTING.md CHANGELOG.md .github || true"
+Chunk ID: 90b6b1
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 461
+Output:
+SECURITY.md:20:- **Storage**: API tokens are stored in Obsidian's plugin data directory, which is encrypted by Obsidian's security layer on desktop.
+SECURITY.md:23:- **Best Practice**: Treat your API token like a password. Never share it or commit it to version control.
+src/settings-tab.ts:32:			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+src/settings-tab.ts:42:			.setName("API token")
+src/settings-tab.ts:44:				"Use a personal token from https://dev.are.na/oauth/applications.",
+src/settings-tab.ts:47:				text.setPlaceholder("Enter your Are.na token")
+src/settings-tab.ts:59:						new Notice("Please enter an API token first");
+src/settings-tab.ts:63:					new Notice(ok ? "Token is valid" : "Invalid token");
+src/main.ts:175:			new Notice("Are.na Importer: Please set your API token in settings.");
+src/main.ts:395:			throw new Error("Please set your API token first.");
+src/api.ts:32:	private token: string;
+src/api.ts:35:	constructor(token: string, debug = false) {
+src/api.ts:36:		this.token = token;
+src/api.ts:44:		if (this.token) {
+src/api.ts:45:			h["Authorization"] = `Bearer ${this.token}`;
+src/api.ts:145:				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
+CHANGELOG.md:24:- **Token verification**: One-click API token validation in settings.
+CHANGELOG.md:38:- API tokens masked in settings UI (password input field).
+CHANGELOG.md:40:- Secure token verification with clear feedback.
+README.md:78:- API token with verify action.
+README.md:102:3. Open settings and add your API token.
+README.md:132:- API tokens are masked in the UI and stored in Obsidian plugin data.
+README.md:140:### Invalid API token
+README.md:142:1. Generate a token at <https://dev.are.na/oauth/applications>.
+README.md:144:3. Ensure the token includes read access.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,120p' src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,120p' src/settings-tab.ts"
+Chunk ID: 29f91e
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 896
+Output:
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import type ArenaSyncPlugin from "./main";
+import type {
+	AttachmentHandling,
+	AttachmentStorage,
+	BannerImagePriority,
+	ChannelIndexNoteStyle,
+	BlockNamingScheme,
+	DownloadedAttachmentLinkStyle,
+	ImageHandling,
+} from "./types";
+
+export class ArenaSyncSettingTab extends PluginSettingTab {
+	plugin: ArenaSyncPlugin;
+
+	constructor(app: App, plugin: ArenaSyncPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.addClass("arena-sync-settings");
+
+		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("p", {
+			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
+			cls: "setting-item-description",
+		});
+		containerEl.createEl("p", {
+			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+			cls: "setting-item-description",
+		});
+
+		this.renderSectionHeader(
+			containerEl,
+			"Authentication",
+			"Connect your Are.na account for read-only import access.",
+		);
+		new Setting(containerEl)
+			.setName("API token")
+			.setDesc(
+				"Use a personal token from https://dev.are.na/oauth/applications.",
+			)
+			.addText((text) => {
+				text.setPlaceholder("Enter your Are.na token")
+					.setValue(this.plugin.settings.apiToken)
+					.onChange(async (value) => {
+						this.plugin.settings.apiToken = value.trim();
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "password";
+				return text;
+			})
+			.addButton((btn) =>
+				btn.setButtonText("Verify").onClick(async () => {
+					if (!this.plugin.settings.apiToken) {
+						new Notice("Please enter an API token first");
+						return;
+					}
+					const ok = await this.plugin.api.verifyToken();
+					new Notice(ok ? "Token is valid" : "Invalid token");
+				}),
+			);
+
+		this.renderSectionHeader(
+			containerEl,
+			"Content rendering",
+			"Configure note format, metadata, and enrichment behavior.",
+		);
+		new Setting(containerEl)
+			.setName("Block file naming")
+			.setDesc("Choose the filename format for imported block notes.")
+			.addDropdown((dd) =>
+				dd
+					.addOptions({
+						title: "Block title",
+						id: "Block ID",
+						"title-id": "Title (ID)",
+					} as Record<BlockNamingScheme, string>)
+					.setValue(this.plugin.settings.blockNaming)
+					.onChange(async (value) => {
+						this.plugin.settings.blockNaming =
+							value as BlockNamingScheme;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Banner frontmatter field")
+			.setDesc("Add an optional banner URL frontmatter field for the Banners plugin.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.bannerFieldEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.bannerFieldEnabled = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.bannerFieldEnabled) {
+			new Setting(containerEl)
+				.setName("Banner field name")
+				.setDesc("Set the frontmatter key that stores the banner URL.")
+				.addText((text) =>
+					text
+						.setPlaceholder("banner")
+						.setValue(this.plugin.settings.bannerFieldName)
+						.onChange(async (value) => {
+							this.plugin.settings.bannerFieldName =
+								value.trim() || "banner";
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName("Banner image source priority")
+				.setDesc("Choose whether thumbnail or display image is used first.")
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '120,260p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '120,260p' README.md"
+Chunk ID: e34c1e
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 315
+Output:
+- `main.js` in the repository root.
+- `dist/<plugin-id>-<version>.zip` with `main.js`, `manifest.json`, and `styles.css`.
+
+Quality checks:
+
+```bash
+npm run lint
+npm test
+```
+
+## Security
+
+- API tokens are masked in the UI and stored in Obsidian plugin data.
+- The plugin collects no telemetry.
+- External requests are limited to Are.na API and direct file URLs required for configured downloads.
+
+For details, see [SECURITY.md](SECURITY.md).
+
+## Troubleshooting
+
+### Invalid API token
+
+1. Generate a token at <https://dev.are.na/oauth/applications>.
+2. Paste it into settings and click `Verify`.
+3. Ensure the token includes read access.
+
+### Slow imports or timeouts
+
+- Large channels can take several minutes due to API rate limits and pagination.
+- Enable debug logging to monitor progress.
+- Start with a smaller channel to verify configuration.
+
+### Notes are not updating
+
+- Run `Import all channels now` from the Command Palette.
+- Confirm the channel mapping is enabled in settings.
+
+### Assets are not downloading
+
+- Set image or attachment handling to `Download to vault`.
+- Confirm attachment folders are valid and writable.
+- Verify disk space.
+
+### Only 100 blocks imported
+
+- Use the latest build; pagination imports all pages.
+
+## License
+
+MIT
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:42Z)**_
+
+I found two hardcoded old links (settings UI and README troubleshooting). I’m updating both to the personal access token URL now.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/settings-tab.ts`**
+
+```diff
+@@
+ 		new Setting(containerEl)
+ 			.setName("API token")
+ 			.setDesc(
+-				"Use a personal token from https://dev.are.na/oauth/applications.",
++				"Use a personal token from https://www.are.na/developers/personal-access-tokens.",
+ 			)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ 1. Generate a token at <https://dev.are.na/oauth/applications>.
++1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+ 2. Paste it into settings and click `Verify`.
+ 3. Ensure the token includes read access.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '136,156p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '136,156p' README.md"
+Chunk ID: 4696d7
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 169
+Output:
+For details, see [SECURITY.md](SECURITY.md).
+
+## Troubleshooting
+
+### Invalid API token
+
+1. Generate a token at <https://dev.are.na/oauth/applications>.
+1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+2. Paste it into settings and click `Verify`.
+3. Ensure the token includes read access.
+
+### Slow imports or timeouts
+
+- Large channels can take several minutes due to API rate limits and pagination.
+- Enable debug logging to monitor progress.
+- Start with a smaller channel to verify configuration.
+
+### Notes are not updating
+
+- Run `Import all channels now` from the Command Palette.
+- Confirm the channel mapping is enabled in settings.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+-1. Generate a token at <https://dev.are.na/oauth/applications>.
+-1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
++1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "dev\.are\.na/oauth/applications|www\.are\.na/developers/personal-access-tokens" README.md src/settings-tab.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"dev\\.are\\.na/oauth/applications|www\\.are\\.na/developers/personal-access-tokens\" README.md src/settings-tab.ts"
+Chunk ID: bbdbe9
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 51
+Output:
+src/settings-tab.ts:44:				"Use a personal token from https://www.are.na/developers/personal-access-tokens.",
+README.md:142:1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:56:55Z)**_
+
+Updated. The token source now points to the correct personal-access-token page in both places:
+
+- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts): API token setting description
+- [README.md](/home/frost/Are.na-Importer/README.md): troubleshooting step for invalid token
+
+New URL used everywhere: `https://www.are.na/developers/personal-access-tokens`
+
+---
+
+_**User (2026-03-31 02:59:13Z)**_
+
+# Context from my IDE setup:
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+also, can you  double check this url and make sure what we are using is consistent with this documentation (it is the most recent revision of Are.na's API, V3):  https://www.are.na/developers/explore
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:17Z)**_
+
+I’ll verify the current Are.na API docs at that URL and cross-check our implementation for endpoint/version consistency, then I’ll report exactly what matches and what needs adjustment.
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "api\.are\.na|are\.na/api|v2|v3|Authorization|Bearer|per_page|page|channels|blocks|oauth" src README.md CHANGELOG.md`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"api\\.are\\.na|are\\.na/api|v2|v3|Authorization|Bearer|per_page|page|channels|blocks|oauth\" src README.md CHANGELOG.md"
+Chunk ID: e0eda3
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2204
+Output:
+CHANGELOG.md:6:and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+CHANGELOG.md:11:- **Pull sync**: Import Are.na channels as folders of Markdown notes (text, images, links, media, attachments).
+CHANGELOG.md:16:- **Channel mapping UI**: Map any number of Are.na channels to local vault folders with per-mapping enable/disable toggle.
+CHANGELOG.md:17:- **Commands**: Import all channels · Import current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+CHANGELOG.md:18:- **Status bar indicator**: Live import progress with pagination and block-level updates for large channels.
+CHANGELOG.md:51:  - `Import my channels` (bulk-create mappings from Are.na account)
+CHANGELOG.md:52:  - `Auto-enable imported channels` toggle (granular manual control)
+CHANGELOG.md:63:  - import connected channels where block appears, with clickable external links
+CHANGELOG.md:64:  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
+CHANGELOG.md:79:- Fixed pagination edge case where some channels could stop after the first 100 blocks.
+README.md:10:Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+README.md:24:- It does not auto-delete local notes when remote blocks disappear.
+README.md:30:- Imports mapped Are.na channels into mapped vault folders.
+README.md:31:- Supports full pagination for large channels (not limited to the first 100 blocks).
+README.md:33:- Shows status bar progress for channels and block pages.
+README.md:37:- Writes stable Markdown notes for blocks.
+README.md:48:- Best-effort preview image for Channel blocks.
+README.md:61:- `Import my channels` to bulk-create mappings from your Are.na account.
+README.md:62:- `Auto-enable imported channels` toggle for granular control.
+README.md:68:- `Import all channels now`
+README.md:81:- Optional enrichments (description, comments, connected channels, channel preview image).
+README.md:89:1. Create mappings manually or use `Import my channels`.
+README.md:90:2. Run `Import all channels now` or a dry-run preview command.
+README.md:91:3. The plugin fetches channel metadata and all paginated blocks from Are.na.
+README.md:103:4. Add at least one channel mapping, or run `Import my channels`.
+README.md:148:- Large channels can take several minutes due to API rate limits and pagination.
+README.md:154:- Run `Import all channels now` from the Command Palette.
+README.md:163:### Only 100 blocks imported
+README.md:165:- Use the latest build; pagination imports all pages.
+src/modals.ts:134:		if (this.plan.channels.length === 0) {
+src/modals.ts:139:		for (const channel of this.plan.channels) {
+src/migration.ts:27:	channels: MigrationChannelPlan[];
+src/migration.ts:66:	const channels: MigrationChannelPlan[] = [];
+src/migration.ts:117:		channels.push({
+src/migration.ts:126:	const totalMoves = channels.reduce((sum, c) => sum + c.moves.length, 0);
+src/migration.ts:127:	const totalUpdates = channels.reduce(
+src/migration.ts:131:	return { channels, totalMoves, totalUpdates };
+src/migration.ts:156:	for (const channel of plan.channels) {
+src/utils.ts:75:		if (parsed.hostname === "api.are.na") {
+src/utils.ts:76:			const path = parsed.pathname.replace(/^\/v2/, "");
+src/utils.ts:78:				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+src/utils.ts:79:				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+src/types.ts:75:	total_pages: number;
+src/types.ts:76:	current_page: number;
+src/types.ts:135:	phase: "pages" | "blocks";
+src/sync-engine.ts:142:		const blocks = await this.api.getAllChannelBlocksWithProgress(
+src/sync-engine.ts:147:					phase: "pages",
+src/sync-engine.ts:160:		for (let i = 0; i < blocks.length; i++) {
+src/sync-engine.ts:161:			const block = blocks[i];
+src/sync-engine.ts:164:				phase: "blocks",
+src/sync-engine.ts:166:				total: blocks.length,
+src/sync-engine.ts:404:			`- Imported blocks: ${sorted.length}`,
+src/sync-engine.ts:565:				const channels = this.extractConnectedChannels(
+src/sync-engine.ts:569:				if (channels.length > 0) {
+src/sync-engine.ts:570:					out.connectedChannels = channels;
+src/sync-engine.ts:643:			obj.connected_by_channels,
+src/sync-engine.ts:644:			obj.connected_channels,
+src/sync-engine.ts:645:			obj.channels,
+src/sync-engine.ts:646:			obj.appears_in_channels,
+src/sync-engine.ts:682:			chObj.connected_by_channels,
+src/sync-engine.ts:683:			chObj.connected_channels,
+src/sync-engine.ts:684:			chObj.channels,
+src/sync-engine.ts:685:			chObj.appears_in_channels,
+src/sync-engine.ts:733:			const page = await this.api.getChannelContents(slug
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,280p' src/api.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,280p' src/api.ts"
+Chunk ID: a91bd8
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1838
+Output:
+import { requestUrl, RequestUrlParam } from "obsidian";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaChannelListItem,
+	ArenaPaginatedResponse,
+} from "./types";
+
+const BASE_URL = "https://api.are.na/v2";
+const PER_PAGE = 100;
+const MAX_RETRIES = 3;
+const REQUEST_DELAY = 100; // ms between requests
+const JITTER = 50; // ms
+const RATE_LIMIT_STATUS = 429;
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withJitter(baseDelay: number): number {
+	return baseDelay + Math.random() * JITTER;
+}
+
+function transientBackoffMs(attempt: number): number {
+	// 1s, 2s, 4s ... plus jitter.
+	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
+	return Math.round(withJitter(base));
+}
+
+export class ArenaApi {
+	private token: string;
+	private debug: boolean;
+
+	constructor(token: string, debug = false) {
+		this.token = token;
+		this.debug = debug;
+	}
+
+	private headers(): Record<string, string> {
+		const h: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (this.token) {
+			h["Authorization"] = `Bearer ${this.token}`;
+		}
+		return h;
+	}
+
+	private async request<T>(
+		method: string,
+		path: string,
+		body?: unknown,
+	): Promise<T> {
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			const params: RequestUrlParam = {
+				url: `${BASE_URL}${path}`,
+				method,
+				headers: this.headers(),
+			};
+			if (body) {
+				params.body = JSON.stringify(body);
+			}
+
+			if (this.debug) {
+				console.log(`[arena-sync] ${method} ${params.url}`);
+			}
+
+			let res;
+			try {
+				res = await requestUrl(params);
+			} catch (err) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw err;
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
+
+			// Handle rate limiting with exponential backoff
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				const backoffMs = retryAfter * 1000;
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API rate limited (429). Max retries exceeded. ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Rate limited. Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (TRANSIENT_STATUSES.has(res.status)) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API temporary failure (${res.status}). ` +
+							`Max retries exceeded.`,
+					);
+				}
+				const backoffMs = transientBackoffMs(attempts);
+				if (this.debug) {
+					console.log(
+						`[arena-sync] ${res.status} retry in ${backoffMs}ms ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				const errorMessage = this.getErrorMessage(res.status);
+				throw new Error(errorMessage);
+			}
+
+			return res.json as T;
+		}
+
+		throw new Error("Are.na API request failed after max retries");
+	}
+
+	private getErrorMessage(status: number): string {
+		switch (status) {
+			case 400:
+				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
+			case 401:
+				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
+			case 403:
+				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
+			case 404:
+				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
+			case 429:
+				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
+			case 500:
+				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
+			case 502:
+			case 503:
+			case 504:
+				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
+			default:
+				return `Are.na API error ${status}. Please try again or check Are.na status.`;
+		}
+	}
+
+	async verifyToken(): Promise<boolean> {
+		try {
+			await this.request("GET", "/me");
+			return true;
+		} catch (err) {
+			if (this.debug) {
+				console.log(`[arena-sync] Token verification failed:`, err);
+			}
+			return false;
+		}
+	}
+
+	async getChannel(slug: string): Promise<ArenaChannel> {
+		return this.request<ArenaChannel>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
+		);
+	}
+
+	async getChannelContents(
+		slug: string,
+		page = 1,
+	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
+		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
+		);
+	}
+
+	async get
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '280,520p' src/api.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '280,520p' src/api.ts"
+Chunk ID: a3bc47
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 603
+Output:
+		if (this.debug) {
+			console.log(
+				`[arena-sync] Fetched ${blocks.length} unique blocks from ${slug} ` +
+					`across ${pageNumber} page(s)`,
+			);
+		}
+
+		return blocks.sort((a, b) => a.position - b.position);
+	}
+
+	async listMyChannels(
+		page = 1,
+	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
+		return this.request<ArenaPaginatedResponse<ArenaChannelListItem>>(
+			"GET",
+			`/me/channels?page=${page}&per=${PER_PAGE}`,
+		);
+	}
+
+	async listAllMyChannels(): Promise<ArenaChannelListItem[]> {
+		const all: ArenaChannelListItem[] = [];
+		let page = 1;
+		let totalPages = 1;
+		do {
+			const res = await this.listMyChannels(page);
+			all.push(...res.contents);
+			totalPages = Math.max(totalPages, res.total_pages || 1);
+			page++;
+		} while (page <= totalPages);
+		return all;
+	}
+
+	async getBlock(id: number): Promise<ArenaBlock> {
+		return this.request<ArenaBlock>("GET", `/blocks/${id}`);
+	}
+
+	async downloadBinary(url: string): Promise<ArrayBuffer> {
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			let res;
+			try {
+				res = await requestUrl({
+					url,
+					method: "GET",
+					headers: this.headers(),
+				});
+			} catch (err) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw err;
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
+
+			// Handle rate limiting
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Asset download rate limited (429). ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Download rate limited. ` +
+							`Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(retryAfter * 1000);
+				continue;
+			}
+
+			if (TRANSIENT_STATUSES.has(res.status)) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Asset download temporary failure (${res.status}) for ${url}`,
+					);
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				throw new Error(
+					`Asset download failed (${res.status}) for ${url}`,
+				);
+			}
+
+			return res.arrayBuffer;
+		}
+
+		throw new Error(`Asset download failed after max retries for ${url}`);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/types.ts && sed -n '1,260p' src/utils.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/types.ts && sed -n '1,260p' src/utils.ts"
+Chunk ID: f71493
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2916
+Output:
+/**
+ * Are.na API type definitions
+ */
+
+export interface ArenaUser {
+	id: number;
+	slug: string;
+	username: string;
+	first_name: string;
+	last_name: string;
+	avatar: string;
+	channel_count: number;
+}
+
+export interface ArenaBlock {
+	id: number;
+	title: string | null;
+	content: string | null;
+	content_html: string | null;
+	description: string | null;
+	description_html: string | null;
+	source: { url: string; title: string } | null;
+	image: {
+		filename: string;
+		content_type: string;
+		original: { url: string };
+		display: { url: string };
+		thumb: { url: string };
+	} | null;
+	attachment: {
+		file_name: string;
+		file_size: number;
+		url: string;
+		content_type: string;
+		extension: string;
+	} | null;
+	class: string;
+	base_class: "Block";
+	created_at: string;
+	updated_at: string;
+	connected_at: string;
+	position: number;
+	user: ArenaUser;
+}
+
+export interface ArenaChannel {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	follower_count?: number;
+	followers_count?: number;
+	status: "closed" | "public" | "private";
+	user: ArenaUser;
+	contents: ArenaBlock[];
+	created_at: string;
+	updated_at: string;
+	metadata: {
+		description: string | null;
+	} | null;
+}
+
+export interface ArenaChannelListItem {
+	id: number;
+	title: string;
+	slug: string;
+	length: number;
+	status: "closed" | "public" | "private";
+	updated_at: string;
+}
+
+export interface ArenaPaginatedResponse<T> {
+	contents: T[];
+	length: number;
+	total_pages: number;
+	current_page: number;
+	per: number;
+}
+
+/**
+ * Plugin-specific types
+ */
+
+export type BlockNamingScheme = "title" | "id" | "title-id";
+export type ImageHandling = "embed" | "link" | "download";
+export type AttachmentHandling = "link" | "download";
+export type DownloadedAttachmentLinkStyle = "embed" | "link";
+export type AttachmentStorage = "channel" | "global" | "custom";
+export type BannerImagePriority = "thumb-first" | "display-first";
+export type ChannelIndexNoteStyle = "index" | "folder-name";
+
+export interface ChannelMapping {
+	channelSlug: string;
+	channelId: number;
+	channelTitle: string;
+	localFolder: string;
+	lastSyncedAt: string | null;
+	enabled: boolean;
+	attachmentStorageOverride?: AttachmentStorage | null;
+	customAttachmentFolderOverride?: string;
+	lastAttachmentBase?: string | null;
+}
+
+export interface SyncRecord {
+	blockId: number;
+	channelId: number;
+	localPath: string;
+	lastSyncedAt: string;
+	localHash: string;
+	remoteHash: string;
+}
+
+export interface SyncResult {
+	created: number;
+	updated: number;
+	deleted: number;
+	moved: number;
+	skipped: number;
+	downloaded: number;
+	dryRun: boolean;
+	actions: string[];
+	moves: MoveRecord[];
+	fileDiffs: FileDiff[];
+	missingPaths: string[];
+	errors: SyncError[];
+	duration: number;
+}
+
+export interface SyncOptions {
+	dryRun?: boolean;
+}
+
+export interface ImportProgress {
+	channelSlug: string;
+	phase: "pages" | "blocks";
+	current: number;
+	total: number;
+}
+
+export interface SyncError {
+	blockId: number | null;
+	channelSlug: string;
+	message: string;
+	recoverable: boolean;
+}
+
+export interface MoveRecord {
+	from: string;
+	to: string;
+}
+
+export interface FileDiff {
+	path: string;
+	before: string;
+	after: string;
+	diff: string;
+	kind: "create" | "update" | "move" | "delete";
+}
+
+export interface ArenaSyncSettings {
+	apiToken: string;
+	syncInterval: number;
+	syncOnStartup: boolean;
+	autoEnableImportedChannels: boolean;
+	blockNaming: BlockNamingScheme;
+	bannerFieldEnabled: boolean;
+	bannerFieldName: string;
+	bannerImagePriority: BannerImagePriority;
+	includeBlockDescriptionFrontmatter: boolean;
+	includeBlockComments: boolean;
+	includeBlockConnectedChannels: boolean;
+	includeChannelBlockPreviewImage: boolean;
+	channelIndexNoteStyle: ChannelIndexNoteStyle;
+	imageHandling: ImageHandling;
+	attachmentHandling: AttachmentHandling;
+	downloadedAttachmentLinkStyle: DownloadedAttachmentLinkStyle;
+	attachmentStorage: AttachmentStorage;
+	globalAttachmentFolder: string;
+	customAttachmentFolder: string;
+	channelMappings: ChannelMapping[];
+	syncRecords: SyncRecord[];
+	frontmatterEnabled: boolean;
+	excludeClasses: string[];
+	notifyOnSync: boolean;
+	debugLogging: boolean;
+}
+
+export const DEFAULT_SETTINGS: ArenaSyncSettings = {
+	apiToken: "",
+	syncInterval: 30,
+	syncOnStartup: false,
+	autoEnableImportedChannels: true,
+	blockNaming: "title",
+	bannerFieldEnabled: false,
+	bannerFieldName: "banner",
+	bannerImagePriority: "thumb-first",
+	includeBlockDescriptionFrontmatter: false,
+	includeBlockComments: false,
+	includeBlockConnectedChannels: false,
+	includeChannelBlockPreviewImage: false,
+	channelIndexNoteStyle: "index",
+	imageHandling: "download",
+	attachmentHandling: "download",
+	downloadedAttachmentLinkStyle: "link",
+	attachmentStorage: "global",
+	globalAttachmentFolder: "Are.na/Attachments",
+	customAttachmentFolder: "",
+	channelMappings: [],
+	syncRecords: [],
+	frontmatter
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 02:59:59Z)**_
+
+Short answer: **the token URL is correct now**, but the API implementation is **not fully aligned with current v3 docs**.
+
+### What I verified
+- The docs page you shared is live: https://www.are.na/developers/explore
+- The personal token link in those docs resolves to: https://www.are.na/developers/personal-access-tokens  
+  That matches what we now use in UI/README.
+
+### Gaps vs v3 docs
+1. `src/api.ts` uses `https://api.are.na/v2` as base URL (v3 docs reference `/v3/...` routes).
+2. `src/types.ts` expects v2-style pagination (`contents`, `total_pages` at top level), while v3 docs describe `data` + `meta`.
+3. `src/utils.ts` still normalizes old `api.are.na/v2/...` URLs.
+4. Current importer behavior intentionally paginates through entire channels; v3 docs “Best Practices” recommend on-demand paging (guidance, not a hard protocol requirement).
+
+If you want, I can do a focused v3 migration pass next (API client + types + pagination adapter + URL normalization + docs).
+
+Sources:
+- https://www.are.na/developers/explore
+- https://www.are.na/developers/personal-access-tokens

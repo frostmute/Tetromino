@@ -4,6 +4,7 @@ import {
 	computeHash,
 	markdownToBlockContent,
 	normalizeArenaUrl,
+	resolveChannelFolder,
 	sanitiseFilename,
 } from "../utils";
 import type {ArenaBlock, ArenaSyncSettings} from "../types";
@@ -155,6 +156,16 @@ describe("blockToMarkdown", () => {
 		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
 	});
 
+	it("can include block description in frontmatter", () => {
+		const block = makeBlock({ description: "Short summary" });
+		const s = {
+			...settings,
+			includeBlockDescriptionFrontmatter: true,
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain('arena_description: "Short summary"');
+	});
+
 	it("supports display-first banner priority", () => {
 		const block = makeBlock({
 			class: "Image",
@@ -175,6 +186,29 @@ describe("blockToMarkdown", () => {
 		};
 		const md = blockToMarkdown(block, s);
 		expect(md).toContain('banner: "https://cdn.are.na/photo_display.jpg"');
+	});
+
+	it("renders comments and connected channels sections from context", () => {
+		const block = makeBlock({ class: "Channel", content: null });
+		const md = blockToMarkdown(block, settings, {
+			bodyImageUrl: "https://cdn.are.na/channel-preview.jpg",
+			connectedChannels: [
+				{ title: "A Library", slug: "a-library" },
+				{ title: "Read", slug: "read" },
+			],
+			comments: [
+				{
+					author: "testuser",
+					createdAt: "2026-03-30T00:00:00.000Z",
+					body: "Great channel",
+				},
+			],
+		});
+		expect(md).toContain("![Test Block](https://cdn.are.na/channel-preview.jpg)");
+		expect(md).toContain("## This Block Also Appears In");
+		expect(md).toContain("[A Library](https://www.are.na/channel/a-library)");
+		expect(md).toContain("## Comments");
+		expect(md).toContain("Great channel");
 	});
 });
 
@@ -268,5 +302,33 @@ describe("normalizeArenaUrl", () => {
 
 	it("leaves external URLs unchanged", () => {
 		expect(normalizeArenaUrl("https://example.com")).toBe("https://example.com");
+	});
+});
+
+describe("resolveChannelFolder", () => {
+	it("uses default Are.na/<slug> when local folder is blank", () => {
+		expect(
+			resolveChannelFolder({
+				channelSlug: "rad-readings",
+				channelId: 0,
+				channelTitle: "",
+				localFolder: "",
+				lastSyncedAt: null,
+				enabled: true,
+			}),
+		).toBe("Are.na/rad-readings");
+	});
+
+	it("uses explicit local folder when provided", () => {
+		expect(
+			resolveChannelFolder({
+				channelSlug: "rad-readings",
+				channelId: 0,
+				channelTitle: "",
+				localFolder: "Custom/Wherever",
+				lastSyncedAt: null,
+				enabled: true,
+			}),
+		).toBe("Custom/Wherever");
 	});
 });

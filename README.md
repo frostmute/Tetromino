@@ -1,45 +1,67 @@
-# Are.na Import for Obsidian
+<h1 align="center">Are.na Importer for Obsidian</h1>
+<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 
-Import Are.na channel content into your Obsidian vault as Markdown notes.
+<div align="center">
 
-This plugin is **one-way import only**: Are.na → Obsidian.
+One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run previews • User-controlled output
 
-> **Why one-way?** Obsidian is designed for personal knowledge management. Pushing back to Are.na would require conflict resolution, permission handling, and network reliability guarantees. For v1.0, we focused on reliable imports. Push sync may return in v2.0.
+</div>
 
-## What it does
+Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 
-- Imports mapped Are.na channels into mapped vault folders
-- Creates Markdown files for Are.na blocks
-- Updates existing imported files when remote block content changes
-- Adds optional YAML frontmatter metadata
-- Manual import only (no background sync)
-- Supports dry-run preview commands
-- Downloads images and non-image attachments (including PDFs) when configured
-- Supports image embeds using Are.na display images in note body
-- Supports attachment storage in channel-local, global, or custom folders
-- Supports per-channel attachment storage overrides
-- Includes attachment migration preview + diff and migration history log
-- Optional `banner` frontmatter field for Obsidian Banners plugin compatibility
-- Writes channel index notes for graph-friendly linking
-- Writes a master overview note for all synced channels
-- Shows a sync summary modal with diffs for updated files
-- Shows page/block progress in the status bar for large channels
+## Quick Navigation
 
-## What it does not do
+- Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
+- CI and releases: [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
+- Planning and reporting: [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
 
-- ❌ Push from Obsidian back to Are.na (one-way import only)
-- ❌ Automatic deletion of local files when blocks are removed remotely
-- ❌ Background sync (manual only)
+## What This Plugin Is (and Is Not)
 
-## Rate Limiting
+- It is a deterministic importer from Are.na to Obsidian.
+- It is vault-first, manual, and transparent.
+- It is not a two-way sync engine.
+- It does not run background sync jobs.
+- It does not auto-delete local notes when remote blocks disappear.
 
-Are.na's API allows **120 requests per minute** for authenticated requests. For channels with:
-- **< 100 blocks**: Import completes in seconds
-- **100–1,000 blocks**: Import takes 1–5 minutes
-- **1,000+ blocks**: Import may take 10+ minutes due to pagination
+## Feature Highlights
 
-If you encounter rate-limit errors (HTTP 429), the plugin will automatically retry with exponential backoff.
-Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
+### Import Engine
+
+- Imports mapped Are.na channels into mapped vault folders.
+- Supports full pagination for large channels (not limited to the first 100 blocks).
+- Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
+- Shows status bar progress for channels and block pages.
+
+### Deterministic Writing
+
+- Writes stable Markdown notes for blocks.
+- Rewrites existing notes when remote block content changes.
+- Writes channel index notes and a master overview note.
+- Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
+
+### Block Enrichment (Optional)
+
+- Banner frontmatter field for Banners plugin compatibility (`enabled`, custom key, source priority).
+- Block description in frontmatter (`arena_description`).
+- Block comments in a dedicated `Comments` section.
+- Connected channel list (`This block appears in`) with external links.
+- Best-effort preview image for Channel blocks.
+
+### Attachments and Media
+
+- Image handling modes: `download`, `embed`, `link`.
+- Non-image attachment handling modes: `download`, `link`.
+- Downloaded attachment rendering: `link` or `embed`.
+- Storage modes: channel-local, global folder, custom folder.
+- Per-channel storage overrides.
+- Migration tools with preview, diff, execution, and history logging.
+
+### Channel Management
+
+- `Import my channels` to bulk-create mappings from your Are.na account.
+- `Auto-enable imported channels` toggle for granular control.
+- Backup, restore, and reset tools for channel mappings.
+- Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
 
 ## Commands
 
@@ -51,44 +73,34 @@ Transient upstream errors (HTTP 500/502/503/504) are also retried automatically.
 - `Preview attachment migration`
 - `Run attachment migration`
 
-## Settings
+## Settings Overview
 
-- API token with verify action
-- Block file naming (`title`, `id`, `title-id`)
-- Optional banner frontmatter field (`enabled`, `field name`, `image source priority`)
-- Image handling (`download`, `embed`, `link`)
-- Attachment handling (`download`, `link`)
-- Downloaded attachment render (`embed`, `link`)
-- Attachment storage (`with channel notes`, `global`, `custom`)
-- Per-channel attachment storage override (`inherit`, `channel`, `global`, `custom`)
-- Global and custom attachment folder paths
-- Frontmatter toggle
-- Notifications toggle
-- Debug logging toggle
-- Channel mappings (`channel slug` -> `local folder`)
-- Block class exclusion filter (skip Image, Media, etc.)
-- Attachment migration preview + run controls
+- API token with verify action.
+- Block file naming (`title`, `id`, `title-id`).
+- Banner frontmatter options (`enabled`, field name, image source priority).
+- Optional enrichments (description, comments, connected channels, channel preview image).
+- Image and attachment rendering controls.
+- Attachment storage controls (global defaults and per-channel overrides).
+- Frontmatter, notifications, and debug logging toggles.
+- Channel mapping management and migration actions.
 
-## How import works
+## How Import Works
 
-1. The plugin reads each enabled channel mapping.
-2. It fetches channel metadata and all channel blocks from the Are.na API.
-3. Each block is rendered to Markdown and written to the mapped folder.
-4. Optional asset downloads are resolved and linked in notes.
-5. Existing files are overwritten when remote content changes.
-6. Channel index notes are regenerated with links to imported notes.
-7. A master overview note is regenerated with links to each channel index.
-8. A sync summary modal is displayed with diffs for updated files.
-9. Sync records and last-import timestamps are persisted in plugin data.
+1. Create mappings manually or use `Import my channels`.
+2. Run `Import all channels now` or a dry-run preview command.
+3. The plugin fetches channel metadata and all paginated blocks from Are.na.
+4. It normalizes each block into deterministic Markdown output.
+5. It compares planned output against existing vault files.
+6. It writes updated notes, indexes, and overview files.
+7. It shows a sync summary with diffs for changed files.
+8. It records import state and timestamps in plugin data.
 
 ## Installation
 
-1. Put `main.js`, `manifest.json`, and `styles.css` in:
-   `<your-vault>/.obsidian/plugins/arena-sync/`
-2. Enable the plugin in Obsidian Community Plugins.
-3. Open plugin settings and add:
-	- Are.na API token
-	- At least one channel mapping
+1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
+2. Enable **Are.na Importer** in Obsidian Community Plugins.
+3. Open settings and add your API token.
+4. Add at least one channel mapping, or run `Import my channels`.
 
 ## Development
 
@@ -103,53 +115,54 @@ Build:
 npm run build
 ```
 
-This produces:
+Build output:
 
-- `main.js` in the repo root
-- `dist/<plugin-id>-<version>.zip` containing `main.js`, `manifest.json`, and `styles.css`
+- `main.js` in the repository root.
+- `dist/<plugin-id>-<version>.zip` with `main.js`, `manifest.json`, and `styles.css`.
 
-Tests:
-
-```bash
-npm test
-```
-
-Lint:
+Quality checks:
 
 ```bash
 npm run lint
+npm test
 ```
 
 ## Security
 
-- **API tokens** are masked in the settings UI and stored securely in Obsidian's plugin data directory.
-- **No telemetry**: This plugin does not collect any usage data.
-- **No external requests**: Only Are.na API calls are made (no tracking pixels, analytics, etc.).
+- API tokens are masked in the UI and stored in Obsidian plugin data.
+- The plugin collects no telemetry.
+- External requests are limited to Are.na API and direct file URLs required for configured downloads.
 
-See [SECURITY.md](SECURITY.md) for detailed security information.
+For details, see [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 
-### Import fails with "Invalid API token"
-1. Generate a new token at https://dev.are.na/oauth/applications
-2. Paste it in settings and click "Verify"
-3. Ensure the token has at least `read` scope
+### Invalid API token
 
-### Import is slow or times out
-- Large channels (1,000+ blocks) may take 10+ minutes due to API rate limits
-- Check debug logging in settings to see progress
-- Try importing smaller channels first
+1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+2. Paste it into settings and click `Verify`.
+3. Ensure the token includes read access.
 
-### Files aren't updating
-- Manually trigger with Command Palette: `Sync all channels now`
-- Check that channel mappings are enabled (toggle in settings)
+### Slow imports or timeouts
 
-### Assets aren't downloading
-- Images and PDFs only download if "Image handling" or "Attachment handling" is set to "Download to vault"
-- Check that attachment storage folder is writable
-- Check disk space
+- Large channels can take several minutes due to API rate limits and pagination.
+- Enable debug logging to monitor progress.
+- Start with a smaller channel to verify configuration.
 
-For more help, enable "Debug logging" in settings and check the browser console (`Ctrl/Cmd + Shift + I`).
+### Notes are not updating
+
+- Run `Import all channels now` from the Command Palette.
+- Confirm the channel mapping is enabled in settings.
+
+### Assets are not downloading
+
+- Set image or attachment handling to `Download to vault`.
+- Confirm attachment folders are valid and writable.
+- Verify disk space.
+
+### Only 100 blocks imported
+
+- Use the latest build; pagination imports all pages.
 
 ## License
 
