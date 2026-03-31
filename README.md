@@ -99,6 +99,11 @@ Build:
 npm run build
 ```
 
+This produces:
+
+- `main.js` in the repo root
+- `dist/<plugin-id>-<version>.zip` containing `main.js`, `manifest.json`, and `styles.css`
+
 Tests:
 
 ```bash
