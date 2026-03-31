@@ -452,12 +452,12 @@ export default class ArenaSyncPlugin extends Plugin {
 		];
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
 		if (!existing) {
-			await this.app.vault.create(filePath, lines.join(\"\\n\"));
+			await this.app.vault.create(filePath, lines.join("\n"));
 			return;
 		}
 		if (existing instanceof TFile) {
 			const current = await this.app.vault.read(existing);
-			await this.app.vault.modify(existing, `${current}\\n${lines.join(\"\\n\")}`);
+			await this.app.vault.modify(existing, `${current}\n${lines.join("\n")}`);
 		}
 	}
 }

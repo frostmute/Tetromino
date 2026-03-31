@@ -5,4 +5,7 @@ module.exports = {
 	roots: ["<rootDir>/src"],
 	testMatch: ["**/__tests__/**/*.test.ts"],
 	collectCoverageFrom: ["src/**/*.ts", "!src/**/__tests__/**"],
+	moduleNameMapper: {
+		"^obsidian$": "<rootDir>/src/__mocks__/obsidian.ts",
+	},
 };
