@@ -27,3 +27,4 @@ coverage/
 # Obsidian
 data.json
 /conversation-export.md
+.specstory/statistics.json
