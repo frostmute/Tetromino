@@ -73,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
 - Mapping folder is now optional in settings UI; explicit folders still override default behavior.
 - API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
+- API client now targets Are.na REST API v3 routes with a compatibility adapter for v3 `data/meta` pagination responses.
+- URL normalization now recognizes both legacy `/v2/...` and current `/v3/...` API URLs.
 
 ### Fixed
 

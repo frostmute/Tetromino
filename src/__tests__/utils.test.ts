@@ -294,8 +294,14 @@ describe("blockFileName", () => {
 });
 
 describe("normalizeArenaUrl", () => {
-	it("converts api block URLs to web URLs", () => {
+	it("converts v2 api block URLs to web URLs", () => {
 		expect(normalizeArenaUrl("https://api.are.na/v2/blocks/12345")).toBe(
+			"https://www.are.na/block/12345"
+		);
+	});
+
+	it("converts v3 api block URLs to web URLs", () => {
+		expect(normalizeArenaUrl("https://api.are.na/v3/blocks/12345")).toBe(
 			"https://www.are.na/block/12345"
 		);
 	});

@@ -6,7 +6,8 @@ import type {
 	ArenaPaginatedResponse,
 } from "./types";
 
-const BASE_URL = "https://api.are.na/v2";
+const BASE_URL = "https://api.are.na";
+const API_VERSION_PREFIX = "/v3";
 const PER_PAGE = 100;
 const MAX_RETRIES = 3;
 const REQUEST_DELAY = 100; // ms between requests
@@ -26,6 +27,19 @@ function transientBackoffMs(attempt: number): number {
 	// 1s, 2s, 4s ... plus jitter.
 	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
 	return Math.round(withJitter(base));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function asNumber(value: unknown): number | null {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string" && value.trim()) {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) return parsed;
+	}
+	return null;
 }
 
 export class ArenaApi {
@@ -56,7 +70,7 @@ export class ArenaApi {
 
 		while (attempts < MAX_RETRIES) {
 			const params: RequestUrlParam = {
-				url: `${BASE_URL}${path}`,
+				url: this.buildApiUrl(path),
 				method,
 				headers: this.headers(),
 			};
@@ -82,10 +96,7 @@ export class ArenaApi {
 
 			// Handle rate limiting with exponential backoff
 			if (res.status === RATE_LIMIT_STATUS) {
-				const retryAfter = parseInt(
-					res.headers["retry-after"] || "60",
-					10,
-				);
+				const retryAfter = this.readRetryAfterSeconds(res.headers);
 				const backoffMs = retryAfter * 1000;
 				attempts++;
 
@@ -137,6 +148,119 @@ export class ArenaApi {
 		throw new Error("Are.na API request failed after max retries");
 	}
 
+	private buildApiUrl(path: string): string {
+		if (/^https?:\/\//.test(path)) return path;
+		const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+		if (normalizedPath.startsWith("/v")) {
+			return `${BASE_URL}${normalizedPath}`;
+		}
+		return `${BASE_URL}${API_VERSION_PREFIX}${normalizedPath}`;
+	}
+
+	private readRetryAfterSeconds(headers: Record<string, string>): number {
+		const raw =
+			headers["retry-after"] ??
+			headers["Retry-After"] ??
+			headers["retry_after"] ??
+			"60";
+		const parsed = parseInt(raw, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
+	}
+
+	private unwrapData<T>(payload: unknown): T {
+		if (isRecord(payload) && "data" in payload) {
+			return payload.data as T;
+		}
+		return payload as T;
+	}
+
+	private normalizeChannel(payload: unknown): ArenaChannel {
+		const raw = this.unwrapData<unknown>(payload);
+		if (!isRecord(raw)) {
+			throw new Error("Unexpected Are.na channel response format");
+		}
+		const metadata = isRecord(raw.metadata)
+			? {
+					description:
+						typeof raw.metadata.description === "string"
+							? raw.metadata.description
+							: null,
+				}
+			: null;
+		const description =
+			typeof raw.description === "string" ? raw.description : null;
+		const length =
+			asNumber(raw.length) ??
+			asNumber(raw.total_connections) ??
+			asNumber(raw.connections_count) ??
+			0;
+
+		return {
+			...(raw as unknown as ArenaChannel),
+			length,
+			description,
+			metadata,
+		};
+	}
+
+	private normalizeBlock(payload: unknown): ArenaBlock {
+		const raw = this.unwrapData<unknown>(payload);
+		if (!isRecord(raw)) {
+			throw new Error("Unexpected Are.na block response format");
+		}
+		return raw as unknown as ArenaBlock;
+	}
+
+	private normalizePaginatedResponse<T>(
+		payload: unknown,
+	): ArenaPaginatedResponse<T> {
+		// v3 shape: { data: [...], meta: {...} }
+		if (isRecord(payload) && Array.isArray(payload.data)) {
+			const data = payload.data as T[];
+			const meta = isRecord(payload.meta) ? payload.meta : {};
+			const currentPage = asNumber(meta.current_page) ?? 1;
+			const per =
+				asNumber(meta.per_page) ??
+				asNumber(meta.per) ??
+				PER_PAGE;
+			const totalPages = asNumber(meta.total_pages) ?? 1;
+			const totalCount = asNumber(meta.total_count) ?? data.length;
+			return {
+				contents: data,
+				length: totalCount,
+				total_pages: totalPages,
+				current_page: currentPage,
+				per,
+			};
+		}
+
+		// v2/legacy shape: { contents: [...], ... }
+		if (isRecord(payload) && Array.isArray(payload.contents)) {
+			const contents = payload.contents as T[];
+			return {
+				contents,
+				length: asNumber(payload.length) ?? contents.length,
+				total_pages: asNumber(payload.total_pages) ?? 1,
+				current_page: asNumber(payload.current_page) ?? 1,
+				per: asNumber(payload.per) ?? PER_PAGE,
+			};
+		}
+
+		// Fallback: raw array payload.
+		if (Array.isArray(payload)) {
+			const contents = payload as T[];
+			return {
+				contents,
+				length: contents.length,
+				total_pages: 1,
+				current_page: 1,
+				per: contents.length || PER_PAGE,
+			};
+		}
+
+		throw new Error("Unexpected Are.na pagination response format");
+	}
+
 	private getErrorMessage(status: number): string {
 		switch (status) {
 			case 400:
@@ -173,20 +297,22 @@ export class ArenaApi {
 	}
 
 	async getChannel(slug: string): Promise<ArenaChannel> {
-		return this.request<ArenaChannel>(
+		const payload = await this.request<unknown>(
 			"GET",
-			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
+			`/channels/${encodeURIComponent(slug)}`,
 		);
+		return this.normalizeChannel(payload);
 	}
 
 	async getChannelContents(
 		slug: string,
 		page = 1,
 	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
-		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
+		const payload = await this.request<unknown>(
 			"GET",
 			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
 		);
+		return this.normalizePaginatedResponse<ArenaBlock>(payload);
 	}
 
 	async getAllChannelBlocks(slug: string): Promise<ArenaBlock[]> {
@@ -284,16 +410,21 @@ export class ArenaApi {
 			);
 		}
 
-		return blocks.sort((a, b) => a.position - b.position);
+		return blocks.sort((a, b) => {
+			const aPos = typeof a.position === "number" ? a.position : Number.MAX_SAFE_INTEGER;
+			const bPos = typeof b.position === "number" ? b.position : Number.MAX_SAFE_INTEGER;
+			return aPos - bPos || a.id - b.id;
+		});
 	}
 
 	async listMyChannels(
 		page = 1,
 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
-		return this.request<ArenaPaginatedResponse<ArenaChannelListItem>>(
+		const payload = await this.request<unknown>(
 			"GET",
 			`/me/channels?page=${page}&per=${PER_PAGE}`,
 		);
+		return this.normalizePaginatedResponse<ArenaChannelListItem>(payload);
 	}
 
 	async listAllMyChannels(): Promise<ArenaChannelListItem[]> {
@@ -310,7 +441,8 @@ export class ArenaApi {
 	}
 
 	async getBlock(id: number): Promise<ArenaBlock> {
-		return this.request<ArenaBlock>("GET", `/blocks/${id}`);
+		const payload = await this.request<unknown>("GET", `/blocks/${id}`);
+		return this.normalizeBlock(payload);
 	}
 
 	async downloadBinary(url: string): Promise<ArrayBuffer> {
@@ -335,10 +467,7 @@ export class ArenaApi {
 
 			// Handle rate limiting
 			if (res.status === RATE_LIMIT_STATUS) {
-				const retryAfter = parseInt(
-					res.headers["retry-after"] || "60",
-					10,
-				);
+				const retryAfter = this.readRetryAfterSeconds(res.headers);
 				attempts++;
 
 				if (attempts >= MAX_RETRIES) {

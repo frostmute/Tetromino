@@ -39,7 +39,7 @@ export interface ArenaBlock {
 	created_at: string;
 	updated_at: string;
 	connected_at: string;
-	position: number;
+	position?: number;
 	user: ArenaUser;
 }
 
@@ -50,12 +50,13 @@ export interface ArenaChannel {
 	length: number;
 	follower_count?: number;
 	followers_count?: number;
+	description?: string | null;
 	status: "closed" | "public" | "private";
 	user: ArenaUser;
-	contents: ArenaBlock[];
+	contents?: ArenaBlock[];
 	created_at: string;
 	updated_at: string;
-	metadata: {
+	metadata?: {
 		description: string | null;
 	} | null;
 }

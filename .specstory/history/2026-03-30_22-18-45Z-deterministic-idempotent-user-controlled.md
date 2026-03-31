@@ -18586,3 +18586,2940 @@ If you want, I can do a focused v3 migration pass next (API client + types + pag
 Sources:
 - https://www.are.na/developers/explore
 - https://www.are.na/developers/personal-access-tokens
+
+---
+
+_**User (2026-03-31 03:03:18Z)**_
+
+# Context from my IDE setup:
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+do a focused v3 migration pass next (API client + types + pagination adapter + URL normalization + docs).
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+Perfect, I’ll do the full v3 migration pass now: update the API base/routes, add a response adapter for v3 pagination, update types and URL normalization, then refresh docs and run lint/test/build to verify everything end-to-end.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/sync-engine.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/sync-engine.ts"
+Chunk ID: 1b9e9e
+Wall time: 0.0135 seconds
+Process exited with code 0
+Original token count: 1566
+Output:
+import { App, normalizePath, TFile, Vault } from "obsidian";
+import { ArenaApi } from "./api";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaSyncSettings,
+	ChannelMapping,
+	ImportProgress,
+	SyncOptions,
+	SyncRecord,
+	SyncResult,
+} from "./types";
+import {
+	blockFileName as utilsBlockFileName,
+	blockToMarkdown,
+	computeHash,
+	resolveChannelFolder,
+	resolveAttachmentBaseFolder,
+	sanitiseFilename,
+} from "./utils";
+import { unifiedDiff } from "./diff";
+
+type ProgressHandler = (progress: ImportProgress) => void;
+
+export class SyncEngine {
+	private api: ArenaApi;
+	private readonly settings: ArenaSyncSettings;
+	private vault: Vault;
+	private onProgress?: ProgressHandler;
+	private blockDetailsCache = new Map<number, unknown>();
+	private channelPreviewCache = new Map<string, string | null>();
+
+	constructor(
+		app: App,
+		api: ArenaApi,
+		settings: ArenaSyncSettings,
+		onProgress?: ProgressHandler,
+	) {
+		this.api = api;
+		this.settings = settings;
+		this.vault = app.vault;
+		this.onProgress = onProgress;
+	}
+
+	async syncAll(options: SyncOptions = {}): Promise<SyncResult> {
+		const dryRun = options.dryRun === true;
+		const aggregate: SyncResult = {
+			created: 0,
+			updated: 0,
+			deleted: 0,
+			moved: 0,
+			skipped: 0,
+			downloaded: 0,
+			dryRun,
+			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
+			errors: [],
+			duration: 0,
+		};
+		const start = Date.now();
+
+		for (const mapping of this.settings.channelMappings) {
+			if (!mapping.enabled) continue;
+			try {
+				const result = await this.syncChannel(mapping, options);
+				aggregate.created += result.created;
+				aggregate.updated += result.updated;
+				aggregate.deleted += result.deleted;
+				aggregate.moved += result.moved;
+				aggregate.skipped += result.skipped;
+				aggregate.downloaded += result.downloaded;
+				aggregate.actions.push(...result.actions);
+				aggregate.moves.push(...result.moves);
+				aggregate.fileDiffs.push(...result.fileDiffs);
+				aggregate.missingPaths.push(...result.missingPaths);
+				aggregate.errors.push(...result.errors);
+			} catch (err) {
+				aggregate.errors.push({
+					blockId: null,
+					channelSlug: mapping.channelSlug,
+					message: (err as Error).message,
+					recoverable: false,
+				});
+			}
+		}
+
+		await this.updateMasterOverview(aggregate, dryRun);
+
+		aggregate.duration = Date.now() - start;
+		return aggregate;
+	}
+
+	async syncChannel(
+		mapping: ChannelMapping,
+		options: SyncOptions = {},
+	): Promise<SyncResult> {
+		this.blockDetailsCache.clear();
+		this.channelPreviewCache.clear();
+		const dryRun = options.dryRun === true;
+		const result: SyncResult = {
+			created: 0,
+			updated: 0,
+			deleted: 0,
+			moved: 0,
+			skipped: 0,
+			downloaded: 0,
+			dryRun,
+			actions: [],
+			moves: [],
+			fileDiffs: [],
+			missingPaths: [],
+			errors: [],
+			duration: 0,
+		};
+		const start = Date.now();
+		const channel = await this.api.getChannel(mapping.channelSlug);
+
+		if (!dryRun) {
+			mapping.channelId = channel.id;
+			mapping.channelTitle = channel.title;
+		}
+
+		await this.pull(mapping, channel, result, dryRun);
+
+		if (!dryRun) {
+			mapping.lastSyncedAt = new Date().toISOString();
+		}
+
+		result.duration = Date.now() - start;
+		return result;
+	}
+
+	private async pull(
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<void> {
+		const channelFolder = resolveChannelFolder(mapping);
+		const blocks = await this.api.getAllChannelBlocksWithProgress(
+			mapping.channelSlug,
+			(currentPage, totalPages) => {
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "pages",
+					current: currentPage,
+					total: totalPages,
+				});
+			},
+		);
+
+		if (!dryRun) {
+			await this.ensureFolder(channelFolder);
+		}
+
+		const importedPaths: string[] = [];
+		const importedBlockIds: number[] = [];
+		for (let i = 0; i < blocks.length; i++) {
+			const block = blocks[i];
+			this.onProgress?.({
+				channelSlug: mapping.channelSlug,
+				phase: "blocks",
+				current: i + 1,
+				total: blocks.length,
+			});
+
+			if (this.shouldExclude(block)) {
+				result.skipped++;
+				continue;
+			}
+
+			try {
+				const path = await this.pullBlock(
+					block,
+					mapping,
+					channel,
+					result,
+					dryRun,
+				);
+				importedPaths.push(path);
+				importedBlockIds.push(block.id);
+			} catch (err) {
+				result.errors.push({
+					blockId: block.id,
+					channelSlug: mapping.channelSlug,
+					message: (err as Error).message,
+					recoverable: true,
+				});
+			}
+		}
+
+		await this.updateChannelIndex(
+			mapping,
+			channel,
+			importedPaths,
+			dryRun,
+			result,
+		);
+
+		this.markMissing(mapping, importedBlockIds, result);
+	}
+
+	private async pullBlock(
+		block: ArenaBlock,
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		result: SyncResult,
+		dryRun: boolean,
+	): Promise<string> {
+		const noteFileName = this.blockFileName(blo
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,620p' src/sync-engine.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '260,620p' src/sync-engine.ts"
+Chunk ID: 146bab
+Wall time: 0.0041 seconds
+Process exited with code 0
+Original token count: 2396
+Output:
+				await this.vault.create(notePath, markdown);
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					remoteHash,
+					remoteHash,
+				);
+			}
+			return notePath;
+		}
+
+		if (!(existing instanceof TFile)) {
+			result.actions.push(`skip ${notePath} (not a file)`);
+			return notePath;
+		}
+
+		const localContent = await this.vault.read(existing);
+		const localHash = computeHash(localContent);
+		if (localHash === remoteHash) {
+			result.skipped++;
+			result.actions.push(`skip ${notePath}`);
+			if (!record && !dryRun) {
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
+			} else if (moved && !dryRun) {
+				this.upsertRecord(
+					block.id,
+					mapping.channelId,
+					notePath,
+					localHash,
+					remoteHash,
+				);
+			}
+			return notePath;
+		}
+
+		result.updated++;
+		result.actions.push(`update ${notePath}`);
+		result.fileDiffs.push({
+			path: notePath,
+			before: localContent,
+			after: markdown,
+			diff: unifiedDiff(localContent, markdown, notePath, notePath),
+			kind: "update",
+		});
+		if (!dryRun) {
+			await this.vault.modify(existing, markdown);
+			this.upsertRecord(
+				block.id,
+				mapping.channelId,
+				notePath,
+				remoteHash,
+				remoteHash,
+			);
+		}
+		return notePath;
+	}
+
+	private async ensureBlockAsset(
+		block: ArenaBlock,
+		mapping: ChannelMapping,
+		dryRun: boolean,
+		result: SyncResult,
+	): Promise<string | undefined> {
+		let url: string | null = null;
+		let fileName: string | null = null;
+
+		if (block.class === "Image") {
+			if (this.settings.imageHandling !== "download" || !block.image) {
+				return undefined;
+			}
+			url = block.image.original.url;
+			fileName = block.image.filename;
+		}
+
+		if (block.class === "Attachment") {
+			if (
+				this.settings.attachmentHandling !== "download" ||
+				!block.attachment
+			) {
+				return undefined;
+			}
+			url = block.attachment.url;
+			fileName = block.attachment.file_name;
+		}
+
+		if (!url || !fileName) return undefined;
+
+		const baseFolder = resolveAttachmentBaseFolder(this.settings, mapping);
+		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
+		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
+		result.downloaded++;
+		result.actions.push(
+			`${dryRun ? "download" : "ensure"} asset ${assetPath}`,
+		);
+
+		if (dryRun) return assetPath;
+
+		await this.ensureFolder(baseFolder);
+		const existing = this.vault.getAbstractFileByPath(assetPath);
+		if (existing instanceof TFile) {
+			return assetPath;
+		}
+
+		const data = await this.api.downloadBinary(url);
+		await this.vault.createBinary(assetPath, data);
+		return assetPath;
+	}
+
+	private async updateChannelIndex(
+		mapping: ChannelMapping,
+		channel: ArenaChannel,
+		notePaths: string[],
+		dryRun: boolean,
+		result: SyncResult,
+	): Promise<void> {
+		const indexPath = this.channelIndexPath(mapping);
+		const sorted = [...notePaths].sort();
+		const channelDescription = channel.metadata?.description?.trim();
+		const appearsInChannels = this.extractChannelAppearsIn(channel);
+		const followerCount =
+			channel.follower_count ??
+			channel.followers_count ??
+			null;
+		const lines: string[] = [
+			`# ${channel.title}`,
+			"",
+			"## Info",
+			"",
+		];
+		if (channelDescription) {
+			lines.push(channelDescription);
+			lines.push("");
+		}
+		lines.push(
+			`- Are.na: https://www.are.na/channel/${channel.slug}`,
+			`- Started: ${channel.created_at}`,
+			`- Modified: ${channel.updated_at}`,
+			`- Imported blocks: ${sorted.length}`,
+			`- Length: ${channel.length}`,
+		);
+		if (typeof followerCount === "number") {
+			lines.push(`- Followers: ${followerCount}`);
+		}
+		if (appearsInChannels.length > 0) {
+			lines.push("");
+			lines.push("## This Channel Appears In");
+			lines.push("");
+			for (const ch of appearsInChannels) {
+				if (ch.slug) {
+					lines.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
+				} else {
+					lines.push(`- ${ch.title}`);
+				}
+			}
+		}
+		lines.push("", "## Notes");
+		for (const notePath of sorted) {
+			// Extract filename and create clean link text
+			const fileName = notePath.split("/").pop() || notePath;
+			const linkText = fileName.replace(".md", "");
+			lines.push(`- [[${notePath}|${linkText}]]`);
+		}
+		lines.push("");
+		const content = lines.join("\n");
+		const existing = this.vault.getAbstractFileByPath(indexPath);
+		if (existing && !(existing instanceof TFile)) {
+			result.actions.push(`skip ${indexPath} (not a file)`);
+			return;
+		}
+		const before =
+			existing instanceof TFile ? await this.vault.read(existing) : "";
+		if (existing && before === content) {
+			result.actions.push(`skip ${indexPath}`);
+			return;
+		}
+		result.actions.push(`${existing ? "update" : "create"} ${indexPath}`);
+		result.fileDiffs.push({
+			path: indexPath,
+			before,
+			after: content,
+			diff: unifiedDiff(before
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '620,940p' src/sync-engine.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '620,940p' src/sync-engine.ts"
+Chunk ID: 8e8cfa
+Wall time: 0.0028 seconds
+Process exited with code 0
+Original token count: 1411
+Output:
+						: typeof c.comment === "string"
+							? c.comment
+							: "";
+			if (!body.trim()) continue;
+			const user = (c.user || {}) as Record<string, unknown>;
+			const author =
+				(typeof user.username === "string" && user.username) ||
+				(typeof user.slug === "string" && user.slug) ||
+				(typeof c.author === "string" && c.author) ||
+				"Unknown";
+			const createdAt =
+				typeof c.created_at === "string" ? c.created_at : undefined;
+			comments.push({ author, body: body.trim(), createdAt });
+		}
+		return comments;
+	}
+
+	private extractConnectedChannels(
+		detail: unknown,
+		sourceChannelSlug: string,
+	): Array<{ title: string; slug?: string }> {
+		const obj = detail as Record<string, unknown>;
+		const pools = [
+			obj.connected_by_channels,
+			obj.connected_channels,
+			obj.channels,
+			obj.appears_in_channels,
+		];
+		const bySlug = new Map<string, { title: string; slug?: string }>();
+		const byTitle = new Map<string, { title: string; slug?: string }>();
+		for (const pool of pools) {
+			if (!Array.isArray(pool)) continue;
+			for (const item of pool) {
+				if (!item || typeof item !== "object") continue;
+				const ch = item as Record<string, unknown>;
+				const slug =
+					typeof ch.slug === "string" && ch.slug.trim()
+						? ch.slug.trim()
+						: undefined;
+				const title =
+					typeof ch.title === "string" && ch.title.trim()
+						? ch.title.trim()
+						: slug || "Untitled";
+				if (slug && slug === sourceChannelSlug) continue;
+				const row = { title, slug };
+				if (slug) {
+					bySlug.set(slug, row);
+				} else {
+					byTitle.set(title.toLowerCase(), row);
+				}
+			}
+		}
+		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
+			a.title.localeCompare(b.title),
+		);
+	}
+
+	private extractChannelAppearsIn(
+		channel: ArenaChannel,
+	): Array<{ title: string; slug?: string }> {
+		const chObj = channel as unknown as Record<string, unknown>;
+		const pools = [
+			chObj.connected_by_channels,
+			chObj.connected_channels,
+			chObj.channels,
+			chObj.appears_in_channels,
+		];
+		const bySlug = new Map<string, { title: string; slug?: string }>();
+		const byTitle = new Map<string, { title: string; slug?: string }>();
+		for (const pool of pools) {
+			if (!Array.isArray(pool)) continue;
+			for (const item of pool) {
+				if (!item || typeof item !== "object") continue;
+				const row = item as Record<string, unknown>;
+				const slug =
+					typeof row.slug === "string" && row.slug.trim()
+						? row.slug.trim()
+						: undefined;
+				if (slug && slug === channel.slug) continue;
+				const title =
+					typeof row.title === "string" && row.title.trim()
+						? row.title.trim()
+						: slug || "Untitled";
+				if (slug) {
+					bySlug.set(slug, { title, slug });
+				} else {
+					byTitle.set(title.toLowerCase(), { title });
+				}
+			}
+		}
+		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
+			a.title.localeCompare(b.title),
+		);
+	}
+
+	private extractChannelSlugFromBlock(block: ArenaBlock): string | null {
+		const sourceUrl = block.source?.url;
+		if (!sourceUrl) return null;
+		try {
+			const url = new URL(sourceUrl);
+			const match = url.pathname.match(/\/channel\/([^/]+)/);
+			return match?.[1] ? decodeURIComponent(match[1]) : null;
+		} catch {
+			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
+			return match?.[1] ? decodeURIComponent(match[1]) : null;
+		}
+	}
+
+	private async getChannelPreviewImage(slug: string): Promise<string | null> {
+		if (this.channelPreviewCache.has(slug)) {
+			return this.channelPreviewCache.get(slug) || null;
+		}
+		try {
+			const page = await this.api.getChannelContents(slug, 1);
+			for (const block of page.contents) {
+				if (block.class !== "Image" || !block.image) continue;
+				const url =
+					block.image.display?.url ||
+					block.image.thumb?.url ||
+					block.image.original?.url ||
+					null;
+				if (url) {
+					this.channelPreviewCache.set(slug, url);
+					return url;
+				}
+			}
+		} catch {
+			// best effort only
+		}
+		this.channelPreviewCache.set(slug, null);
+		return null;
+	}
+
+	private findRecord(
+		blockId: number,
+		channelId: number,
+	): SyncRecord | undefined {
+		return this.settings.syncRecords.find(
+			(r) => r.blockId === blockId && r.channelId === channelId,
+		);
+	}
+
+	private upsertRecord(
+		blockId: number,
+		channelId: number,
+		localPath: string,
+		localHash: string,
+		remoteHash: string,
+	): void {
+		const idx = this.settings.syncRecords.findIndex(
+			(r) => r.blockId === blockId && r.channelId === channelId,
+		);
+		const record: SyncRecord = {
+			blockId,
+			channelId,
+			localPath,
+			lastSyncedAt: new Date().toISOString(),
+			localHash,
+			remoteHash,
+		};
+		if (idx >= 0) {
+			this.settings.syncRecords[idx] = record;
+		} else {
+			this.settings.syncRecords.push(record);
+		}
+	}
+
+	private async ensureFolder(path: string): Promise<void> {
+		const normalized = normalizePath(path);
+
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/__tests__/utils.test.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/__tests__/utils.test.ts"
+Chunk ID: 71b3d0
+Wall time: 0.0055 seconds
+Process exited with code 0
+Original token count: 1963
+Output:
+import {
+	blockFileName,
+	blockToMarkdown,
+	computeHash,
+	markdownToBlockContent,
+	normalizeArenaUrl,
+	resolveChannelFolder,
+	sanitiseFilename,
+} from "../utils";
+import type {ArenaBlock, ArenaSyncSettings} from "../types";
+import {DEFAULT_SETTINGS} from "../types";
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+
+function makeBlock(overrides: Partial<ArenaBlock> = {}): ArenaBlock {
+	return {
+		id: 12345,
+		title: "Test Block",
+		content: "Hello world",
+		content_html: "<p>Hello world</p>",
+		description: null,
+		description_html: null,
+		source: null,
+		image: null,
+		attachment: null,
+		class: "Text",
+		base_class: "Block",
+		created_at: "2026-01-15T10:00:00.000Z",
+		updated_at: "2026-01-16T12:00:00.000Z",
+		connected_at: "2026-01-15T10:00:00.000Z",
+		position: 1,
+		user: {
+			id: 1,
+			slug: "testuser",
+			username: "testuser",
+			first_name: "Test",
+			last_name: "User",
+			avatar: "",
+			channel_count: 5,
+		},
+		...overrides,
+	};
+}
+
+/* ------------------------------------------------------------------ */
+/*  blockToMarkdown                                                   */
+/* ------------------------------------------------------------------ */
+
+describe("blockToMarkdown", () => {
+	const settings: ArenaSyncSettings = { ...DEFAULT_SETTINGS };
+
+	it("converts a text block with front-matter", () => {
+		const md = blockToMarkdown(makeBlock(), settings);
+		expect(md).toContain("---");
+		expect(md).toContain("arena_id: 12345");
+		expect(md).toContain('arena_class: "Text"');
+		expect(md).toContain("# Test Block");
+		expect(md).toContain("Hello world");
+	});
+
+	it("omits front-matter when disabled", () => {
+		const s = { ...settings, frontmatterEnabled: false };
+		const md = blockToMarkdown(makeBlock(), s);
+		expect(md).not.toContain("---\narena_id");
+		expect(md).toContain("# Test Block");
+	});
+
+	it("handles a link block", () => {
+		const block = makeBlock({
+			class: "Link",
+			content: null,
+			source: { url: "https://example.com", title: "Example" },
+			description: "A description",
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[Example](https://example.com)");
+		expect(md).toContain("A description");
+	});
+
+	it("handles an image block with external link", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...settings, imageHandling: "link" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("[Test Block](https://cdn.are.na/photo_display.jpg)");
+	});
+
+	it("embeds image blocks using Are.na display image in embed mode", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...settings, imageHandling: "embed" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("![Test Block](https://cdn.are.na/photo_display.jpg)");
+	});
+
+	it("handles an attachment block", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[notes.pdf](https://cdn.are.na/notes.pdf)");
+	});
+
+	it("falls back to Block ID when title is null", () => {
+		const block = makeBlock({ title: null });
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("# Block 12345");
+	});
+
+	it("adds optional banner frontmatter field when enabled", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = {
+			...settings,
+			bannerFieldEnabled: true,
+			bannerFieldName: "banner",
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain('banner: "https://cdn.are.na/photo_thumb.jpg"');
+	});
+
+	it("can include block description in frontmatter", () => {
+		const block = makeBlock({ description: "Short summ
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,240p' src/main.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,240p' src/main.ts"
+Chunk ID: c11609
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1724
+Output:
+import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
+import { ArenaApi } from "./api";
+import { SyncEngine } from "./sync-engine";
+import { ArenaSyncSettingTab } from "./settings-tab";
+import type {
+	ArenaChannelListItem,
+	ArenaSyncSettings,
+	ChannelMapping,
+	ImportProgress,
+	SyncResult,
+} from "./types";
+import { DEFAULT_SETTINGS } from "./types";
+import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
+import { resolveChannelFolder } from "./utils";
+import {
+	buildMigrationPlan,
+	computeCurrentAttachmentBase,
+	executeMigration,
+} from "./migration";
+
+const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
+
+export default class ArenaSyncPlugin extends Plugin {
+	settings: ArenaSyncSettings = DEFAULT_SETTINGS;
+	api!: ArenaApi;
+	engine!: SyncEngine;
+	private isSyncing = false;
+	private statusBarItem: HTMLElement | null = null;
+	private isMigrating = false;
+
+	async onload(): Promise<void> {
+		await this.loadSettings();
+
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress),
+		);
+
+		addIcon("arena-sync", ARENA_ICON);
+		this.addRibbonIcon("arena-sync", "Import from Are.na", async () => {
+			await this.runSync(false);
+		});
+
+		this.statusBarItem = this.addStatusBarItem();
+		this.updateStatusBar("idle");
+
+		this.addCommand({
+			id: "arena-sync-now",
+			name: "Import all channels now",
+			callback: async () => await this.runSync(false),
+		});
+
+		this.addCommand({
+			id: "arena-sync-preview",
+			name: "Preview import (dry-run)",
+			callback: async () => await this.runSync(true),
+		});
+
+		this.addCommand({
+			id: "arena-sync-channel",
+			name: "Import current channel",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(resolveChannelFolder(m)),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				this.runChannelSync(mapping.channelSlug, false);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-channel-preview",
+			name: "Preview current channel import (dry-run)",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(resolveChannelFolder(m)),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				this.runChannelSync(mapping.channelSlug, true);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-open-channel",
+			name: "Open channel on Are.na",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file) return false;
+				const mapping = this.settings.channelMappings.find((m) =>
+					file.path.startsWith(resolveChannelFolder(m)),
+				);
+				if (!mapping) return false;
+				if (checking) return true;
+				window.open(
+					`https://www.are.na/channel/${mapping.channelSlug}`,
+					"_blank",
+				);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-migration-preview",
+			name: "Preview attachment migration",
+			callback: async () => {
+				await this.checkForMigrationPrompt(true);
+			},
+		});
+
+		this.addCommand({
+			id: "arena-sync-migration-run",
+			name: "Run attachment migration",
+			callback: async () => {
+				await this.runMigration();
+			},
+		});
+
+		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
+
+		this.checkForMigrationPrompt(false);
+	}
+
+	onunload(): void {
+	}
+
+	async loadSettings(): Promise<void> {
+		const data = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		const changed = this.normalizeMappings();
+		const updatedBases = this.ensureAttachmentBaseSnapshots();
+		if (changed || updatedBases) {
+			await this.saveData(this.settings);
+		}
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+		this.api = new ArenaApi(
+			this.settings.apiToken,
+			this.settings.debugLogging,
+		);
+		this.engine = new SyncEngine(
+			this.app,
+			this.api,
+			this.settings,
+			(progress) => this.updateProgressStatus(progress),
+		);
+		await this.checkForMigrationPrompt(false);
+	}
+
+	async runSync(dryRun = false): Promise<void> {
+		if (thi
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:45Z)**_
+
+I’ve mapped the migration approach: I’m adding a v3-safe adapter layer in `api.ts` so the rest of the importer can stay stable, then I’ll update `types.ts`/`utils.ts` (including URL normalization and tests), and finally refresh README with explicit v3 wording.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,420p' src/__tests__/utils.test.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '260,420p' src/__tests__/utils.test.ts"
+Chunk ID: 2040f2
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 507
+Output:
+});
+
+/* ------------------------------------------------------------------ */
+/*  sanitiseFilename                                                  */
+/* ------------------------------------------------------------------ */
+
+describe("sanitiseFilename", () => {
+	it("replaces forbidden characters", () => {
+		expect(sanitiseFilename('a<b>c:d"e')).toBe("a_b_c_d_e");
+	});
+
+	it("collapses whitespace", () => {
+		expect(sanitiseFilename("hello   world")).toBe("hello world");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  blockFileName                                                     */
+/* ------------------------------------------------------------------ */
+
+describe("blockFileName", () => {
+	const block = makeBlock();
+
+	it("title scheme", () => {
+		expect(blockFileName(block, "title")).toBe("Test Block.md");
+	});
+
+	it("id scheme", () => {
+		expect(blockFileName(block, "id")).toBe("12345.md");
+	});
+
+	it("title-id scheme", () => {
+		expect(blockFileName(block, "title-id")).toBe("Test Block (12345).md");
+	});
+});
+
+describe("normalizeArenaUrl", () => {
+	it("converts api block URLs to web URLs", () => {
+		expect(normalizeArenaUrl("https://api.are.na/v2/blocks/12345")).toBe(
+			"https://www.are.na/block/12345"
+		);
+	});
+
+	it("leaves external URLs unchanged", () => {
+		expect(normalizeArenaUrl("https://example.com")).toBe("https://example.com");
+	});
+});
+
+describe("resolveChannelFolder", () => {
+	it("uses default Are.na/<slug> when local folder is blank", () => {
+		expect(
+			resolveChannelFolder({
+				channelSlug: "rad-readings",
+				channelId: 0,
+				channelTitle: "",
+				localFolder: "",
+				lastSyncedAt: null,
+				enabled: true,
+			}),
+		).toBe("Are.na/rad-readings");
+	});
+
+	it("uses explicit local folder when provided", () => {
+		expect(
+			resolveChannelFolder({
+				channelSlug: "rad-readings",
+				channelId: 0,
+				channelTitle: "",
+				localFolder: "Custom/Wherever",
+				lastSyncedAt: null,
+				enabled: true,
+			}),
+		).toBe("Custom/Wherever");
+	});
+});
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:03:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' src/api.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' src/api.ts"
+Chunk ID: 421981
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1412
+Output:
+import { requestUrl, RequestUrlParam } from "obsidian";
+import type {
+	ArenaBlock,
+	ArenaChannel,
+	ArenaChannelListItem,
+	ArenaPaginatedResponse,
+} from "./types";
+
+const BASE_URL = "https://api.are.na/v2";
+const PER_PAGE = 100;
+const MAX_RETRIES = 3;
+const REQUEST_DELAY = 100; // ms between requests
+const JITTER = 50; // ms
+const RATE_LIMIT_STATUS = 429;
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withJitter(baseDelay: number): number {
+	return baseDelay + Math.random() * JITTER;
+}
+
+function transientBackoffMs(attempt: number): number {
+	// 1s, 2s, 4s ... plus jitter.
+	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
+	return Math.round(withJitter(base));
+}
+
+export class ArenaApi {
+	private token: string;
+	private debug: boolean;
+
+	constructor(token: string, debug = false) {
+		this.token = token;
+		this.debug = debug;
+	}
+
+	private headers(): Record<string, string> {
+		const h: Record<string, string> = {
+			"Content-Type": "application/json",
+		};
+		if (this.token) {
+			h["Authorization"] = `Bearer ${this.token}`;
+		}
+		return h;
+	}
+
+	private async request<T>(
+		method: string,
+		path: string,
+		body?: unknown,
+	): Promise<T> {
+		let attempts = 0;
+
+		while (attempts < MAX_RETRIES) {
+			const params: RequestUrlParam = {
+				url: `${BASE_URL}${path}`,
+				method,
+				headers: this.headers(),
+			};
+			if (body) {
+				params.body = JSON.stringify(body);
+			}
+
+			if (this.debug) {
+				console.log(`[arena-sync] ${method} ${params.url}`);
+			}
+
+			let res;
+			try {
+				res = await requestUrl(params);
+			} catch (err) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw err;
+				}
+				await delay(transientBackoffMs(attempts));
+				continue;
+			}
+
+			// Handle rate limiting with exponential backoff
+			if (res.status === RATE_LIMIT_STATUS) {
+				const retryAfter = parseInt(
+					res.headers["retry-after"] || "60",
+					10,
+				);
+				const backoffMs = retryAfter * 1000;
+				attempts++;
+
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API rate limited (429). Max retries exceeded. ` +
+							`Try again in ${retryAfter} seconds.`,
+					);
+				}
+
+				if (this.debug) {
+					console.log(
+						`[arena-sync] Rate limited. Retrying after ${retryAfter}s ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (TRANSIENT_STATUSES.has(res.status)) {
+				attempts++;
+				if (attempts >= MAX_RETRIES) {
+					throw new Error(
+						`Are.na API temporary failure (${res.status}). ` +
+							`Max retries exceeded.`,
+					);
+				}
+				const backoffMs = transientBackoffMs(attempts);
+				if (this.debug) {
+					console.log(
+						`[arena-sync] ${res.status} retry in ${backoffMs}ms ` +
+							`(attempt ${attempts}/${MAX_RETRIES})`,
+					);
+				}
+				await delay(backoffMs);
+				continue;
+			}
+
+			if (res.status < 200 || res.status >= 300) {
+				const errorMessage = this.getErrorMessage(res.status);
+				throw new Error(errorMessage);
+			}
+
+			return res.json as T;
+		}
+
+		throw new Error("Are.na API request failed after max retries");
+	}
+
+	private getErrorMessage(status: number): string {
+		switch (status) {
+			case 400:
+				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
+			case 401:
+				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
+			case 403:
+				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
+			case 404:
+				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
+			case 429:
+				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
+			case 500:
+				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
+			case 502:
+			case 503:
+			case 504:
+				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
+			default:
+				return `Are.na API error ${status}. Please try again or check Are.na status.`;
+		}
+	}
+
+	async verifyToken(): Promise<boolean> {
+		try {
+			await this.request("GET", "/me");
+			return true;
+		} catch (err) {
+			if (this.debug) {
+				console.log(`[arena-sync] Token verification failed:`, err);
+			}
+			return false;
+		}
+	}
+
+	async getChannel(slug: string): Promise<ArenaChannel> {
+		return this.request<ArenaChannel>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
+		);
+	}
+
+	async getChannelContents(
+		slug: string,
+		page = 1,
+	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
+		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
+			"GET",
+			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
+		);
+	}
+
+	async get
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ import type {
+ 	ArenaBlock,
+ 	ArenaChannel,
+ 	ArenaChannelListItem,
+ 	ArenaPaginatedResponse,
+ } from "./types";
+ 
+-const BASE_URL = "https://api.are.na/v2";
++const BASE_URL = "https://api.are.na";
++const API_VERSION_PREFIX = "/v3";
+ const PER_PAGE = 100;
+@@
+ function transientBackoffMs(attempt: number): number {
+@@
+ 	return Math.round(withJitter(base));
+ }
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++	return typeof value === "object" && value !== null;
++}
++
++function asNumber(value: unknown): number | null {
++	if (typeof value === "number" && Number.isFinite(value)) return value;
++	if (typeof value === "string" && value.trim()) {
++		const parsed = Number(value);
++		if (Number.isFinite(parsed)) return parsed;
++	}
++	return null;
++}
+ 
+ export class ArenaApi {
+@@
+ 	private async request<T>(
+ 		method: string,
+ 		path: string,
+ 		body?: unknown,
+ 	): Promise<T> {
+ 		let attempts = 0;
+ 
+ 		while (attempts < MAX_RETRIES) {
+ 			const params: RequestUrlParam = {
+-				url: `${BASE_URL}${path}`,
++				url: this.buildApiUrl(path),
+ 				method,
+ 				headers: this.headers(),
+ 			};
+@@
+ 			// Handle rate limiting with exponential backoff
+ 			if (res.status === RATE_LIMIT_STATUS) {
+-				const retryAfter = parseInt(
+-					res.headers["retry-after"] || "60",
+-					10,
+-				);
++				const retryAfter = this.readRetryAfterSeconds(res.headers);
+ 				const backoffMs = retryAfter * 1000;
+ 				attempts++;
+@@
+ 			return res.json as T;
+ 		}
+@@
+ 	}
++
++	private buildApiUrl(path: string): string {
++		if (/^https?:\/\//.test(path)) return path;
++		const normalizedPath = path.startsWith("/") ? path : `/${path}`;
++		if (normalizedPath.startsWith("/v")) {
++			return `${BASE_URL}${normalizedPath}`;
++		}
++		return `${BASE_URL}${API_VERSION_PREFIX}${normalizedPath}`;
++	}
++
++	private readRetryAfterSeconds(headers: Record<string, string>): number {
++		const raw =
++			headers["retry-after"] ??
++			headers["Retry-After"] ??
++			headers["retry_after"] ??
++			"60";
++		const parsed = parseInt(raw, 10);
++		return Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
++	}
++
++	private unwrapData<T>(payload: unknown): T {
++		if (isRecord(payload) && "data" in payload) {
++			return payload.data as T;
++		}
++		return payload as T;
++	}
++
++	private normalizePaginatedResponse<T>(
++		payload: unknown,
++	): ArenaPaginatedResponse<T> {
++		// v3 shape: { data: [...], meta: {...} }
++		if (isRecord(payload) && Array.isArray(payload.data)) {
++			const data = payload.data as T[];
++			const meta = isRecord(payload.meta) ? payload.meta : {};
++			const currentPage = asNumber(meta.current_page) ?? 1;
++			const per =
++				asNumber(meta.per_page) ??
++				asNumber(meta.per) ??
++				PER_PAGE;
++			const totalPages = asNumber(meta.total_pages) ?? 1;
++			const totalCount = asNumber(meta.total_count) ?? data.length;
++			return {
++				contents: data,
++				length: totalCount,
++				total_pages: totalPages,
++				current_page: currentPage,
++				per,
++			};
++		}
++
++		// v2/legacy shape: { contents: [...], ... }
++		if (isRecord(payload) && Array.isArray(payload.contents)) {
++			const contents = payload.contents as T[];
++			return {
++				contents,
++				length: asNumber(payload.length) ?? contents.length,
++				total_pages: asNumber(payload.total_pages) ?? 1,
++				current_page: asNumber(payload.current_page) ?? 1,
++				per: asNumber(payload.per) ?? PER_PAGE,
++			};
++		}
++
++		// Fallback: raw array payload.
++		if (Array.isArray(payload)) {
++			const contents = payload as T[];
++			return {
++				contents,
++				length: contents.length,
++				total_pages: 1,
++				current_page: 1,
++				per: contents.length || PER_PAGE,
++			};
++		}
++
++		throw new Error("Unexpected Are.na pagination response format");
++	}
+@@
+ 	async verifyToken(): Promise<boolean> {
+ 		try {
+-			await this.request("GET", "/me");
++			await this.request("GET", "/me");
+ 			return true;
+@@
+ 	async getChannel(slug: string): Promise<ArenaChannel> {
+-		return this.request<ArenaChannel>(
+-			"GET",
+-			`/channels/${encodeURIComponent(slug)}?per=${PER_PAGE}`,
+-		);
++		const payload = await this.request<unknown>(
++			"GET",
++			`/channels/${encodeURIComponent(slug)}`,
++		);
++		return this.unwrapData<ArenaChannel>(payload);
+ 	}
+@@
+ 	async getChannelContents(
+ 		slug: string,
+ 		page = 1,
+ 	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
+-		return this.request<ArenaPaginatedResponse<ArenaBlock>>(
++		const payload = await this.request<unknown>(
+ 			"GET",
+ 			`/channels/${encodeURIComponent(slug)}/contents?page=${page}&per=${PER_PAGE}`,
+ 		);
++		return this.normalizePaginatedResponse<ArenaBlock>(payload);
+ 	}
+@@
+-		return blocks.sort((a, b) => a.position - b.position);
++		return blocks.sort((a, b) => {
++			const aPos = typeof a.position === "number" ? a.position : Number.MAX_SAFE_INTEGER;
++			const bPos = typeof b.position === "number" ? b.position : Number.MAX_SAFE_INTEGER;
++			return aPos - bPos || a.id - b.id;
++		});
+ 	}
+@@
+ 	async listMyChannels(
+ 		page = 1,
+ 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
+-		return this.request<ArenaPaginatedResponse<ArenaChannelListItem>>(
++		const payload = await this.request<unknown>(
+ 			"GET",
+ 			`/me/channels?page=${page}&per=${PER_PAGE}`,
+ 		);
++		return this.normalizePaginatedResponse<ArenaChannelListItem>(payload);
+ 	}
+@@
+ 	async getBlock(id: number): Promise<ArenaBlock> {
+-		return this.request<ArenaBlock>("GET", `/blocks/${id}`);
++		const payload = await this.request<unknown>("GET", `/blocks/${id}`);
++		return this.unwrapData<ArenaBlock>(payload);
+ 	}
+@@
+ 			// Handle rate limiting
+ 			if (res.status === RATE_LIMIT_STATUS) {
+-				const retryAfter = parseInt(
+-					res.headers["retry-after"] || "60",
+-					10,
+-				);
++				const retryAfter = this.readRetryAfterSeconds(res.headers);
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:22Z)**_
+
+I’ve migrated the API client to v3 routing with a compatibility adapter for `data/meta` responses, while keeping the importer internals stable. Next I’m updating type definitions and URL normalization (including tests) so everything lines up cleanly.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+ export interface ArenaBlock {
+@@
+-	position: number;
++	position?: number;
+ 	user: ArenaUser;
+ }
+@@
+ export interface ArenaChannel {
+ 	id: number;
+ 	title: string;
+ 	slug: string;
+ 	length: number;
+ 	follower_count?: number;
+ 	followers_count?: number;
++	description?: string | null;
+ 	status: "closed" | "public" | "private";
+ 	user: ArenaUser;
+-	contents: ArenaBlock[];
++	contents?: ArenaBlock[];
+ 	created_at: string;
+ 	updated_at: string;
+ 	metadata: {
+ 		description: string | null;
+ 	} | null;
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:28Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/utils.ts`**
+
+```diff
+@@
+ export function normalizeArenaUrl(url: string): string {
+ 	if (!url) return url;
+ 	try {
+ 		const parsed = new URL(url);
+ 		if (parsed.hostname === "api.are.na") {
+-			const path = parsed.pathname.replace(/^\/v2/, "");
++			const path = parsed.pathname.replace(/^\/v\d+/, "");
+ 			const converted = path
+ 				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
+ 				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")
+ 				.replace(/^\/users\/([^/]+).*$/, "/user/$1");
+ 			return `https://www.are.na${converted}`;
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/sync-engine.ts`**
+
+```diff
+@@
+-		const channelDescription = channel.metadata?.description?.trim();
++		const channelDescription =
++			channel.metadata?.description?.trim() ||
++			channel.description?.trim() ||
++			"";
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:34Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/types.ts`**
+
+```diff
+@@
+-	metadata: {
++	metadata?: {
+ 		description: string | null;
+ 	} | null;
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__tests__/utils.test.ts`**
+
+```diff
+@@
+ describe("normalizeArenaUrl", () => {
+-	it("converts api block URLs to web URLs", () => {
++	it("converts v2 api block URLs to web URLs", () => {
+ 		expect(normalizeArenaUrl("https://api.are.na/v2/blocks/12345")).toBe(
+ 			"https://www.are.na/block/12345"
+ 		);
+ 	});
++
++	it("converts v3 api block URLs to web URLs", () => {
++		expect(normalizeArenaUrl("https://api.are.na/v3/blocks/12345")).toBe(
++			"https://www.are.na/block/12345"
++		);
++	});
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:44Z)**_
+
+I’ve updated core code and tests; now I’m doing the doc sweep for explicit v3 alignment notes so the implementation and documentation stay in sync.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "v2|v3|api\.are\.na|developers/explore|personal-access-tokens|oauth/applications" README.md CHANGELOG.md SECURITY.md CONTRIBUTING.md src .github`</summary>
+```
+Command: /usr/bin/zsh -lc "rg -n \"v2|v3|api\\.are\\.na|developers/explore|personal-access-tokens|oauth/applications\" README.md CHANGELOG.md SECURITY.md CONTRIBUTING.md src .github"
+Chunk ID: c0d30d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 286
+Output:
+CHANGELOG.md:6:and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+SECURITY.md:38:- The plugin requires network access to reach the Are.na API at `https://api.are.na`.
+README.md:142:1. Generate a token at <https://www.are.na/developers/personal-access-tokens>.
+.github/workflows/release.yml:71:        uses: softprops/action-gh-release@v2
+src/utils.ts:75:		if (parsed.hostname === "api.are.na") {
+src/settings-tab.ts:44:				"Use a personal token from https://www.are.na/developers/personal-access-tokens.",
+src/api.ts:9:const BASE_URL = "https://api.are.na";
+src/api.ts:10:const API_VERSION_PREFIX = "/v3";
+src/api.ts:180:		// v3 shape: { data: [...], meta: {...} }
+src/api.ts:200:		// v2/legacy shape: { contents: [...], ... }
+src/__tests__/utils.test.ts:297:	it("converts v2 api block URLs to web URLs", () => {
+src/__tests__/utils.test.ts:298:		expect(normalizeArenaUrl("https://api.are.na/v2/blocks/12345")).toBe(
+src/__tests__/utils.test.ts:303:	it("converts v3 api block URLs to web URLs", () => {
+src/__tests__/utils.test.ts:304:		expect(normalizeArenaUrl("https://api.are.na/v3/blocks/12345")).toBe(
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' README.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' README.md"
+Chunk ID: 267504
+Wall time: 0.0181 seconds
+Process exited with code 0
+Original token count: 1450
+Output:
+<h1 align="center">Are.na Importer for Obsidian</h1>
+<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
+
+<div align="center">
+
+One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run previews • User-controlled output
+
+</div>
+
+Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+
+## Quick Navigation
+
+- Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
+- CI and releases: [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
+- Planning and reporting: [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+
+## What This Plugin Is (and Is Not)
+
+- It is a deterministic importer from Are.na to Obsidian.
+- It is vault-first, manual, and transparent.
+- It is not a two-way sync engine.
+- It does not run background sync jobs.
+- It does not auto-delete local notes when remote blocks disappear.
+
+## Feature Highlights
+
+### Import Engine
+
+- Imports mapped Are.na channels into mapped vault folders.
+- Supports full pagination for large channels (not limited to the first 100 blocks).
+- Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
+- Shows status bar progress for channels and block pages.
+
+### Deterministic Writing
+
+- Writes stable Markdown notes for blocks.
+- Rewrites existing notes when remote block content changes.
+- Writes channel index notes and a master overview note.
+- Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
+
+### Block Enrichment (Optional)
+
+- Banner frontmatter field for Banners plugin compatibility (`enabled`, custom key, source priority).
+- Block description in frontmatter (`arena_description`).
+- Block comments in a dedicated `Comments` section.
+- Connected channel list (`This block appears in`) with external links.
+- Best-effort preview image for Channel blocks.
+
+### Attachments and Media
+
+- Image handling modes: `download`, `embed`, `link`.
+- Non-image attachment handling modes: `download`, `link`.
+- Downloaded attachment rendering: `link` or `embed`.
+- Storage modes: channel-local, global folder, custom folder.
+- Per-channel storage overrides.
+- Migration tools with preview, diff, execution, and history logging.
+
+### Channel Management
+
+- `Import my channels` to bulk-create mappings from your Are.na account.
+- `Auto-enable imported channels` toggle for granular control.
+- Backup, restore, and reset tools for channel mappings.
+- Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
+
+## Commands
+
+- `Import all channels now`
+- `Preview import (dry-run)`
+- `Import current channel`
+- `Preview current channel import (dry-run)`
+- `Open channel on Are.na`
+- `Preview attachment migration`
+- `Run attachment migration`
+
+## Settings Overview
+
+- API token with verify action.
+- Block file naming (`title`, `id`, `title-id`).
+- Banner frontmatter options (`enabled`, field name, image source priority).
+- Optional enrichments (description, comments, connected channels, channel preview image).
+- Image and attachment rendering controls.
+- Attachment storage controls (global defaults and per-channel overrides).
+- Frontmatter, notifications, and debug logging toggles.
+- Channel mapping management and migration actions.
+
+## How Import Works
+
+1. Create mappings manually or use `Import my channels`.
+2. Run `Import all channels now` or a dry-run preview command.
+3. The plugin fetches channel metadata and all paginated blocks from Are.na.
+4. It normalizes each block into deterministic Markdown output.
+5. It compares planned output against existing vault files.
+6. It writes updated notes, indexes, and overview files.
+7. It shows a sync summary with diffs for changed files.
+8. It records import state and timestamps in plugin data.
+
+## Installation
+
+1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
+2. Enable **Are.na Importer** in Obsidian Community Plugins.
+3. Open settings and add your API token.
+4. Add at least one channel mapping, or run `Import my channels`.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+Build output:
+
+- `main.js` in the repository root.
+- `dist/<plugin-id>-<version>.zip` with `main.js`, `manifest.json`, and `styles.css`.
+
+Quality checks:
+
+```bash
+npm run lint
+npm test
+```
+
+## Security
+
+- API tokens are masked in the UI and stored in Obsidian plugin data.
+- The plugin collects no telemetry.
+- External requests a
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:04:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' CHANGELOG.md`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,220p' CHANGELOG.md"
+Chunk ID: bb8c76
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1284
+Output:
+# Changelog
+
+All notable changes to **Are.na Importer for Obsidian** will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] — 2025-01-15
+
+### Added
+- **Pull sync**: Import Are.na channels as folders of Markdown notes (text, images, links, media, attachments).
+- **YAML front-matter**: Configurable metadata fields (`arena-id`, `arena-url`, `arena-class`, `arena-created-at`, `arena-updated-at`, `arena-channel-slug`, `arena-channel-title`, `arena-source-url`).
+- **Image handling**: Download to vault, Obsidian embed, or external link modes.
+- **Attachment handling**: Download or link PDFs and other non-image attachments with flexible storage options (channel-local, global, or custom folders).
+- **Manual import flow**: Command-driven import with explicit user control.
+- **Channel mapping UI**: Map any number of Are.na channels to local vault folders with per-mapping enable/disable toggle.
+- **Commands**: Import all channels · Import current channel · Preview import (dry-run) · Preview current channel · Open channel on Are.na.
+- **Status bar indicator**: Live import progress with pagination and block-level updates for large channels.
+- **Dry-run mode**: Preview all changes before applying them.
+- **Channel index notes**: Auto-generated index files with links to all imported notes in a channel.
+- **Import history**: Transparent action logging in `Are.na/import-history.md` for audit trail.
+- **Rate-limit handling**: Automatic retry with exponential backoff for API rate limits (HTTP 429).
+- **Mobile support**: Works on Obsidian Mobile without external dependencies.
+- **Token verification**: One-click API token validation in settings.
+- **Debug logging**: Optional verbose console output for troubleshooting.
+- **Selective block exclusion**: Configure which block classes to skip during import (e.g., Image, Media).
+
+### Technical
+- TypeScript codebase with strict null checks and comprehensive type safety.
+- esbuild bundler for fast development and production builds.
+- Jest test suite with utilities for mock block data.
+- ESLint configuration for consistent code style.
+- GitHub Actions CI pipeline (lint, test, build on every push/PR).
+- Automated release workflow with changelog extraction and plugin packaging.
+- Comprehensive documentation (README, CONTRIBUTING, CHANGELOG, LICENSE).
+
+### Security
+- API tokens masked in settings UI (password input field).
+- Input validation for channel mappings (slug required, folder optional with deterministic default).
+- Secure token verification with clear feedback.
+
+## [Unreleased]
+
+### Added
+
+- Sync summary modal with per-file diff viewer.
+- Master overview note generation (`Are.na/overview.md`).
+- Attachment migration system: preview modal, dry-run diffs, execution, and migration history log.
+- Per-channel attachment storage overrides.
+- Channel management tools in settings:
+  - `Import my channels` (bulk-create mappings from Are.na account)
+  - `Auto-enable imported channels` toggle (granular manual control)
+  - `Backup channel mappings`
+  - `Restore latest backup`
+  - `Reset channel mappings`
+- Optional banner frontmatter field for Obsidian Banners plugin compatibility:
+  - enable/disable toggle
+  - custom field name
+  - banner image source priority (`thumb-first` / `display-first`)
+- Optional block enrichment features:
+  - import block description into frontmatter (`arena_description`)
+  - import block comments into note body
+  - import connected channels where block appears, with clickable external links
+  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
+- Channel index enhancements:
+  - folder-note compatible index filename mode (`index.md` or `<folder-name>.md`)
+  - `Info` section with description, started, modified, length, followers (when available)
+  - best-effort `This Channel Appears In` section with clickable external links
+- Build packaging script that outputs `dist/<plugin-id>-<version>.zip` without relying on system `zip`.
+
+### Changed
+
+- Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
+- Mapping folder is now optional in settings UI; explicit folders still override default behavior.
+- API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
+
+### Fixed
+
+- Fixed pagination edge case where some channels could stop after the first 100 blocks.
+- Fixed packaging failures in environments without a system `zip` binary.
+
+---
+
+
+
+---
+
+## Version history format
+
+Each release entry follows this structure:
+
+```
+## [X.Y.Z] — YYYY-MM-DD
+
+### Added      — new features
+### Changed    — changes in existing functionality
+### Deprecated —
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ 	private unwrapData<T>(payload: unknown): T {
+ 		if (isRecord(payload) && "data" in payload) {
+ 			return payload.data as T;
+ 		}
+ 		return payload as T;
+ 	}
++
++	private normalizeChannel(payload: unknown): ArenaChannel {
++		const raw = this.unwrapData<unknown>(payload);
++		if (!isRecord(raw)) {
++			throw new Error("Unexpected Are.na channel response format");
++		}
++		const metadata = isRecord(raw.metadata)
++			? {
++					description:
++						typeof raw.metadata.description === "string"
++							? raw.metadata.description
++							: null,
++				}
++			: null;
++		const description =
++			typeof raw.description === "string" ? raw.description : null;
++		const length =
++			asNumber(raw.length) ??
++			asNumber(raw.total_connections) ??
++			asNumber(raw.connections_count) ??
++			0;
++
++		return {
++			...(raw as ArenaChannel),
++			length,
++			description,
++			metadata,
++		};
++	}
++
++	private normalizeBlock(payload: unknown): ArenaBlock {
++		const raw = this.unwrapData<unknown>(payload);
++		if (!isRecord(raw)) {
++			throw new Error("Unexpected Are.na block response format");
++		}
++		return raw as ArenaBlock;
++	}
+@@
+ 	async getChannel(slug: string): Promise<ArenaChannel> {
+ 		const payload = await this.request<unknown>(
+ 			"GET",
+ 			`/channels/${encodeURIComponent(slug)}`,
+ 		);
+-		return this.unwrapData<ArenaChannel>(payload);
++		return this.normalizeChannel(payload);
+ 	}
+@@
+ 	async getBlock(id: number): Promise<ArenaBlock> {
+ 		const payload = await this.request<unknown>("GET", `/blocks/${id}`);
+-		return this.unwrapData<ArenaBlock>(payload);
++		return this.normalizeBlock(payload);
+ 	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `README.md`**
+
+```diff
+@@
+ Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
++
++API compatibility targets the current Are.na REST API v3 documentation: <https://www.are.na/developers/explore>.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `CHANGELOG.md`**
+
+```diff
+@@
+ ### Changed
+ 
+ - Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
+ - Mapping folder is now optional in settings UI; explicit folders still override default behavior.
+ - API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
++- API client now targets Are.na REST API v3 routes with a compatibility adapter for v3 `data/meta` pagination responses.
++- URL normalization now recognizes both legacy `/v2/...` and current `/v3/...` API URLs.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:18Z)**_
+
+I’ve finished the code and doc migration edits. I’m running lint, tests, and build now to catch any typing/format issues from the v3 adapter changes before we call it done.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint'
+Chunk ID: 59bb7d
+Wall time: 2.2577 seconds
+Process exited with code 0
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 10d412
+Wall time: 3.1420 seconds
+Process exited with code 0
+Original token count: 841
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/utils.test.ts
+  blockToMarkdown
+    ✓ converts a text block with front-matter (4 ms)
+    ✓ omits front-matter when disabled (1 ms)
+    ✓ handles a link block
+    ✓ handles an image block with external link (3 ms)
+    ✓ embeds image blocks using Are.na display image in embed mode (2 ms)
+    ✓ handles an attachment block (1 ms)
+    ✓ falls back to Block ID when title is null (1 ms)
+    ✓ adds optional banner frontmatter field when enabled
+    ✓ can include block description in frontmatter (1 ms)
+    ✓ supports display-first banner priority (12 ms)
+    ✓ renders comments and connected channels sections from context (2 ms)
+  markdownToBlockContent
+    ✓ strips front-matter and extracts title (1 ms)
+    ✓ handles content without front-matter
+  computeHash
+    ✓ returns a 16-char hex string (1 ms)
+    ✓ is deterministic (1 ms)
+    ✓ differs for different inputs
+  sanitiseFilename
+    ✓ replaces forbidden characters (5 ms)
+    ✓ collapses whitespace (1 ms)
+  blockFileName
+    ✓ title scheme (3 ms)
+    ✓ id scheme
+    ✓ title-id scheme
+  normalizeArenaUrl
+    ✓ converts v2 api block URLs to web URLs
+    ✓ converts v3 api block URLs to web URLs (1 ms)
+    ✓ leaves external URLs unchanged (1 ms)
+  resolveChannelFolder
+    ✓ uses default Are.na/<slug> when local folder is blank
+    ✓ uses explicit local folder when provided
+
+-----------------|---------|----------|---------|---------|----------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                      
+-----------------|---------|----------|---------|---------|----------------------------------------
+All files        |    8.35 |    12.03 |    3.77 |    8.82 |                                        
+ api.ts          |       0 |        0 |       0 |       0 | 1-512                                  
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                   
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                  
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                  
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                  
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-603                                  
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-818                                  
+ types.ts        |     100 |      100 |     100 |     100 |                                        
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245 
+-----------------|---------|----------|---------|---------|----------------------------------------
+Test Suites: 1 passed, 1 total
+Tests:       26 passed, 26 total
+Snapshots:   0 total
+Time:        2.456 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: e29d21
+Wall time: 2.2130 seconds
+Process exited with code 2
+Original token count: 222
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+src/api.ts(199,8): error TS2352: Conversion of type 'Record<string, unknown>' to type 'ArenaChannel' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Record<string, unknown>' is missing the following properties from type 'ArenaChannel': id, title, slug, length, and 4 more.
+src/api.ts(211,10): error TS2352: Conversion of type 'Record<string, unknown>' to type 'ArenaBlock' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Record<string, unknown>' is missing the following properties from type 'ArenaBlock': id, title, content, content_html, and 11 more.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:24Z)**_
+
+Build caught two strict TypeScript cast warnings in the new normalization helpers; I’m patching those cast sites now and re-running build immediately.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/api.ts`**
+
+```diff
+@@
+ 		return {
+-			...(raw as ArenaChannel),
++			...(raw as unknown as ArenaChannel),
+ 			length,
+ 			description,
+ 			metadata,
+ 		};
+@@
+-		return raw as ArenaBlock;
++		return raw as unknown as ArenaBlock;
+ 	}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: 899a9e
+Wall time: 1.3208 seconds
+Process exited with code 0
+Original token count: 49
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:05:43Z)**_
+
+Completed. I shipped a focused Are.na API v3 migration pass across client, types, adapters, URL normalization, tests, and docs.
+
+### What changed
+
+- API client now targets v3 routes on `https://api.are.na` with `/v3/...` prefix by default:
+  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+
+- Added response compatibility adapters so importer internals still use stable `contents/current_page/total_pages`:
+  - Supports v3 pagination shape: `data + meta`
+  - Still supports legacy shape: `contents + total_pages`
+  - Added robust `data` unwrapping for single-resource responses (`/channels/:slug`, `/blocks/:id`)
+  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+
+- Hardened channel normalization for v3 field variability:
+  - `length` fallback from alternate count fields
+  - `description` + `metadata.description` normalization
+  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+
+- Updated URL normalization to handle both v2 and v3 API links:
+  - [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+
+- Updated types for safer v3 compatibility:
+  - `ArenaBlock.position` optional
+  - `ArenaChannel.description` optional
+  - `ArenaChannel.contents` optional
+  - `ArenaChannel.metadata` optional
+  - [types.ts](/home/frost/Are.na-Importer/src/types.ts)
+
+- Channel index description now also falls back to top-level `channel.description`:
+  - [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
+
+- Added/updated tests for v3 URL normalization:
+  - [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+
+- Documentation updated to explicitly state v3 doc target:
+  - [README.md](/home/frost/Are.na-Importer/README.md)
+  - [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
+
+### Verification
+
+- `npm run lint` ✅
+- `npm test -- --runInBand` ✅ (26 passing)
+- `npm run build` ✅
+- Package output: `/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip`
+
+If you want, next I can add a small integration test fixture for v3 `data/meta` payload parsing in `api.ts` so this adapter behavior is permanently regression-tested.
+
+---
+
+_**User (2026-03-31 03:26:52Z)**_
+
+# Context from my IDE setup:
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+add a small integration test fixture for v3 data/meta payload parsing in api.ts so this adapter behavior is permanently regression-tested.
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:26:58Z)**_
+
+Great call. I’ll add a focused `api.ts` test file that mocks `requestUrl` and validates v3 `data/meta` parsing for both paginated and single-resource endpoints, then run the full test/build checks.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:26:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat package.json`</summary>
+```
+Command: /usr/bin/zsh -lc 'cat package.json'
+Chunk ID: bfc08f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 282
+Output:
+{
+  "name": "Are.na Importer",
+  "version": "1.0.0",
+	"description": "One-way import from Are.na channels into your Obsidian vault.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs",
+    "package": "node scripts/package.mjs",
+	  "lint": "eslint \"src/**/*.ts\"",
+	  "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "release": "bash scripts/release.sh"
+  },
+  "keywords": [
+    "obsidian",
+    "arena",
+    "are.na",
+    "import",
+    "plugin"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "obsidian": "latest",
+    "ts-jest": "^29.1.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {}
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:26:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -la && ls -la src/__tests__ && rg -n "jest|ts-jest|moduleNameMapper|obsidian" -S .`</summary>
+```
+Command: /usr/bin/zsh -lc 'ls -la && ls -la src/__tests__ && rg -n "jest|ts-jest|moduleNameMapper|obsidian" -S .'
+Chunk ID: 5598c5
+Wall time: 0.0017 seconds
+Process exited with code 0
+Original token count: 5729
+Output:
+total 328
+drwxr-xr-x 1 frost frost    596 Mar 30 19:21 .
+drwx------ 1 frost frost   1536 Mar 30 22:02 ..
+-r--r--r-- 1 frost frost      0 Mar 30 17:19 .codex
+-rw-r--r-- 1 frost frost    239 Mar 30 17:10 .editorconfig
+-rw-r--r-- 1 frost frost    477 Mar 30 17:10 .eslintrc.cjs
+drwxr-xr-x 1 frost frost    188 Mar 30 22:02 .git
+drwxr-xr-x 1 frost frost    164 Mar 30 21:42 .github
+-rw-r--r-- 1 frost frost    236 Mar 30 17:10 .gitignore
+drwxr-xr-x 1 frost frost     76 Mar 30 22:26 .specstory
+drwxr-xr-x 1 frost frost     26 Mar 30 19:18 .vscode
+-rw-r--r-- 1 frost frost   5343 Mar 30 22:05 CHANGELOG.md
+-rw-r--r-- 1 frost frost   1242 Mar 30 21:41 CONTRIBUTING.md
+-rw-r--r-- 1 frost frost   1081 Mar 30 17:10 LICENSE
+-rw-r--r-- 1 frost frost   5914 Mar 30 22:05 README.md
+-rw-r--r-- 1 frost frost   3417 Mar 30 21:41 SECURITY.md
+drwxr-xr-x 1 frost frost    104 Mar 30 17:10 assets
+drwxr-xr-x 1 frost frost     98 Mar 30 19:10 coverage
+drwxr-xr-x 1 frost frost    142 Mar 30 19:58 dist
+-rw-r--r-- 1 frost frost    930 Mar 30 17:10 esbuild.config.mjs
+-rw-r--r-- 1 frost frost    318 Mar 30 19:10 jest.config.cjs
+-rw-r--r-- 1 frost frost  52768 Mar 30 22:05 main.js
+-rw-r--r-- 1 frost frost    316 Mar 30 17:10 manifest.json
+drwxr-xr-x 1 frost frost   6032 Mar 30 18:35 node_modules
+-rw-r--r-- 1 frost frost 202061 Mar 30 18:35 package-lock.json
+-rw-r--r-- 1 frost frost   1128 Mar 30 19:14 package.json
+drwxr-xr-x 1 frost frost     70 Mar 30 19:14 scripts
+drwxr-xr-x 1 frost frost    208 Mar 30 19:10 src
+-rw-r--r-- 1 frost frost   5090 Mar 30 17:35 styles.css
+-rw-r--r-- 1 frost frost    545 Mar 30 17:10 tsconfig.json
+-rw-r--r-- 1 frost frost    688 Mar 30 17:10 version-bump.mjs
+-rw-r--r-- 1 frost frost     22 Mar 30 17:10 versions.json
+total 16
+drwxr-xr-x 1 frost frost    48 Mar 30 17:10 .
+drwxr-xr-x 1 frost frost   208 Mar 30 19:10 ..
+-rw-r--r-- 1 frost frost   326 Mar 30 17:10 fixtures.ts
+-rw-r--r-- 1 frost frost 10048 Mar 30 22:04 utils.test.ts
+./src/modals.ts:1:import { App, Modal, Setting } from "obsidian";
+./src/migration.ts:1:import { App, normalizePath, TFile, Vault } from "obsidian";
+./src/utils.ts:2:import { normalizePath } from "obsidian";
+./src/sync-engine.ts:1:import { App, normalizePath, TFile, Vault } from "obsidian";
+./src/settings-tab.ts:1:import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+./src/main.ts:1:import { addIcon, normalizePath, Notice, Plugin, TFile } from "obsidian";
+./esbuild.config.mjs:7:https://github.com/arena-sync/arena-sync-obsidian
+./esbuild.config.mjs:19:		"obsidian",
+./src/api.ts:1:import { requestUrl, RequestUrlParam } from "obsidian";
+./assets/forum-post.md:42:- GitHub: https://github.com/arena-sync/arena-sync-obsidian
+./assets/forum-post.md:43:- Changelog: https://github.com/arena-sync/arena-sync-obsidian/blob/main/CHANGELOG.md
+./assets/forum-post.md:44:- Contributing: https://github.com/arena-sync/arena-sync-obsidian/blob/main/CONTRIBUTING.md
+./README.md:102:1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
+./package.json:12:    "test": "jest --coverage",
+./package.json:13:    "test:watch": "jest --watch",
+./package.json:18:    "obsidian",
+./package.json:32:    "jest": "^29.7.0",
+./package.json:33:    "obsidian": "latest",
+./package.json:34:    "ts-jest": "^29.1.0",
+./scripts/release.sh:110:echo -e "${GREEN}    https://github.com/arena-sync/arena-sync-obsidian/actions${NC}"
+./jest.config.cjs:1:/** @type {import('jest').Config} */
+./jest.config.cjs:3:	preset: "ts-jest",
+./jest.config.cjs:8:	moduleNameMapper: {
+./jest.config.cjs:9:		"^obsidian$": "<rootDir>/src/__mocks__/obsidian.ts",
+./package-lock.json:18:        "jest": "^29.7.0",
+./package-lock.json:19:        "obsidian": "latest",
+./package-lock.json:20:        "ts-jest": "^29.1.0",
+./package-lock.json:1223:    "node_modules/@jest/console": {
+./package-lock.json:1225:      "resolved": "https://registry.npmjs.org/@jest/console/-/console-29.7.0.tgz",
+./package-lock.json:1230:        "@jest/types": "^29.6.3",
+./package-lock.json:1233:        "jest-message-util": "^29.7.0",
+./package-lock.json:1234:        "jest-util": "^29.7.0",
+./package-lock.json:1241:    "node_modules/@jest/core": {
+./package-lock.json:1243:      "resolved": "https://registry.npmjs.org/@jest/core/-/core-29.7.0.tgz",
+./package-lock.json:1248:        "@jest/console": "^29.7.0",
+./package-lock.json:1249:        "@jest/reporters": "^29.7.0",
+./package-lock.json:1250:        "@jest/test-result": "^29.7.0",
+./package-lock.json:1251:        "@jest/transform": "^29.7.0",
+./package-lock.json:1252:        "@jest/types": "^29.6.3",
+./package-lock.json:1259:        "jest-changed-files": "^29.7.0",
+./package-lock.json:1260:        "jest-config": "^29.7.0",
+./package-lock.json:1261:        "jest-haste-
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:26:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat jest.config.js 2>/dev/null || cat jest.config.cjs 2>/dev/null || true`</summary>
+```
+Command: /usr/bin/zsh -lc 'cat jest.config.js 2>/dev/null || cat jest.config.cjs 2>/dev/null || true'
+Chunk ID: a395a8
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 80
+Output:
+/** @type {import('jest').Config} */
+module.exports = {
+	preset: "ts-jest",
+	testEnvironment: "node",
+	roots: ["<rootDir>/src"],
+	testMatch: ["**/__tests__/**/*.test.ts"],
+	collectCoverageFrom: ["src/**/*.ts", "!src/**/__tests__/**"],
+	moduleNameMapper: {
+		"^obsidian$": "<rootDir>/src/__mocks__/obsidian.ts",
+	},
+};
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:26:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat tsconfig.json`</summary>
+```
+Command: /usr/bin/zsh -lc 'cat tsconfig.json'
+Chunk ID: 3a882c
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 137
+Output:
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "module": "ESNext",
+    "target": "ES6",
+    "allowJs": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "isolatedModules": true,
+    "strictFunctionTypes": true,
+    "lib": ["DOM", "ES5", "ES6", "ES7"],
+    "outDir": "./dist",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' src/__mocks__/obsidian.ts`</summary>
+```
+Command: /usr/bin/zsh -lc "sed -n '1,260p' src/__mocks__/obsidian.ts"
+Chunk ID: e0f8c9
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 28
+Output:
+export function normalizePath(path: string): string {
+	return path.replace(/\\/g, "/").replace(/\/+/g, "/");
+}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:15Z)**_
+
+I found the Jest setup is already ready for this; I just need to expand the Obsidian mock to include `requestUrl`, then add `api.test.ts` with v3 `data/meta` fixtures and endpoint assertions. I’m applying that now.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__mocks__/obsidian.ts`**
+
+```diff
+@@
+ export function normalizePath(path: string): string {
+ 	return path.replace(/\\/g, "/").replace(/\/+/g, "/");
+ }
++
++export type RequestUrlParam = {
++	url: string;
++	method?: string;
++	headers?: Record<string, string>;
++	body?: string;
++};
++
++export async function requestUrl(_params: RequestUrlParam): Promise<{
++	status: number;
++	headers: Record<string, string>;
++	json: unknown;
++	arrayBuffer: ArrayBuffer;
++}> {
++	throw new Error("requestUrl mock not implemented for this test");
++}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Add: `src/__tests__/api.test.ts`**
+
+```diff
++import * as obsidian from "obsidian";
++import { ArenaApi } from "../api";
++import type { ArenaBlock } from "../types";
++
++function makeBlock(id: number): ArenaBlock {
++	return {
++		id,
++		title: `Block ${id}`,
++		content: "content",
++		content_html: "<p>content</p>",
++		description: null,
++		description_html: null,
++		source: null,
++		image: null,
++		attachment: null,
++		class: "Text",
++		base_class: "Block",
++		created_at: "2026-01-01T00:00:00.000Z",
++		updated_at: "2026-01-01T00:00:00.000Z",
++		connected_at: "2026-01-01T00:00:00.000Z",
++		position: id,
++		user: {
++			id: 1,
++			slug: "tester",
++			username: "tester",
++			first_name: "Test",
++			last_name: "User",
++			avatar: "",
++			channel_count: 1,
++		},
++	};
++}
++
++describe("ArenaApi v3 adapters", () => {
++	const requestUrlMock = jest.spyOn(obsidian, "requestUrl");
++
++	beforeEach(() => {
++		requestUrlMock.mockReset();
++	});
++
++	afterAll(() => {
++		requestUrlMock.mockRestore();
++	});
++
++	it("parses v3 data/meta payloads for channel contents", async () => {
++		requestUrlMock.mockResolvedValueOnce({
++			status: 200,
++			headers: {},
++			json: {
++				data: [makeBlock(2), makeBlock(1)],
++				meta: {
++					current_page: 2,
++					per_page: 100,
++					total_pages: 7,
++					total_count: 654,
++				},
++			},
++			arrayBuffer: new ArrayBuffer(0),
++		});
++
++		const api = new ArenaApi("token-123");
++		const page = await api.getChannelContents("rad-readings", 2);
++
++		expect(page.contents).toHaveLength(2);
++		expect(page.current_page).toBe(2);
++		expect(page.total_pages).toBe(7);
++		expect(page.length).toBe(654);
++		expect(page.per).toBe(100);
++
++		expect(requestUrlMock).toHaveBeenCalledWith(
++			expect.objectContaining({
++				method: "GET",
++				url: "https://api.are.na/v3/channels/rad-readings/contents?page=2&per=100",
++				headers: expect.objectContaining({
++					Authorization: "Bearer token-123",
++				}),
++			}),
++		);
++	});
++
++	it("unwraps v3 data payloads for single resources", async () => {
++		requestUrlMock
++			.mockResolvedValueOnce({
++				status: 200,
++				headers: {},
++				json: {
++					data: {
++						id: 42,
++						title: "Rad Readings",
++						slug: "rad-readings",
++						status: "public",
++						user: makeBlock(1).user,
++						created_at: "2026-01-01T00:00:00.000Z",
++						updated_at: "2026-01-02T00:00:00.000Z",
++						total_connections: 717,
++						description: "Channel description",
++					},
++				},
++				arrayBuffer: new ArrayBuffer(0),
++			})
++			.mockResolvedValueOnce({
++				status: 200,
++				headers: {},
++				json: {
++					data: makeBlock(999),
++				},
++				arrayBuffer: new ArrayBuffer(0),
++			});
++
++		const api = new ArenaApi("token-xyz");
++		const channel = await api.getChannel("rad-readings");
++		const block = await api.getBlock(999);
++
++		expect(channel.id).toBe(42);
++		expect(channel.slug).toBe("rad-readings");
++		expect(channel.length).toBe(717);
++		expect(channel.description).toBe("Channel description");
++		expect(block.id).toBe(999);
++
++		expect(requestUrlMock).toHaveBeenNthCalledWith(
++			1,
++			expect.objectContaining({
++				url: "https://api.are.na/v3/channels/rad-readings",
++			}),
++		);
++		expect(requestUrlMock).toHaveBeenNthCalledWith(
++			2,
++			expect.objectContaining({
++				url: "https://api.are.na/v3/blocks/999",
++			}),
++		);
++	});
++});
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:43Z)**_
+
+The new v3 adapter tests are in place. I’m running lint, tests, and build to ensure the fixture is stable and regression-proof in CI.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint'
+Chunk ID: 463d10
+Wall time: 2.7412 seconds
+Process exited with code 1
+Original token count: 59
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+
+
+/home/frost/Are.na-Importer/src/__mocks__/obsidian.ts
+  12:34  error  '_params' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: e47e6e
+Wall time: 3.2027 seconds
+Process exited with code 0
+Original token count: 716
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/api.test.ts
+PASS src/__tests__/utils.test.ts
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                  
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+All files        |   12.56 |    17.78 |    9.05 |    13.2 |                                                                                                    
+ api.ts          |   29.52 |    24.57 |   48.27 |   29.61 | 19-29,39-40,78,82,89-94,99-118,122-137,141-142,148,155,162-167,174,180,209,238-295,319-440,449-512 
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                                                                               
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                                                                              
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                                                                              
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                                                                              
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-603                                                                                              
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-818                                                                                              
+ types.ts        |     100 |      100 |     100 |     100 |                                                                                                    
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245                                                             
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+
+Test Suites: 2 passed, 2 total
+Tests:       28 passed, 28 total
+Snapshots:   0 total
+Time:        2.366 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run build`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run build'
+Chunk ID: caba00
+Wall time: 2.7489 seconds
+Process exited with code 0
+Original token count: 49
+Output:
+
+> Are.na Importer@1.0.0 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
+
+Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:48Z)**_
+
+Tests/build are green and the new v3 fixture works; there’s one quick lint fix left in the Obsidian mock (`_params` unused), and I’m patching that now.
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__mocks__/obsidian.ts`**
+
+```diff
+@@
+-export async function requestUrl(_params: RequestUrlParam): Promise<{
++export async function requestUrl(_unused: RequestUrlParam): Promise<{
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `src/__mocks__/obsidian.ts`**
+
+```diff
+@@
+ export async function requestUrl(_unused: RequestUrlParam): Promise<{
+ 	status: number;
+ 	headers: Record<string, string>;
+ 	json: unknown;
+ 	arrayBuffer: ArrayBuffer;
+ }> {
++	void _unused;
+ 	throw new Error("requestUrl mock not implemented for this test");
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm run lint`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm run lint'
+Chunk ID: ed0230
+Wall time: 1.5589 seconds
+Process exited with code 0
+Original token count: 14
+Output:
+
+> Are.na Importer@1.0.0 lint
+> eslint "src/**/*.ts"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:27:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `npm test -- --runInBand`</summary>
+```
+Command: /usr/bin/zsh -lc 'npm test -- --runInBand'
+Chunk ID: 1af665
+Wall time: 1.8049 seconds
+Process exited with code 0
+Original token count: 720
+Output:
+
+> Are.na Importer@1.0.0 test
+> jest --coverage --runInBand
+
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+PASS src/__tests__/api.test.ts
+PASS src/__tests__/utils.test.ts
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+File             | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                  
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+All files        |   12.56 |    17.78 |    9.05 |    13.2 |                                                                                                    
+ api.ts          |   29.52 |    24.57 |   48.27 |   29.61 | 19-29,39-40,78,82,89-94,99-118,122-137,141-142,148,155,162-167,174,180,209,238-295,319-440,449-512 
+ diff.ts         |       0 |        0 |       0 |       0 | 3-75                                                                                               
+ main.ts         |       0 |        0 |       0 |       0 | 1-577                                                                                              
+ migration.ts    |       0 |        0 |       0 |       0 | 1-209                                                                                              
+ modals.ts       |       0 |        0 |       0 |       0 | 1-185                                                                                              
+ settings-tab.ts |       0 |        0 |       0 |       0 | 1-603                                                                                              
+ sync-engine.ts  |       0 |        0 |       0 |       0 | 1-818                                                                                              
+ types.ts        |     100 |      100 |     100 |     100 |                                                                                                    
+ utils.ts        |   87.14 |    55.21 |    90.9 |   89.05 | 85,107,110,173-176,180-183,207,233-245                                                             
+-----------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------
+
+Test Suites: 2 passed, 2 total
+Tests:       28 passed, 28 total
+Snapshots:   0 total
+Time:        1.404 s, estimated 2 s
+Ran all test suites.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:28:06Z)**_
+
+Done. I added a permanent v3 adapter regression fixture in:
+
+- [api.test.ts](/home/frost/Are.na-Importer/src/__tests__/api.test.ts)
+
+### What it tests
+- v3 paginated payload parsing:
+  - `{ data: [...], meta: { current_page, per_page, total_pages, total_count } }`
+  - verifies normalization into internal `contents/current_page/total_pages/length/per`
+- v3 single-resource unwrapping:
+  - `{ data: { ...channel } }` for `getChannel`
+  - `{ data: { ...block } }` for `getBlock`
+- endpoint/version correctness:
+  - asserts requests hit `https://api.are.na/v3/...`
+  - asserts `Authorization: Bearer <token>` header is sent
+
+### Supporting mock update
+- Expanded [obsidian.ts](/home/frost/Are.na-Importer/src/__mocks__/obsidian.ts) to include `requestUrl` and `RequestUrlParam` for API tests.
+
+### Validation
+- `npm run lint` ✅
+- `npm test -- --runInBand` ✅ (28 tests passing)
+
+---
+
+_**User (2026-03-31 03:29:23Z)**_
+
+# Context from my IDE setup:
+
+## Active file: README.md
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+zsh: parse error near `\n'
+❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:29:27Z)**_
+
+That error is expected in `zsh` because `<...>` is treated as shell redirection syntax, not text.
+
+Use one of these instead:
+
+```bash
+echo '<h1 align="center">Are.na Importer for Obsidian</h1>'
+```
+
+or if you’re editing the README, just paste the line directly into the file (not into terminal).  
+If you want to print the whole README safely:
+
+```bash
+cat README.md
+```
+
+---
+
+_**User (2026-03-31 03:30:24Z)**_
+
+# Context from my IDE setup:
+
+## Active file: README.md
+
+## Open tabs:
+- README.md: README.md
+
+## My request for Codex:
+no the terminal just starts cyling over and over now... im in vscode
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-03-31 03:30:32Z)**_
+
+You’re likely in a stuck terminal input loop. Quick reset in VS Code:
+
+1. Click the terminal and press `Ctrl + C` a few times.
+2. If it keeps repeating, kill that terminal:
+   - Terminal panel → trash can icon (`Kill Terminal`)
+3. Open a fresh one:
+   - `Terminal` → `New Terminal`
+4. If the new one is still weird, run:
+   ```bash
+   reset
+   stty sane
+   ```
+
+If it *still* auto-repeats, VS Code itself has a stuck terminal session/keybind:
+1. `Ctrl + Shift + P`
+2. Run `Developer: Reload Window`
+
+You’re not damaging anything; this is just the shell parser choking on pasted HTML input.

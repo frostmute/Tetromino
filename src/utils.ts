@@ -73,7 +73,7 @@ export function normalizeArenaUrl(url: string): string {
 	try {
 		const parsed = new URL(url);
 		if (parsed.hostname === "api.are.na") {
-			const path = parsed.pathname.replace(/^\/v2/, "");
+			const path = parsed.pathname.replace(/^\/v\d+/, "");
 			const converted = path
 				.replace(/^\/channels\/([^/]+).*$/, "/channel/$1")
 				.replace(/^\/blocks\/([^/]+).*$/, "/block/$1")

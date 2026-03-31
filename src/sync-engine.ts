@@ -381,7 +381,10 @@ export class SyncEngine {
 	): Promise<void> {
 		const indexPath = this.channelIndexPath(mapping);
 		const sorted = [...notePaths].sort();
-		const channelDescription = channel.metadata?.description?.trim();
+		const channelDescription =
+			channel.metadata?.description?.trim() ||
+			channel.description?.trim() ||
+			"";
 		const appearsInChannels = this.extractChannelAppearsIn(channel);
 		const followerCount =
 			channel.follower_count ??

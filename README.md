@@ -9,6 +9,8 @@ One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run p
 
 Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 
+API compatibility targets the current Are.na REST API v3 documentation: <https://www.are.na/developers/explore>.
+
 ## Quick Navigation
 
 - Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
