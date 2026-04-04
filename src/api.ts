@@ -387,7 +387,7 @@ export class ArenaApi {
 				console.error(
 					`[arena-sync] Error fetching page ${pageNumber} for ${slug} ` +
 						`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
-					error,
+					error instanceof Error ? error.message : String(error),
 				);
 
 				if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
