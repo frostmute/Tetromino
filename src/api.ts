@@ -261,27 +261,23 @@ export class ArenaApi {
 		throw new Error("Unexpected Are.na pagination response format");
 	}
 
+	private static readonly ERROR_MESSAGES: Record<number, string> = {
+		400: "Are.na API error: Invalid request (400). Check your channel slug and try again.",
+		401: "Are.na API error: Invalid API token (401). Please check your token in settings.",
+		403: "Are.na API error: Access denied (403). The channel may be private or you don't have permission.",
+		404: "Are.na API error: Channel not found (404). Check that the channel slug is correct.",
+		429: "Are.na API error: Rate limited (429). Too many requests — please try again later.",
+		500: "Are.na API error: Server error (500). Are.na may be temporarily unavailable.",
+		502: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+		503: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+		504: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+	};
+
 	private getErrorMessage(status: number): string {
-		switch (status) {
-			case 400:
-				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
-			case 401:
-				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
-			case 403:
-				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
-			case 404:
-				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
-			case 429:
-				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
-			case 500:
-				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
-			case 502:
-			case 503:
-			case 504:
-				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
-			default:
-				return `Are.na API error ${status}. Please try again or check Are.na status.`;
-		}
+		return (
+			ArenaApi.ERROR_MESSAGES[status] ||
+			`Are.na API error ${status}. Please try again or check Are.na status.`
+		);
 	}
 
 	async verifyToken(): Promise<boolean> {
