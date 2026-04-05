@@ -577,18 +577,22 @@ export class SyncEngine {
 			}>;
 		} = {};
 
-		if (
-			this.settings.includeBlockComments ||
-			this.settings.includeBlockConnectedChannels
-		) {
+		const needsComments =
+			this.settings.includeBlockComments &&
+			("comment_count" in block && typeof block.comment_count === "number"
+				? block.comment_count > 0
+				: true);
+		const needsChannels = this.settings.includeBlockConnectedChannels;
+
+		if (needsComments || needsChannels) {
 			const detail = await this.getBlockDetail(block.id);
-			if (detail && this.settings.includeBlockComments) {
+			if (detail && needsComments) {
 				const comments = this.extractComments(detail);
 				if (comments.length > 0) {
 					out.comments = comments;
 				}
 			}
-			if (detail && this.settings.includeBlockConnectedChannels) {
+			if (detail && needsChannels) {
 				const channels = this.extractConnectedChannels(
 					detail,
 					sourceChannelSlug,
