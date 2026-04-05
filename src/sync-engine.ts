@@ -156,6 +156,29 @@ export class SyncEngine {
 			await this.ensureFolder(channelFolder);
 		}
 
+		if (this.settings.includeChannelBlockPreviewImage) {
+			const channelSlugsToFetch = new Set<string>();
+			for (const block of blocks) {
+				if (block.class === "Channel" && !this.shouldExclude(block)) {
+					const slug = this.extractChannelSlugFromBlock(block);
+					if (slug && !this.channelPreviewCache.has(slug)) {
+						channelSlugsToFetch.add(slug);
+					}
+				}
+			}
+
+			if (channelSlugsToFetch.size > 0) {
+				const slugsArray = Array.from(channelSlugsToFetch);
+				const BATCH_SIZE = 5;
+				for (let i = 0; i < slugsArray.length; i += BATCH_SIZE) {
+					const batch = slugsArray.slice(i, i + BATCH_SIZE);
+					await Promise.all(
+						batch.map(slug => this.getChannelPreviewImage(slug))
+					);
+				}
+			}
+		}
+
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
 		for (let i = 0; i < blocks.length; i++) {
