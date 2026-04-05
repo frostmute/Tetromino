@@ -29,6 +29,7 @@ export class SyncEngine {
 	private onProgress?: ProgressHandler;
 	private blockDetailsCache = new Map<number, unknown>();
 	private channelPreviewCache = new Map<string, string | null>();
+	private folderCache = new Set<string>();
 
 	constructor(
 		app: App,
@@ -789,14 +790,24 @@ export class SyncEngine {
 
 	private async ensureFolder(path: string): Promise<void> {
 		const normalized = normalizePath(path);
+		if (this.folderCache.has(normalized)) return;
+		if (this.vault.getAbstractFileByPath(normalized)) {
+			this.folderCache.add(normalized);
+			return;
+		}
+
 		const parts = normalized.split("/").filter(Boolean);
 		let current = "";
 		for (const part of parts) {
 			current = current ? `${current}/${part}` : part;
-			if (!this.vault.getAbstractFileByPath(current)) {
-				await this.vault.createFolder(current);
+			if (!this.folderCache.has(current)) {
+				if (!this.vault.getAbstractFileByPath(current)) {
+					await this.vault.createFolder(current);
+				}
+				this.folderCache.add(current);
 			}
 		}
+		this.folderCache.add(normalized);
 	}
 
 	private markMissing(
