@@ -354,9 +354,8 @@ export class ArenaApi {
 		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			try {
-				if (pageNumber > 1 || consecutiveErrors > 0) {
-					const delayMultiplier = Math.max(1, consecutiveErrors);
-					await delay(REQUEST_DELAY * delayMultiplier + withJitter(JITTER));
+				if (pageNumber > 1 && consecutiveErrors === 0) {
+					await delay(withJitter(REQUEST_DELAY));
 				}
 				const page = await this.getChannelContents(slug, pageNumber);
 				return page;
@@ -374,6 +373,10 @@ export class ArenaApi {
 							`Last error: ${(error as Error).message}`,
 					);
 				}
+
+				await delay(
+					REQUEST_DELAY * consecutiveErrors + withJitter(JITTER),
+				);
 			}
 		}
 	}
