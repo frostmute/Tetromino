@@ -84,28 +84,30 @@ export async function buildMigrationPlan(
 			isMarkdownFile(file, channelFolder),
 		);
 
-		for (const note of noteFiles) {
-			const before = await app.vault.read(note);
-			if (!before.includes(oldPrefix)) continue;
-			const after = before.split(oldPrefix).join(newPrefix);
-			if (after === before) continue;
+		await Promise.all(
+			noteFiles.map(async (note) => {
+				const before = await app.vault.read(note);
+				if (!before.includes(oldPrefix)) return;
+				const after = before.split(oldPrefix).join(newPrefix);
+				if (after === before) return;
 
-			updates.push({
-				path: note.path,
-				before,
-				after,
-				diff: unifiedDiff(before, after, note.path, note.path),
-			});
+				updates.push({
+					path: note.path,
+					before,
+					after,
+					diff: unifiedDiff(before, after, note.path, note.path),
+				});
 
-			const paths = extractWikiPaths(before);
-			for (const p of paths) {
-				if (!p.startsWith(oldPrefix)) continue;
-				const suffix = p.slice(oldPrefix.length);
-				const from = normalizePath(p);
-				const to = normalizePath(`${toBase}/${suffix}`);
-				if (from && to) movesMap.set(from, to);
-			}
-		}
+				const paths = extractWikiPaths(before);
+				for (const p of paths) {
+					if (!p.startsWith(oldPrefix)) continue;
+					const suffix = p.slice(oldPrefix.length);
+					const from = normalizePath(p);
+					const to = normalizePath(`${toBase}/${suffix}`);
+					if (from && to) movesMap.set(from, to);
+				}
+			})
+		);
 
 		const moves = Array.from(movesMap.entries()).map(([from, to]) => ({
 			from,
