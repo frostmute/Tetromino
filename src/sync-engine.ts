@@ -81,7 +81,7 @@ export class SyncEngine {
 				aggregate.errors.push({
 					blockId: null,
 					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
+					message: err instanceof Error ? err.message : String(err),
 					recoverable: false,
 				});
 			}
