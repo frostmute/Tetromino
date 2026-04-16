@@ -37,11 +37,13 @@ export interface MigrationReport {
 	duration: number;
 }
 
+const WIKI_LINK_REGEX = /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]/g;
+
 function extractWikiPaths(content: string): string[] {
 	const paths: string[] = [];
-	const regex = /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]/g;
 	let match: RegExpExecArray | null;
-	while ((match = regex.exec(content)) !== null) {
+	WIKI_LINK_REGEX.lastIndex = 0;
+	while ((match = WIKI_LINK_REGEX.exec(content)) !== null) {
 		const raw = (match[1] || match[2] || "").trim();
 		if (!raw) continue;
 		const pipeIdx = raw.indexOf("|");
