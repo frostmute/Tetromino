@@ -398,10 +398,14 @@ export default class ArenaSyncPlugin extends Plugin {
 		const remoteChannels = await this.api.listAllMyChannels();
 		let created = 0;
 		let updated = 0;
+
+		const existingMappings = new Map<string, ChannelMapping>();
+		for (const mapping of this.settings.channelMappings) {
+			existingMappings.set(mapping.channelSlug, mapping);
+		}
+
 		for (const remote of remoteChannels) {
-			const existing = this.settings.channelMappings.find(
-				(m) => m.channelSlug === remote.slug,
-			);
+			const existing = existingMappings.get(remote.slug);
 			if (existing) {
 				const beforeId = existing.channelId;
 				const beforeTitle = existing.channelTitle;
