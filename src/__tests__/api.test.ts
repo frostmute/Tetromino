@@ -130,4 +130,54 @@ describe("ArenaApi v3 adapters", () => {
 			}),
 		);
 	});
+
+	describe("verifyToken", () => {
+		it("returns true when /me returns 200", async () => {
+			requestUrlMock.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: { data: { id: 1, slug: "me" } },
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+			const api = new ArenaApi("valid-token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(true);
+			expect(requestUrlMock).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: "https://api.are.na/v3/me",
+					headers: expect.objectContaining({
+						Authorization: "Bearer valid-token",
+					}),
+				}),
+			);
+		});
+
+		it("returns false when /me returns 401", async () => {
+			requestUrlMock.mockResolvedValueOnce({
+				status: 401,
+				headers: {},
+				json: {},
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+			const api = new ArenaApi("invalid-token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(false);
+		});
+
+		it("returns false when /me request fails after retries", async () => {
+			// Mock network error for all attempts
+			requestUrlMock.mockRejectedValue(new Error("Network Error"));
+
+			const api = new ArenaApi("token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(false);
+			// Should have tried 3 times (MAX_RETRIES)
+			expect(requestUrlMock).toHaveBeenCalledTimes(3);
+		});
+	});
 });
