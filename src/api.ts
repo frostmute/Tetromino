@@ -315,69 +315,50 @@ export class ArenaApi {
 		return this.getAllChannelBlocksWithProgress(slug, () => {});
 	}
 
-	async getAllChannelBlocksWithProgress(
+	private shouldStopPagination(
 		slug: string,
-		onPage: (currentPage: number, totalPages: number) => void,
-	): Promise<ArenaBlock[]> {
-		const blocks: ArenaBlock[] = [];
-		const seenBlockIds = new Set<number>();
-		let pageNumber = 1;
-		let hasMore = true;
-		let reportedTotalPages: number | null = null;
+		pageNumber: number,
+		reportedTotalPages: number | null,
+		pageLength: number,
+		newBlocksCount: number,
+	): boolean {
+		const emptyPage = pageLength === 0;
+		const lastPageByCount = pageLength < PER_PAGE;
+		const lastPageByTotal =
+			reportedTotalPages !== null && pageNumber >= reportedTotalPages;
+		const duplicatePage = newBlocksCount === 0 && pageLength > 0;
+
+		const stop =
+			emptyPage || lastPageByCount || lastPageByTotal || duplicatePage;
+
+		if (stop && this.debug) {
+			console.log(
+				`[arena-sync] Stopping pagination for ${slug}: ` +
+					`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
+					`blocksOnPage=${pageLength}, ` +
+					`newBlocks=${newBlocksCount}, ` +
+					`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
+			);
+		}
+
+		return stop;
+	}
+
+	private async fetchPageWithRetries(
+		slug: string,
+		pageNumber: number,
+	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
 		let consecutiveErrors = 0;
 		const MAX_CONSECUTIVE_ERRORS = 3;
 
-		while (hasMore) {
+		// eslint-disable-next-line no-constant-condition
+		while (true) {
 			try {
-				if (pageNumber > 1) {
+				if (pageNumber > 1 && consecutiveErrors === 0) {
 					await delay(withJitter(REQUEST_DELAY));
 				}
-
 				const page = await this.getChannelContents(slug, pageNumber);
-				consecutiveErrors = 0;
-
-				if (page.total_pages && page.total_pages > 0) {
-					reportedTotalPages = page.total_pages;
-				}
-
-				let newBlocksCount = 0;
-				for (const block of page.contents) {
-					if (!seenBlockIds.has(block.id)) {
-						seenBlockIds.add(block.id);
-						blocks.push(block);
-						newBlocksCount++;
-					}
-				}
-
-				onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
-
-				const emptyPage = page.contents.length === 0;
-				const lastPageByCount = page.contents.length < PER_PAGE;
-				const lastPageByTotal =
-					reportedTotalPages !== null &&
-					pageNumber >= reportedTotalPages;
-				const duplicatePage =
-					newBlocksCount === 0 && page.contents.length > 0;
-
-				if (
-					emptyPage ||
-					lastPageByCount ||
-					lastPageByTotal ||
-					duplicatePage
-				) {
-					hasMore = false;
-					if (this.debug) {
-						console.log(
-							`[arena-sync] Stopping pagination for ${slug}: ` +
-								`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
-								`blocksOnPage=${page.contents.length}, ` +
-								`newBlocks=${newBlocksCount}, ` +
-								`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
-						);
-					}
-				} else {
-					pageNumber++;
-				}
+				return page;
 			} catch (error) {
 				consecutiveErrors++;
 				console.error(
@@ -396,6 +377,50 @@ export class ArenaApi {
 				await delay(
 					REQUEST_DELAY * consecutiveErrors + withJitter(JITTER),
 				);
+			}
+		}
+	}
+
+	async getAllChannelBlocksWithProgress(
+		slug: string,
+		onPage: (currentPage: number, totalPages: number) => void,
+	): Promise<ArenaBlock[]> {
+		const blocks: ArenaBlock[] = [];
+		const seenBlockIds = new Set<number>();
+		let pageNumber = 1;
+		let hasMore = true;
+		let reportedTotalPages: number | null = null;
+
+		while (hasMore) {
+			const page = await this.fetchPageWithRetries(slug, pageNumber);
+
+			if (page.total_pages && page.total_pages > 0) {
+				reportedTotalPages = page.total_pages;
+			}
+
+			let newBlocksCount = 0;
+			for (const block of page.contents) {
+				if (!seenBlockIds.has(block.id)) {
+					seenBlockIds.add(block.id);
+					blocks.push(block);
+					newBlocksCount++;
+				}
+			}
+
+			onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
+
+			if (
+				this.shouldStopPagination(
+					slug,
+					pageNumber,
+					reportedTotalPages,
+					page.contents.length,
+					newBlocksCount,
+				)
+			) {
+				hasMore = false;
+			} else {
+				pageNumber++;
 			}
 		}
 
