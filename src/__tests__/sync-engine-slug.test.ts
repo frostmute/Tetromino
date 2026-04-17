@@ -93,6 +93,14 @@ describe("SyncEngine - extractChannelSlugFromBlock", () => {
 		expect(callExtract(block)).toBe("malformed slug");
 	});
 
+	it("should handle invalidly encoded characters gracefully", () => {
+		const block = {
+			source: { url: "://www.are.na/channel/bad%slug", title: "" }
+		};
+		// This currently might throw in the implementation
+		expect(() => callExtract(block)).not.toThrow();
+	});
+
 	it("should return null if URL does not match channel pattern", () => {
 		const block = {
 			source: { url: "https://www.are.na/block/12345", title: "" }
