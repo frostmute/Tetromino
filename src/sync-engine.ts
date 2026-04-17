@@ -625,7 +625,8 @@ export class SyncEngine {
 			const detail = await this.api.getBlock(id);
 			this.blockDetailsCache.set(id, detail);
 			return detail;
-		} catch {
+		} catch (error) {
+			console.warn(`[arena-sync] Failed to fetch block detail for ${id}:`, error);
 			this.blockDetailsCache.set(id, null);
 			return null;
 		}
@@ -750,7 +751,8 @@ export class SyncEngine {
 			const url = new URL(sourceUrl);
 			const match = url.pathname.match(/\/channel\/([^/]+)/);
 			return match?.[1] ? decodeURIComponent(match[1]) : null;
-		} catch {
+		} catch (error) {
+			console.debug(`[arena-sync] Error parsing URL ${sourceUrl}, falling back to regex:`, error);
 			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
 			return match?.[1] ? decodeURIComponent(match[1]) : null;
 		}
@@ -774,7 +776,8 @@ export class SyncEngine {
 					return url;
 				}
 			}
-		} catch {
+		} catch (error) {
+				console.warn(`[arena-sync] Failed to fetch channel preview for ${slug}:`, error);
 			// best effort only
 		}
 		this.channelPreviewCache.set(slug, null);
