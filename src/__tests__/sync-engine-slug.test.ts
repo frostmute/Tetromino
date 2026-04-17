@@ -75,13 +75,7 @@ describe("SyncEngine - extractChannelSlugFromBlock", () => {
 			source: { url: "://www.are.na/channel/malformed-slug", title: "" }
 		};
 
-		// Verify new URL throws for this string in this environment
-		try {
-			new URL("://www.are.na/channel/malformed-slug");
-			// If it doesn't throw, we need a better malformed URL for this test
-		} catch (e) {
-			// it throws as expected
-		}
+		// This URL is expected to make new URL() throw, triggering the fallback regex
 
 		expect(callExtract(block)).toBe("malformed-slug");
 	});
