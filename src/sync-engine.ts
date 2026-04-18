@@ -201,39 +201,61 @@ export class SyncEngine {
 
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
-		for (let i = 0; i < blocks.length; i++) {
-			const block = blocks[i];
-			this.onProgress?.({
-				channelSlug: mapping.channelSlug,
-				phase: "blocks",
-				current: i + 1,
-				total: blocks.length,
-			});
 
+		let completed = 0;
+		const CONCURRENCY_LIMIT = 5;
+		const workers = new Set<Promise<void>>();
+
+		for (const block of blocks) {
 			if (this.shouldExclude(block)) {
+				completed++;
 				result.skipped++;
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "blocks",
+					current: completed,
+					total: blocks.length,
+				});
 				continue;
 			}
 
-			try {
-				const path = await this.pullBlock(
-					block,
-					mapping,
-					channel,
-					result,
-					dryRun,
-				);
-				importedPaths.push(path);
-				importedBlockIds.push(block.id);
-			} catch (err) {
-				result.errors.push({
-					blockId: block.id,
-					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
-					recoverable: true,
-				});
+			const worker = (async () => {
+				try {
+					const path = await this.pullBlock(
+						block,
+						mapping,
+						channel,
+						result,
+						dryRun,
+					);
+					importedPaths.push(path);
+					importedBlockIds.push(block.id);
+				} catch (err) {
+					result.errors.push({
+						blockId: block.id,
+						channelSlug: mapping.channelSlug,
+						message: (err as Error).message,
+						recoverable: true,
+					});
+				} finally {
+					completed++;
+					this.onProgress?.({
+						channelSlug: mapping.channelSlug,
+						phase: "blocks",
+						current: completed,
+						total: blocks.length,
+					});
+				}
+			})();
+
+			workers.add(worker);
+			worker.then(() => workers.delete(worker));
+			if (workers.size >= CONCURRENCY_LIMIT) {
+				await Promise.race(workers);
 			}
 		}
+
+		await Promise.all(workers);
 
 		await this.updateChannelIndex(
 			mapping,
