@@ -19,6 +19,7 @@ import {
 	sanitiseFilename,
 } from "./utils";
 import { unifiedDiff } from "./diff";
+import { pMap } from "./utils";
 
 type ProgressHandler = (progress: ImportProgress) => void;
 
@@ -30,6 +31,7 @@ export class SyncEngine {
 	private blockDetailsCache = new Map<number, unknown>();
 	private channelPreviewCache = new Map<string, string | null>();
 	private folderCache = new Set<string>();
+	private ensureFolderMutex: Promise<void> = Promise.resolve();
 
 	constructor(
 		app: App,
@@ -62,29 +64,47 @@ export class SyncEngine {
 		};
 		const start = Date.now();
 
-		for (const mapping of this.settings.channelMappings) {
-			if (!mapping.enabled) continue;
+		const enabledMappings = this.settings.channelMappings.filter(m => m.enabled);
+
+		const results = await pMap(enabledMappings, 3, async (mapping) => {
 			try {
-				const result = await this.syncChannel(mapping, options);
-				aggregate.created += result.created;
-				aggregate.updated += result.updated;
-				aggregate.deleted += result.deleted;
-				aggregate.moved += result.moved;
-				aggregate.skipped += result.skipped;
-				aggregate.downloaded += result.downloaded;
-				aggregate.actions.push(...result.actions);
-				aggregate.moves.push(...result.moves);
-				aggregate.fileDiffs.push(...result.fileDiffs);
-				aggregate.missingPaths.push(...result.missingPaths);
-				aggregate.errors.push(...result.errors);
+				return await this.syncChannel(mapping, options);
 			} catch (err) {
-				aggregate.errors.push({
-					blockId: null,
-					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
-					recoverable: false,
-				});
+				return {
+					created: 0,
+					updated: 0,
+					deleted: 0,
+					moved: 0,
+					skipped: 0,
+					downloaded: 0,
+					dryRun,
+					actions: [],
+					moves: [],
+					fileDiffs: [],
+					missingPaths: [],
+					errors: [{
+						blockId: null,
+						channelSlug: mapping.channelSlug,
+						message: (err as Error).message,
+						recoverable: false,
+					}],
+					duration: 0,
+				};
 			}
+		});
+
+		for (const result of results) {
+			aggregate.created += result.created;
+			aggregate.updated += result.updated;
+			aggregate.deleted += result.deleted;
+			aggregate.moved += result.moved;
+			aggregate.skipped += result.skipped;
+			aggregate.downloaded += result.downloaded;
+			aggregate.actions.push(...result.actions);
+			aggregate.moves.push(...result.moves);
+			aggregate.fileDiffs.push(...result.fileDiffs);
+			aggregate.missingPaths.push(...result.missingPaths);
+			aggregate.errors.push(...result.errors);
 		}
 
 		await this.updateMasterOverview(aggregate, dryRun);
@@ -819,25 +839,35 @@ export class SyncEngine {
 	}
 
 	private async ensureFolder(path: string): Promise<void> {
-		const normalized = normalizePath(path);
-		if (this.folderCache.has(normalized)) return;
-		if (this.vault.getAbstractFileByPath(normalized)) {
-			this.folderCache.add(normalized);
-			return;
-		}
+		const release = await new Promise<() => void>((resolve) => {
+			let releaseNext: () => void;
+			this.ensureFolderMutex.then(() => resolve(releaseNext));
+			this.ensureFolderMutex = new Promise((r) => { releaseNext = r; });
+		});
 
-		const parts = normalized.split("/").filter(Boolean);
-		let current = "";
-		for (const part of parts) {
-			current = current ? `${current}/${part}` : part;
-			if (!this.folderCache.has(current)) {
-				if (!this.vault.getAbstractFileByPath(current)) {
-					await this.vault.createFolder(current);
-				}
-				this.folderCache.add(current);
+		try {
+			const normalized = normalizePath(path);
+			if (this.folderCache.has(normalized)) return;
+			if (this.vault.getAbstractFileByPath(normalized)) {
+				this.folderCache.add(normalized);
+				return;
 			}
+
+			const parts = normalized.split("/").filter(Boolean);
+			let current = "";
+			for (const part of parts) {
+				current = current ? `${current}/${part}` : part;
+				if (!this.folderCache.has(current)) {
+					if (!this.vault.getAbstractFileByPath(current)) {
+						await this.vault.createFolder(current);
+					}
+					this.folderCache.add(current);
+				}
+			}
+			this.folderCache.add(normalized);
+		} finally {
+			release();
 		}
-		this.folderCache.add(normalized);
 	}
 
 	private markMissing(
