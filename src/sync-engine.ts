@@ -199,6 +199,36 @@ export class SyncEngine {
 			}
 		}
 
+		const needsComments = this.settings.includeBlockComments;
+		const needsChannels = this.settings.includeBlockConnectedChannels;
+
+		if (needsComments || needsChannels) {
+			const blockIdsToFetch = new Set<number>();
+			for (const block of blocks) {
+				if (this.shouldExclude(block)) continue;
+
+				const blockNeedsComments = needsComments &&
+					("comment_count" in block && typeof block.comment_count === "number"
+						? block.comment_count > 0
+						: true);
+
+				if ((blockNeedsComments || needsChannels) && !this.blockDetailsCache.has(block.id)) {
+					blockIdsToFetch.add(block.id);
+				}
+			}
+
+			if (blockIdsToFetch.size > 0) {
+				const idsArray = Array.from(blockIdsToFetch);
+				const BATCH_SIZE = 5;
+				for (let i = 0; i < idsArray.length; i += BATCH_SIZE) {
+					const batch = idsArray.slice(i, i + BATCH_SIZE);
+					await Promise.all(
+						batch.map(id => this.getBlockDetail(id))
+					);
+				}
+			}
+		}
+
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
 
