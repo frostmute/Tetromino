@@ -1,7 +1,8 @@
 import { App, Vault } from "obsidian";
 import { SyncEngine } from "../sync-engine";
 import { ArenaApi } from "../api";
-import { DEFAULT_SETTINGS, ArenaChannel } from "../types";
+import { DEFAULT_SETTINGS, ArenaChannel, ArenaBlock, ChannelMapping } from "../types";
+import { makeChannel, makeBlock } from "./fixtures";
 
 jest.mock("obsidian", () => ({
 	App: jest.fn(),
@@ -70,12 +71,12 @@ describe("SyncEngine", () => {
 					channelSlug: "disabled-channel",
 					enabled: false,
 					folderPrefix: "",
-				},
+				} as ChannelMapping,
 				{
 					channelSlug: "enabled-channel",
 					enabled: true,
 					folderPrefix: "",
-				},
+				} as ChannelMapping,
 			];
 
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
@@ -98,7 +99,7 @@ describe("SyncEngine", () => {
 			});
 
 			// Mock updateMasterOverview since we just want to test syncAll logic
-			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined);
 
 			const result = await engine.syncAll();
 
@@ -121,13 +122,13 @@ describe("SyncEngine", () => {
 					channelSlug: "error-channel",
 					enabled: true,
 					folderPrefix: "",
-				},
+				} as ChannelMapping,
 			];
 
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
 
 			const syncChannelSpy = jest.spyOn(engine, "syncChannel").mockRejectedValue(new Error("API failure"));
-			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined);
 
 			const result = await engine.syncAll();
 
@@ -263,41 +264,17 @@ describe("SyncEngine", () => {
 		it("should fetch channel and call pull", async () => {
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
 
-			const channel: ArenaChannel = {
-				id: 123,
-				title: "Test Channel",
-				slug: "test-channel",
-				length: 1,
-				published: true,
-				created_at: "2026-01-01T00:00:00.000Z",
-				updated_at: "2026-01-01T00:00:00.000Z",
-				status: "public",
-				open: false,
-				collaboration: false,
-				collaborators: [],
-				follower_count: 0,
-				total_connections: 1,
-				user: {
-					id: 1,
-					slug: "tester",
-					username: "tester",
-					first_name: "Test",
-					last_name: "User",
-					avatar: "",
-					channel_count: 1,
-				},
-				metadata: null,
-			};
+			const channel = makeChannel(123, "test-channel", "Test Channel") as ArenaChannel;
 
 			mockApi.getChannel.mockResolvedValue(channel);
 
-			const pullSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "pull").mockResolvedValue(undefined);
+			const pullSpy = jest.spyOn(engine as any, "pull").mockResolvedValue(undefined);
 
 			const mapping = {
 				channelSlug: "test-channel",
 				enabled: true,
 				folderPrefix: "",
-			};
+			} as ChannelMapping;
 
 			await engine.syncChannel(mapping, { dryRun: false });
 
@@ -312,40 +289,16 @@ describe("SyncEngine", () => {
 		it("should not update mapping state if dryRun is true", async () => {
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
 
-			const channel: ArenaChannel = {
-				id: 123,
-				title: "Test Channel",
-				slug: "test-channel",
-				length: 1,
-				published: true,
-				created_at: "2026-01-01T00:00:00.000Z",
-				updated_at: "2026-01-01T00:00:00.000Z",
-				status: "public",
-				open: false,
-				collaboration: false,
-				collaborators: [],
-				follower_count: 0,
-				total_connections: 1,
-				user: {
-					id: 1,
-					slug: "tester",
-					username: "tester",
-					first_name: "Test",
-					last_name: "User",
-					avatar: "",
-					channel_count: 1,
-				},
-				metadata: null,
-			};
+			const channel = makeChannel(123, "test-channel", "Test Channel") as ArenaChannel;
 
 			mockApi.getChannel.mockResolvedValue(channel);
-			const pullSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "pull").mockResolvedValue(undefined);
+			const pullSpy = jest.spyOn(engine as any, "pull").mockResolvedValue(undefined);
 
 			const mapping = {
 				channelSlug: "test-channel",
 				enabled: true,
 				folderPrefix: "",
-			};
+			} as ChannelMapping;
 
 			await engine.syncChannel(mapping, { dryRun: true });
 
@@ -354,6 +307,54 @@ describe("SyncEngine", () => {
 			expect(mapping).not.toHaveProperty("lastSyncedAt");
 
 			pullSpy.mockRestore();
+		});
+
+		it("should capture recoverable errors when pullBlock fails", async () => {
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+
+			const channel = makeChannel(123, "test-channel", "Test Channel") as ArenaChannel;
+
+			const blocks = [
+				makeBlock(1),
+				makeBlock(2),
+			] as ArenaBlock[];
+
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
+
+			const pullBlockSpy = jest.spyOn(engine as any, "pullBlock");
+			pullBlockSpy.mockImplementation(async (block: ArenaBlock) => {
+				if (block.id === 1) {
+					throw new Error("Failed to pull block 1");
+				}
+				return "path/to/block2";
+			});
+
+			// Mock other private methods that might be called
+			const updateChannelIndexSpy = jest.spyOn(engine as any, "updateChannelIndex").mockResolvedValue(undefined);
+			const markMissingSpy = jest.spyOn(engine as any, "markMissing").mockImplementation(() => {});
+			const ensureFolderSpy = jest.spyOn(engine as any, "ensureFolder").mockResolvedValue(undefined);
+
+			const mapping = {
+				channelSlug: "test-channel",
+				enabled: true,
+				folderPrefix: "",
+			} as ChannelMapping;
+
+			const result = await engine.syncChannel(mapping);
+
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0]).toEqual({
+				blockId: 1,
+				channelSlug: "test-channel",
+				message: "Failed to pull block 1",
+				recoverable: true,
+			});
+
+			pullBlockSpy.mockRestore();
+			updateChannelIndexSpy.mockRestore();
+			markMissingSpy.mockRestore();
+			ensureFolderSpy.mockRestore();
 		});
 	});
 });
