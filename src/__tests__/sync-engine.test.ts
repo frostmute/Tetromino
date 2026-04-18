@@ -143,6 +143,120 @@ describe("SyncEngine", () => {
 			syncChannelSpy.mockRestore();
 			updateMasterOverviewSpy.mockRestore();
 		});
+
+		it("should handle multiple channels and aggregate results and errors", async () => {
+			defaultSettings.channelMappings = [
+				{
+					channelSlug: "success-channel",
+					enabled: true,
+					folderPrefix: "",
+				},
+				{
+					channelSlug: "fail-channel",
+					enabled: true,
+					folderPrefix: "",
+				},
+				{
+					channelSlug: "another-success-channel",
+					enabled: true,
+					folderPrefix: "",
+				},
+			];
+
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+
+			const syncChannelSpy = jest.spyOn(engine, "syncChannel");
+			syncChannelSpy
+				.mockResolvedValueOnce({
+					created: 1, updated: 0, deleted: 0, moved: 0, skipped: 0, downloaded: 0,
+					dryRun: false, actions: ["success 1"], moves: [], fileDiffs: [], missingPaths: [], errors: [], duration: 5
+				})
+				.mockRejectedValueOnce(new Error("Channel failure"))
+				.mockResolvedValueOnce({
+					created: 2, updated: 0, deleted: 0, moved: 0, skipped: 0, downloaded: 0,
+					dryRun: false, actions: ["success 2"], moves: [], fileDiffs: [], missingPaths: [], errors: [], duration: 5
+				});
+
+			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+
+			const result = await engine.syncAll();
+
+			expect(syncChannelSpy).toHaveBeenCalledTimes(3);
+			expect(result.created).toBe(3); // 1 + 2
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].channelSlug).toBe("fail-channel");
+			expect(result.errors[0].message).toBe("Channel failure");
+			expect(result.actions).toContain("success 1");
+			expect(result.actions).toContain("success 2");
+
+			expect(updateMasterOverviewSpy).toHaveBeenCalled();
+
+			syncChannelSpy.mockRestore();
+			updateMasterOverviewSpy.mockRestore();
+		});
+
+		it("should handle non-Error exceptions gracefully", async () => {
+			defaultSettings.channelMappings = [
+				{
+					channelSlug: "string-error-channel",
+					enabled: true,
+					folderPrefix: "",
+				},
+			];
+
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+
+			// Mock syncChannel to throw a string instead of an Error object
+			const syncChannelSpy = jest.spyOn(engine, "syncChannel").mockRejectedValue("Literal string error");
+			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+
+			const result = await engine.syncAll();
+
+			expect(result.errors).toHaveLength(1);
+			// Currently, it handles it via (err as Error).message which might be undefined for strings
+			// We expect it to be handled better in the next step of the plan
+			expect(result.errors[0].channelSlug).toBe("string-error-channel");
+			expect(result.errors[0].message).toBe("Literal string error");
+
+			syncChannelSpy.mockRestore();
+			updateMasterOverviewSpy.mockRestore();
+		});
+
+		it("should aggregate errors returned from syncChannel (non-throwing)", async () => {
+			defaultSettings.channelMappings = [
+				{
+					channelSlug: "partial-error-channel",
+					enabled: true,
+					folderPrefix: "",
+				},
+			];
+
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+
+			const syncChannelSpy = jest.spyOn(engine, "syncChannel").mockResolvedValue({
+				created: 0, updated: 0, deleted: 0, moved: 0, skipped: 0, downloaded: 0,
+				dryRun: false, actions: [], moves: [], fileDiffs: [], missingPaths: [],
+				errors: [
+					{
+						blockId: 123,
+						channelSlug: "partial-error-channel",
+						message: "Block failed",
+						recoverable: true,
+					}
+				],
+				duration: 5
+			});
+			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+
+			const result = await engine.syncAll();
+
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].blockId).toBe(123);
+			expect(result.errors[0].message).toBe("Block failed");
+
+			syncChannelSpy.mockRestore();
+			updateMasterOverviewSpy.mockRestore();
+		});
 	});
 
 	describe("syncChannel", () => {
