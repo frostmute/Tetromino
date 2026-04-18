@@ -32,18 +32,8 @@ function makeBlock(id: number): ArenaBlock {
 }
 
 describe("ArenaApi v3 adapters", () => {
-	const requestUrlMock = jest.spyOn(obsidian, "requestUrl");
-
-	beforeEach(() => {
-		requestUrlMock.mockReset();
-	});
-
-	afterAll(() => {
-		requestUrlMock.mockRestore();
-	});
-
 	it("parses v3 data/meta payloads for channel contents", async () => {
-		requestUrlMock.mockResolvedValueOnce({
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce({
 			status: 200,
 			headers: {},
 			json: {
@@ -76,10 +66,11 @@ describe("ArenaApi v3 adapters", () => {
 				}),
 			}),
 		);
+		requestUrlMock.mockRestore();
 	});
 
 	it("unwraps v3 data payloads for single resources", async () => {
-		requestUrlMock
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl")
 			.mockResolvedValueOnce({
 				status: 200,
 				headers: {},
@@ -129,5 +120,81 @@ describe("ArenaApi v3 adapters", () => {
 				url: "https://api.are.na/v3/blocks/999",
 			}),
 		);
+		requestUrlMock.mockRestore();
+	});
+});
+
+describe("ArenaApi security", () => {
+	it("downloadBinary should NOT include Authorization header", async () => {
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			json: {},
+			arrayBuffer: new ArrayBuffer(0),
+		});
+
+		const api = new ArenaApi("secret-token");
+		const url = "https://external-asset.com/image.png";
+		await api.downloadBinary(url);
+
+		expect(requestUrlMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				url: url,
+				headers: expect.not.objectContaining({
+					Authorization: expect.any(String),
+				}),
+			}),
+		);
+		requestUrlMock.mockRestore();
+	});
+
+	describe("verifyToken", () => {
+		it("returns true when /me returns 200", async () => {
+			requestUrlMock.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: { data: { id: 1, slug: "me" } },
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+			const api = new ArenaApi("valid-token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(true);
+			expect(requestUrlMock).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: "https://api.are.na/v3/me",
+					headers: expect.objectContaining({
+						Authorization: "Bearer valid-token",
+					}),
+				}),
+			);
+		});
+
+		it("returns false when /me returns 401", async () => {
+			requestUrlMock.mockResolvedValueOnce({
+				status: 401,
+				headers: {},
+				json: {},
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+			const api = new ArenaApi("invalid-token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(false);
+		});
+
+		it("returns false when /me request fails after retries", async () => {
+			// Mock network error for all attempts
+			requestUrlMock.mockRejectedValue(new Error("Network Error"));
+
+			const api = new ArenaApi("token");
+			const isValid = await api.verifyToken();
+
+			expect(isValid).toBe(false);
+			// Should have tried 3 times (MAX_RETRIES)
+			expect(requestUrlMock).toHaveBeenCalledTimes(3);
+		});
 	});
 });

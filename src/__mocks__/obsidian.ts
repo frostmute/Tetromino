@@ -18,3 +18,20 @@ export async function requestUrl(_unused: RequestUrlParam): Promise<{
 	void _unused;
 	throw new Error("requestUrl mock not implemented for this test");
 }
+
+export class TFile {
+	path: string;
+	name: string;
+	basename: string;
+	extension: string;
+	constructor() {}
+}
+
+export class App {
+    vault: Vault;
+    constructor() {}
+}
+
+export class Vault {
+    constructor() {}
+}

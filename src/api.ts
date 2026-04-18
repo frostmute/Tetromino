@@ -10,36 +10,31 @@ const BASE_URL = "https://api.are.na";
 const API_VERSION_PREFIX = "/v3";
 const PER_PAGE = 100;
 const MAX_RETRIES = 3;
-const REQUEST_DELAY = 100; // ms between requests
-const JITTER = 50; // ms
 const RATE_LIMIT_STATUS = 429;
+const REQUEST_DELAY = 100;
+const JITTER = 50;
+
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function withJitter(baseDelay: number): number {
-	return baseDelay + Math.random() * JITTER;
+function withJitter(ms: number): number {
+	return ms + Math.floor(Math.random() * JITTER);
 }
 
-function transientBackoffMs(attempt: number): number {
-	// 1s, 2s, 4s ... plus jitter.
-	const base = 1000 * Math.pow(2, Math.max(0, attempt - 1));
-	return Math.round(withJitter(base));
+function transientBackoffMs(attempts: number): number {
+	return Math.min(1000 * Math.pow(2, attempts), 10000) + withJitter(0);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
+function isRecord(val: unknown): val is Record<string, unknown> {
+	return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
-function asNumber(value: unknown): number | null {
-	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (typeof value === "string" && value.trim()) {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) return parsed;
-	}
-	return null;
+function asNumber(val: unknown): number | null {
+	const n = typeof val === "string" ? parseInt(val, 10) : val;
+	return typeof n === "number" && !isNaN(n) ? n : null;
 }
 
 export class ArenaApi {
@@ -97,49 +92,36 @@ export class ArenaApi {
 			// Handle rate limiting with exponential backoff
 			if (res.status === RATE_LIMIT_STATUS) {
 				const retryAfter = this.readRetryAfterSeconds(res.headers);
-				const backoffMs = retryAfter * 1000;
 				attempts++;
 
 				if (attempts >= MAX_RETRIES) {
-					throw new Error(
-						`Are.na API rate limited (429). Max retries exceeded. ` +
-							`Try again in ${retryAfter} seconds.`,
-					);
+					throw new Error(this.getErrorMessage(RATE_LIMIT_STATUS));
 				}
 
 				if (this.debug) {
 					console.log(
-						`[arena-sync] Rate limited. Retrying after ${retryAfter}s ` +
+						`[arena-sync] Rate limited (429). ` +
+							`Retrying after ${retryAfter}s ` +
 							`(attempt ${attempts}/${MAX_RETRIES})`,
 					);
 				}
 
-				await delay(backoffMs);
+				await delay(retryAfter * 1000);
 				continue;
 			}
 
+			// Handle transient server errors
 			if (TRANSIENT_STATUSES.has(res.status)) {
 				attempts++;
 				if (attempts >= MAX_RETRIES) {
-					throw new Error(
-						`Are.na API temporary failure (${res.status}). ` +
-							`Max retries exceeded.`,
-					);
+					throw new Error(this.getErrorMessage(res.status));
 				}
-				const backoffMs = transientBackoffMs(attempts);
-				if (this.debug) {
-					console.log(
-						`[arena-sync] ${res.status} retry in ${backoffMs}ms ` +
-							`(attempt ${attempts}/${MAX_RETRIES})`,
-					);
-				}
-				await delay(backoffMs);
+				await delay(transientBackoffMs(attempts));
 				continue;
 			}
 
 			if (res.status < 200 || res.status >= 300) {
-				const errorMessage = this.getErrorMessage(res.status);
-				throw new Error(errorMessage);
+				throw new Error(this.getErrorMessage(res.status));
 			}
 
 			return res.json as T;
@@ -261,27 +243,23 @@ export class ArenaApi {
 		throw new Error("Unexpected Are.na pagination response format");
 	}
 
+	private static readonly ERROR_MESSAGES: Record<number, string> = {
+		400: "Are.na API error: Invalid request (400). Check your channel slug and try again.",
+		401: "Are.na API error: Invalid API token (401). Please check your token in settings.",
+		403: "Are.na API error: Access denied (403). The channel may be private or you don't have permission.",
+		404: "Are.na API error: Channel not found (404). Check that the channel slug is correct.",
+		429: "Are.na API error: Rate limited (429). Too many requests — please try again later.",
+		500: "Are.na API error: Server error (500). Are.na may be temporarily unavailable.",
+		502: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+		503: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+		504: "Are.na API error: Service unavailable. Are.na may be down for maintenance.",
+	};
+
 	private getErrorMessage(status: number): string {
-		switch (status) {
-			case 400:
-				return "Are.na API error: Invalid request (400). Check your channel slug and try again.";
-			case 401:
-				return "Are.na API error: Invalid API token (401). Please check your token in settings.";
-			case 403:
-				return "Are.na API error: Access denied (403). The channel may be private or you don't have permission.";
-			case 404:
-				return "Are.na API error: Channel not found (404). Check that the channel slug is correct.";
-			case 429:
-				return "Are.na API error: Rate limited (429). Too many requests — please try again later.";
-			case 500:
-				return "Are.na API error: Server error (500). Are.na may be temporarily unavailable.";
-			case 502:
-			case 503:
-			case 504:
-				return "Are.na API error: Service unavailable. Are.na may be down for maintenance.";
-			default:
-				return `Are.na API error ${status}. Please try again or check Are.na status.`;
-		}
+		return (
+			ArenaApi.ERROR_MESSAGES[status] ||
+			`Are.na API error ${status}. Please try again or check Are.na status.`
+		);
 	}
 
 	async verifyToken(): Promise<boolean> {
@@ -319,75 +297,56 @@ export class ArenaApi {
 		return this.getAllChannelBlocksWithProgress(slug, () => {});
 	}
 
-	async getAllChannelBlocksWithProgress(
+	private shouldStopPagination(
 		slug: string,
-		onPage: (currentPage: number, totalPages: number) => void,
-	): Promise<ArenaBlock[]> {
-		const blocks: ArenaBlock[] = [];
-		const seenBlockIds = new Set<number>();
-		let pageNumber = 1;
-		let hasMore = true;
-		let reportedTotalPages: number | null = null;
+		pageNumber: number,
+		reportedTotalPages: number | null,
+		pageLength: number,
+		newBlocksCount: number,
+	): boolean {
+		const emptyPage = pageLength === 0;
+		const lastPageByCount = pageLength < PER_PAGE;
+		const lastPageByTotal =
+			reportedTotalPages !== null && pageNumber >= reportedTotalPages;
+		const duplicatePage = newBlocksCount === 0 && pageLength > 0;
+
+		const stop =
+			emptyPage || lastPageByCount || lastPageByTotal || duplicatePage;
+
+		if (stop && this.debug) {
+			console.log(
+				`[arena-sync] Stopping pagination for ${slug}: ` +
+					`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
+					`blocksOnPage=${pageLength}, ` +
+					`newBlocks=${newBlocksCount}, ` +
+					`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
+			);
+		}
+
+		return stop;
+	}
+
+	private async fetchPageWithRetries(
+		slug: string,
+		pageNumber: number,
+	): Promise<ArenaPaginatedResponse<ArenaBlock>> {
 		let consecutiveErrors = 0;
 		const MAX_CONSECUTIVE_ERRORS = 3;
 
-		while (hasMore) {
+		// eslint-disable-next-line no-constant-condition
+		while (true) {
 			try {
-				if (pageNumber > 1) {
+				if (pageNumber > 1 && consecutiveErrors === 0) {
 					await delay(withJitter(REQUEST_DELAY));
 				}
-
 				const page = await this.getChannelContents(slug, pageNumber);
-				consecutiveErrors = 0;
-
-				if (page.total_pages && page.total_pages > 0) {
-					reportedTotalPages = page.total_pages;
-				}
-
-				let newBlocksCount = 0;
-				for (const block of page.contents) {
-					if (!seenBlockIds.has(block.id)) {
-						seenBlockIds.add(block.id);
-						blocks.push(block);
-						newBlocksCount++;
-					}
-				}
-
-				onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
-
-				const emptyPage = page.contents.length === 0;
-				const lastPageByCount = page.contents.length < PER_PAGE;
-				const lastPageByTotal =
-					reportedTotalPages !== null &&
-					pageNumber >= reportedTotalPages;
-				const duplicatePage =
-					newBlocksCount === 0 && page.contents.length > 0;
-
-				if (
-					emptyPage ||
-					lastPageByCount ||
-					lastPageByTotal ||
-					duplicatePage
-				) {
-					hasMore = false;
-					if (this.debug) {
-						console.log(
-							`[arena-sync] Stopping pagination for ${slug}: ` +
-								`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
-								`blocksOnPage=${page.contents.length}, ` +
-								`newBlocks=${newBlocksCount}, ` +
-								`reason=${emptyPage ? "empty" : lastPageByCount ? "partial" : lastPageByTotal ? "total" : "duplicates"}`,
-						);
-					}
-				} else {
-					pageNumber++;
-				}
+				return page;
 			} catch (error) {
 				consecutiveErrors++;
 				console.error(
 					`[arena-sync] Error fetching page ${pageNumber} for ${slug} ` +
 						`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
-					error,
+					error instanceof Error ? error.message : String(error),
 				);
 
 				if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
@@ -400,6 +359,50 @@ export class ArenaApi {
 				await delay(
 					REQUEST_DELAY * consecutiveErrors + withJitter(JITTER),
 				);
+			}
+		}
+	}
+
+	async getAllChannelBlocksWithProgress(
+		slug: string,
+		onPage: (currentPage: number, totalPages: number) => void,
+	): Promise<ArenaBlock[]> {
+		const blocks: ArenaBlock[] = [];
+		const seenBlockIds = new Set<number>();
+		let pageNumber = 1;
+		let hasMore = true;
+		let reportedTotalPages: number | null = null;
+
+		while (hasMore) {
+			const page = await this.fetchPageWithRetries(slug, pageNumber);
+
+			if (page.total_pages && page.total_pages > 0) {
+				reportedTotalPages = page.total_pages;
+			}
+
+			let newBlocksCount = 0;
+			for (const block of page.contents) {
+				if (!seenBlockIds.has(block.id)) {
+					seenBlockIds.add(block.id);
+					blocks.push(block);
+					newBlocksCount++;
+				}
+			}
+
+			onPage(pageNumber, reportedTotalPages ?? pageNumber + 1);
+
+			if (
+				this.shouldStopPagination(
+					slug,
+					pageNumber,
+					reportedTotalPages,
+					page.contents.length,
+					newBlocksCount,
+				)
+			) {
+				hasMore = false;
+			} else {
+				pageNumber++;
 			}
 		}
 
@@ -454,7 +457,7 @@ export class ArenaApi {
 				res = await requestUrl({
 					url,
 					method: "GET",
-					headers: this.headers(),
+					headers: {},
 				});
 			} catch (err) {
 				attempts++;

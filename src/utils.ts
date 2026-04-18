@@ -297,3 +297,23 @@ export function blockFileName(
 			return `${safeTitle} (${block.id}).md`;
 	}
 }
+
+
+export async function pMap<T, R>(
+	items: T[],
+	limit: number,
+	fn: (item: T) => Promise<R>
+): Promise<R[]> {
+	const results: R[] = new Array(items.length);
+	let i = 0;
+
+	const workers = new Array(Math.min(items.length, limit)).fill(0).map(async () => {
+		while (i < items.length) {
+			const index = i++;
+			results[index] = await fn(items[index]);
+		}
+	});
+
+	await Promise.all(workers);
+	return results;
+}

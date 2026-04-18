@@ -5,6 +5,7 @@ import {
 	markdownToBlockContent,
 	normalizeArenaUrl,
 	resolveChannelFolder,
+	resolveAttachmentBaseFolder,
 	sanitiseFilename,
 } from "../utils";
 import type {ArenaBlock, ArenaSyncSettings} from "../types";
@@ -336,5 +337,84 @@ describe("resolveChannelFolder", () => {
 				enabled: true,
 			}),
 		).toBe("Custom/Wherever");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  resolveAttachmentBaseFolder,                                       */
+/* ------------------------------------------------------------------ */
+
+describe("resolveAttachmentBaseFolder,", () => {
+	const baseSettings = { ...DEFAULT_SETTINGS };
+	const baseMapping = {
+		channelSlug: "test-channel",
+		channelId: 1,
+		channelTitle: "Test Channel",
+		localFolder: "",
+		lastSyncedAt: null,
+		enabled: true,
+	};
+
+	it("uses global attachment folder by default (global mode)", () => {
+		const result = resolveAttachmentBaseFolder(baseSettings, baseMapping);
+		expect(result).toBe("Are.na/Attachments");
+	});
+
+	it("uses channel folder + _attachments when storage is channel", () => {
+		const s = { ...baseSettings, attachmentStorage: "channel" as const };
+		const result = resolveAttachmentBaseFolder(s, baseMapping);
+		expect(result).toBe("Are.na/test-channel/_attachments");
+	});
+
+	it("uses explicit local folder + _attachments when storage is channel", () => {
+		const s = { ...baseSettings, attachmentStorage: "channel" as const };
+		const m = { ...baseMapping, localFolder: "Custom/Path" };
+		const result = resolveAttachmentBaseFolder(s, m);
+		expect(result).toBe("Custom/Path/_attachments");
+	});
+
+	it("uses custom attachment folder when storage is custom", () => {
+		const s = {
+			...baseSettings,
+			attachmentStorage: "custom" as const,
+			customAttachmentFolder: "Custom/Assets",
+		};
+		const result = resolveAttachmentBaseFolder(s, baseMapping);
+		expect(result).toBe("Custom/Assets");
+	});
+
+	it("falls back to global folder if custom storage has no folder defined", () => {
+		const s = {
+			...baseSettings,
+			attachmentStorage: "custom" as const,
+			customAttachmentFolder: "", // empty
+		};
+		const result = resolveAttachmentBaseFolder(s, baseMapping);
+		expect(result).toBe("Are.na/Attachments");
+	});
+
+	it("uses mapping override for attachment storage", () => {
+		// Global setting is 'global', but mapping overrides to 'channel'
+		const m = {
+			...baseMapping,
+			attachmentStorageOverride: "channel" as const,
+		};
+		const result = resolveAttachmentBaseFolder(baseSettings, m);
+		expect(result).toBe("Are.na/test-channel/_attachments");
+	});
+
+	it("uses mapping override for custom attachment folder", () => {
+		const s = {
+			...baseSettings,
+			attachmentStorage: "custom" as const,
+			customAttachmentFolder: "Default/Custom",
+		};
+		const m = {
+			...baseMapping,
+			attachmentStorageOverride: "custom" as const,
+			customAttachmentFolderOverride: "Specific/Override",
+		};
+		const result = resolveAttachmentBaseFolder(s, m);
+		expect(result).toBe("Specific/Override");
 	});
 });
