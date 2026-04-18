@@ -19,6 +19,7 @@ import {
 	sanitiseFilename,
 } from "./utils";
 import { unifiedDiff } from "./diff";
+import { pMap } from "./utils";
 
 type ProgressHandler = (progress: ImportProgress) => void;
 
@@ -30,6 +31,7 @@ export class SyncEngine {
 	private blockDetailsCache = new Map<number, unknown>();
 	private channelPreviewCache = new Map<string, string | null>();
 	private folderCache = new Set<string>();
+	private ensureFolderMutex: Promise<void> = Promise.resolve();
 
 	constructor(
 		app: App,
@@ -62,29 +64,47 @@ export class SyncEngine {
 		};
 		const start = Date.now();
 
-		for (const mapping of this.settings.channelMappings) {
-			if (!mapping.enabled) continue;
+		const enabledMappings = this.settings.channelMappings.filter(m => m.enabled);
+
+		const results = await pMap(enabledMappings, 3, async (mapping) => {
 			try {
-				const result = await this.syncChannel(mapping, options);
-				aggregate.created += result.created;
-				aggregate.updated += result.updated;
-				aggregate.deleted += result.deleted;
-				aggregate.moved += result.moved;
-				aggregate.skipped += result.skipped;
-				aggregate.downloaded += result.downloaded;
-				aggregate.actions.push(...result.actions);
-				aggregate.moves.push(...result.moves);
-				aggregate.fileDiffs.push(...result.fileDiffs);
-				aggregate.missingPaths.push(...result.missingPaths);
-				aggregate.errors.push(...result.errors);
+				return await this.syncChannel(mapping, options);
 			} catch (err) {
-				aggregate.errors.push({
-					blockId: null,
-					channelSlug: mapping.channelSlug,
-					message: err instanceof Error ? err.message : String(err),
-					recoverable: false,
-				});
+				return {
+					created: 0,
+					updated: 0,
+					deleted: 0,
+					moved: 0,
+					skipped: 0,
+					downloaded: 0,
+					dryRun,
+					actions: [],
+					moves: [],
+					fileDiffs: [],
+					missingPaths: [],
+					errors: [{
+						blockId: null,
+						channelSlug: mapping.channelSlug,
+						message: (err as Error).message,
+						recoverable: false,
+					}],
+					duration: 0,
+				};
 			}
+		});
+
+		for (const result of results) {
+			aggregate.created += result.created;
+			aggregate.updated += result.updated;
+			aggregate.deleted += result.deleted;
+			aggregate.moved += result.moved;
+			aggregate.skipped += result.skipped;
+			aggregate.downloaded += result.downloaded;
+			aggregate.actions.push(...result.actions);
+			aggregate.moves.push(...result.moves);
+			aggregate.fileDiffs.push(...result.fileDiffs);
+			aggregate.missingPaths.push(...result.missingPaths);
+			aggregate.errors.push(...result.errors);
 		}
 
 		await this.updateMasterOverview(aggregate, dryRun);
@@ -181,39 +201,61 @@ export class SyncEngine {
 
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
-		for (let i = 0; i < blocks.length; i++) {
-			const block = blocks[i];
-			this.onProgress?.({
-				channelSlug: mapping.channelSlug,
-				phase: "blocks",
-				current: i + 1,
-				total: blocks.length,
-			});
 
+		let completed = 0;
+		const CONCURRENCY_LIMIT = 5;
+		const workers = new Set<Promise<void>>();
+
+		for (const block of blocks) {
 			if (this.shouldExclude(block)) {
+				completed++;
 				result.skipped++;
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "blocks",
+					current: completed,
+					total: blocks.length,
+				});
 				continue;
 			}
 
-			try {
-				const path = await this.pullBlock(
-					block,
-					mapping,
-					channel,
-					result,
-					dryRun,
-				);
-				importedPaths.push(path);
-				importedBlockIds.push(block.id);
-			} catch (err) {
-				result.errors.push({
-					blockId: block.id,
-					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
-					recoverable: true,
-				});
+			const worker = (async () => {
+				try {
+					const path = await this.pullBlock(
+						block,
+						mapping,
+						channel,
+						result,
+						dryRun,
+					);
+					importedPaths.push(path);
+					importedBlockIds.push(block.id);
+				} catch (err) {
+					result.errors.push({
+						blockId: block.id,
+						channelSlug: mapping.channelSlug,
+						message: (err as Error).message,
+						recoverable: true,
+					});
+				} finally {
+					completed++;
+					this.onProgress?.({
+						channelSlug: mapping.channelSlug,
+						phase: "blocks",
+						current: completed,
+						total: blocks.length,
+					});
+				}
+			})();
+
+			workers.add(worker);
+			worker.then(() => workers.delete(worker));
+			if (workers.size >= CONCURRENCY_LIMIT) {
+				await Promise.race(workers);
 			}
 		}
+
+		await Promise.all(workers);
 
 		await this.updateChannelIndex(
 			mapping,
@@ -625,7 +667,8 @@ export class SyncEngine {
 			const detail = await this.api.getBlock(id);
 			this.blockDetailsCache.set(id, detail);
 			return detail;
-		} catch {
+		} catch (error) {
+			console.warn(`[arena-sync] Failed to fetch block detail for ${id}:`, error);
 			this.blockDetailsCache.set(id, null);
 			return null;
 		}
@@ -750,7 +793,8 @@ export class SyncEngine {
 			const url = new URL(sourceUrl);
 			const match = url.pathname.match(/\/channel\/([^/]+)/);
 			return match?.[1] ? decodeURIComponent(match[1]) : null;
-		} catch {
+		} catch (error) {
+			console.debug(`[arena-sync] Error parsing URL ${sourceUrl}, falling back to regex:`, error);
 			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
 			return match?.[1] ? decodeURIComponent(match[1]) : null;
 		}
@@ -774,7 +818,8 @@ export class SyncEngine {
 					return url;
 				}
 			}
-		} catch {
+		} catch (error) {
+				console.warn(`[arena-sync] Failed to fetch channel preview for ${slug}:`, error);
 			// best effort only
 		}
 		this.channelPreviewCache.set(slug, null);
@@ -816,25 +861,35 @@ export class SyncEngine {
 	}
 
 	private async ensureFolder(path: string): Promise<void> {
-		const normalized = normalizePath(path);
-		if (this.folderCache.has(normalized)) return;
-		if (this.vault.getAbstractFileByPath(normalized)) {
-			this.folderCache.add(normalized);
-			return;
-		}
+		const release = await new Promise<() => void>((resolve) => {
+			let releaseNext: () => void;
+			this.ensureFolderMutex.then(() => resolve(releaseNext));
+			this.ensureFolderMutex = new Promise((r) => { releaseNext = r; });
+		});
 
-		const parts = normalized.split("/").filter(Boolean);
-		let current = "";
-		for (const part of parts) {
-			current = current ? `${current}/${part}` : part;
-			if (!this.folderCache.has(current)) {
-				if (!this.vault.getAbstractFileByPath(current)) {
-					await this.vault.createFolder(current);
-				}
-				this.folderCache.add(current);
+		try {
+			const normalized = normalizePath(path);
+			if (this.folderCache.has(normalized)) return;
+			if (this.vault.getAbstractFileByPath(normalized)) {
+				this.folderCache.add(normalized);
+				return;
 			}
+
+			const parts = normalized.split("/").filter(Boolean);
+			let current = "";
+			for (const part of parts) {
+				current = current ? `${current}/${part}` : part;
+				if (!this.folderCache.has(current)) {
+					if (!this.vault.getAbstractFileByPath(current)) {
+						await this.vault.createFolder(current);
+					}
+					this.folderCache.add(current);
+				}
+			}
+			this.folderCache.add(normalized);
+		} finally {
+			release();
 		}
-		this.folderCache.add(normalized);
 	}
 
 	private markMissing(
