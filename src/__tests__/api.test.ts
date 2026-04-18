@@ -32,18 +32,8 @@ function makeBlock(id: number): ArenaBlock {
 }
 
 describe("ArenaApi v3 adapters", () => {
-	const requestUrlMock = jest.spyOn(obsidian, "requestUrl");
-
-	beforeEach(() => {
-		requestUrlMock.mockReset();
-	});
-
-	afterAll(() => {
-		requestUrlMock.mockRestore();
-	});
-
 	it("parses v3 data/meta payloads for channel contents", async () => {
-		requestUrlMock.mockResolvedValueOnce({
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce({
 			status: 200,
 			headers: {},
 			json: {
@@ -76,10 +66,11 @@ describe("ArenaApi v3 adapters", () => {
 				}),
 			}),
 		);
+		requestUrlMock.mockRestore();
 	});
 
 	it("unwraps v3 data payloads for single resources", async () => {
-		requestUrlMock
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl")
 			.mockResolvedValueOnce({
 				status: 200,
 				headers: {},
@@ -129,6 +120,32 @@ describe("ArenaApi v3 adapters", () => {
 				url: "https://api.are.na/v3/blocks/999",
 			}),
 		);
+		requestUrlMock.mockRestore();
+	});
+});
+
+describe("ArenaApi security", () => {
+	it("downloadBinary should NOT include Authorization header", async () => {
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			json: {},
+			arrayBuffer: new ArrayBuffer(0),
+		});
+
+		const api = new ArenaApi("secret-token");
+		const url = "https://external-asset.com/image.png";
+		await api.downloadBinary(url);
+
+		expect(requestUrlMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				url: url,
+				headers: expect.not.objectContaining({
+					Authorization: expect.any(String),
+				}),
+			}),
+		);
+		requestUrlMock.mockRestore();
 	});
 
 	describe("verifyToken", () => {
