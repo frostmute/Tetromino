@@ -188,9 +188,9 @@ export class SyncEngine {
 			}
 
 			if (channelSlugsToFetch.size > 0) {
-				await pMap(Array.from(channelSlugsToFetch), 5, slug =>
-					this.getChannelPreviewImage(slug),
-				);
+await pMap([...channelSlugsToFetch], 5, slug =>
+	this.getChannelPreviewImage(slug),
+);
 			}
 		}
 
