@@ -213,9 +213,9 @@ await pMap([...channelSlugsToFetch], 5, slug =>
 			}
 
 			if (blockIdsToFetch.size > 0) {
-				await pMap(Array.from(blockIdsToFetch), 5, id =>
-					this.getBlockDetail(id),
-				);
+await pMap([...blockIdsToFetch], 5, id =>
+	this.getBlockDetail(id),
+);
 			}
 		}
 
