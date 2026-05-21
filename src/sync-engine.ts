@@ -188,14 +188,9 @@ export class SyncEngine {
 			}
 
 			if (channelSlugsToFetch.size > 0) {
-				const slugsArray = Array.from(channelSlugsToFetch);
-				const BATCH_SIZE = 5;
-				for (let i = 0; i < slugsArray.length; i += BATCH_SIZE) {
-					const batch = slugsArray.slice(i, i + BATCH_SIZE);
-					await Promise.all(
-						batch.map(slug => this.getChannelPreviewImage(slug))
-					);
-				}
+await pMap([...channelSlugsToFetch], 5, slug =>
+	this.getChannelPreviewImage(slug),
+);
 			}
 		}
 
@@ -218,14 +213,9 @@ export class SyncEngine {
 			}
 
 			if (blockIdsToFetch.size > 0) {
-				const idsArray = Array.from(blockIdsToFetch);
-				const BATCH_SIZE = 5;
-				for (let i = 0; i < idsArray.length; i += BATCH_SIZE) {
-					const batch = idsArray.slice(i, i + BATCH_SIZE);
-					await Promise.all(
-						batch.map(id => this.getBlockDetail(id))
-					);
-				}
+await pMap([...blockIdsToFetch], 5, id =>
+	this.getBlockDetail(id),
+);
 			}
 		}
 
