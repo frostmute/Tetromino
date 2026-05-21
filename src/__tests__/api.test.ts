@@ -149,6 +149,16 @@ describe("ArenaApi security", () => {
 	});
 
 	describe("verifyToken", () => {
+		let requestUrlMock: jest.SpyInstance;
+
+		beforeEach(() => {
+			requestUrlMock = jest.spyOn(obsidian, "requestUrl");
+		});
+
+		afterEach(() => {
+			requestUrlMock.mockRestore();
+		});
+
 		it("returns true when /me returns 200", async () => {
 			requestUrlMock.mockResolvedValueOnce({
 				status: 200,
