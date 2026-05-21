@@ -85,7 +85,7 @@ export class SyncEngine {
 					errors: [{
 						blockId: null,
 						channelSlug: mapping.channelSlug,
-						message: (err as Error).message,
+						message: err instanceof Error ? err.message : String(err),
 						recoverable: false,
 					}],
 					duration: 0,
@@ -826,7 +826,12 @@ export class SyncEngine {
 		} catch (error) {
 			console.debug(`[arena-sync] Error parsing URL ${sourceUrl}, falling back to regex:`, error);
 			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
-			return match?.[1] ? decodeURIComponent(match[1]) : null;
+			if (!match?.[1]) return null;
+			try {
+				return decodeURIComponent(match[1]);
+			} catch {
+				return match[1];
+			}
 		}
 	}
 
