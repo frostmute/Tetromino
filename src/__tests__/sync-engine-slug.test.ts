@@ -91,8 +91,8 @@ describe("SyncEngine - extractChannelSlugFromBlock", () => {
 		const block = {
 			source: { url: "://www.are.na/channel/bad%slug", title: "" }
 		};
-		// This currently might throw in the implementation
 		expect(() => callExtract(block)).not.toThrow();
+		expect(callExtract(block)).toBe("bad%slug");
 	});
 
 	it("should return null if URL does not match channel pattern", () => {

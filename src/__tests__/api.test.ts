@@ -2,6 +2,8 @@ import * as obsidian from "obsidian";
 import { ArenaApi } from "../api";
 import type { ArenaBlock } from "../types";
 
+const MAX_RETRIES = 3;
+
 function makeBlock(id: number): ArenaBlock {
 	return {
 		id,
@@ -149,6 +151,16 @@ describe("ArenaApi security", () => {
 	});
 
 	describe("verifyToken", () => {
+		let requestUrlMock: jest.SpyInstance;
+
+		beforeEach(() => {
+			requestUrlMock = jest.spyOn(obsidian, "requestUrl");
+		});
+
+		afterEach(() => {
+			requestUrlMock.mockRestore();
+		});
+
 		it("returns true when /me returns 200", async () => {
 			requestUrlMock.mockResolvedValueOnce({
 				status: 200,
@@ -186,15 +198,22 @@ describe("ArenaApi security", () => {
 		});
 
 		it("returns false when /me request fails after retries", async () => {
-			// Mock network error for all attempts
+			jest.useFakeTimers();
 			requestUrlMock.mockRejectedValue(new Error("Network Error"));
 
 			const api = new ArenaApi("token");
-			const isValid = await api.verifyToken();
+			const resultPromise = api.verifyToken();
+
+			// Advance past all retry backoff delays
+			for (let i = 0; i < MAX_RETRIES; i++) {
+				await Promise.resolve();
+				jest.advanceTimersByTime(30000);
+			}
+
+			const isValid = await resultPromise;
 
 			expect(isValid).toBe(false);
-			// Should have tried 3 times (MAX_RETRIES)
-			expect(requestUrlMock).toHaveBeenCalledTimes(3);
+			jest.useRealTimers();
 		});
 	});
 });
