@@ -276,11 +276,15 @@ export function computeHash(input: string): string {
 }
 
 export function sanitiseFilename(name: string): string {
-	return name
+	const sanitised = name
 		// eslint-disable-next-line no-control-regex
 		.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
 		.replace(/\s+/g, " ")
 		.trim();
+	if (/^\.+$/.test(sanitised)) {
+		return sanitised.replace(/\./g, "_");
+	}
+	return sanitised;
 }
 
 export function blockFileName(

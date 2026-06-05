@@ -272,6 +272,13 @@ describe("sanitiseFilename", () => {
 	it("collapses whitespace", () => {
 		expect(sanitiseFilename("hello   world")).toBe("hello world");
 	});
+
+	it("replaces exact dots to prevent directory traversal", () => {
+		expect(sanitiseFilename(".")).toBe("_");
+		expect(sanitiseFilename("..")).toBe("__");
+		expect(sanitiseFilename("...")).toBe("___");
+		expect(sanitiseFilename("hello.md")).toBe("hello.md"); // Normal extensions should work
+	});
 });
 
 /* ------------------------------------------------------------------ */
