@@ -34,7 +34,7 @@ export function resolveChannelFolder(mapping: ChannelMapping): string {
 }
 
 function yamlQuote(value: string): string {
-	return `"${value.replace(/"/g, '\\"')}"`;
+	return JSON.stringify(value);
 }
 
 function resolveImageEmbedUrl(block: ArenaBlock): string | null {
