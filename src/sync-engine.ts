@@ -29,6 +29,7 @@ export class SyncEngine {
 	private vault: Vault;
 	private onProgress?: ProgressHandler;
 	private blockDetailsCache = new Map<number, unknown>();
+	private syncRecordMap = new Map<string, SyncRecord>();
 	private channelPreviewCache = new Map<string, string | null>();
 	private folderCache = new Set<string>();
 	private ensureFolderMutex: Promise<void> = Promise.resolve();
@@ -43,6 +44,12 @@ export class SyncEngine {
 		this.settings = settings;
 		this.vault = app.vault;
 		this.onProgress = onProgress;
+		for (const record of settings.syncRecords) {
+			this.syncRecordMap.set(
+				this.getRecordKey(record.blockId, record.channelId),
+				record,
+			);
+		}
 	}
 
 	async syncAll(options: SyncOptions = {}): Promise<SyncResult> {
@@ -64,7 +71,9 @@ export class SyncEngine {
 		};
 		const start = Date.now();
 
-		const enabledMappings = this.settings.channelMappings.filter(m => m.enabled);
+		const enabledMappings = this.settings.channelMappings.filter(
+			(m) => m.enabled,
+		);
 
 		const results = await pMap(enabledMappings, 3, async (mapping) => {
 			try {
@@ -82,12 +91,17 @@ export class SyncEngine {
 					moves: [],
 					fileDiffs: [],
 					missingPaths: [],
-					errors: [{
-						blockId: null,
-						channelSlug: mapping.channelSlug,
-						message: err instanceof Error ? err.message : String(err),
-						recoverable: false,
-					}],
+					errors: [
+						{
+							blockId: null,
+							channelSlug: mapping.channelSlug,
+							message:
+								err instanceof Error
+									? err.message
+									: String(err),
+							recoverable: false,
+						},
+					],
 					duration: 0,
 				};
 			}
@@ -188,7 +202,7 @@ export class SyncEngine {
 			}
 
 			if (channelSlugsToFetch.size > 0) {
-				await pMap(Array.from(channelSlugsToFetch), 5, slug =>
+				await pMap(Array.from(channelSlugsToFetch), 5, (slug) =>
 					this.getChannelPreviewImage(slug),
 				);
 			}
@@ -202,18 +216,23 @@ export class SyncEngine {
 			for (const block of blocks) {
 				if (this.shouldExclude(block)) continue;
 
-				const blockNeedsComments = needsComments &&
-					("comment_count" in block && typeof block.comment_count === "number"
+				const blockNeedsComments =
+					needsComments &&
+					("comment_count" in block &&
+					typeof block.comment_count === "number"
 						? block.comment_count > 0
 						: true);
 
-				if ((blockNeedsComments || needsChannels) && !this.blockDetailsCache.has(block.id)) {
+				if (
+					(blockNeedsComments || needsChannels) &&
+					!this.blockDetailsCache.has(block.id)
+				) {
 					blockIdsToFetch.add(block.id);
 				}
 			}
 
 			if (blockIdsToFetch.size > 0) {
-				await pMap(Array.from(blockIdsToFetch), 5, id =>
+				await pMap(Array.from(blockIdsToFetch), 5, (id) =>
 					this.getBlockDetail(id),
 				);
 			}
@@ -297,9 +316,7 @@ export class SyncEngine {
 	): Promise<string> {
 		const noteFileName = this.blockFileName(block);
 		const channelFolder = resolveChannelFolder(mapping);
-		const notePath = normalizePath(
-			`${channelFolder}/${noteFileName}`,
-		);
+		const notePath = normalizePath(`${channelFolder}/${noteFileName}`);
 		const assetPath = await this.ensureBlockAsset(
 			block,
 			mapping,
@@ -473,15 +490,8 @@ export class SyncEngine {
 			"";
 		const appearsInChannels = this.extractChannelAppearsIn(channel);
 		const followerCount =
-			channel.follower_count ??
-			channel.followers_count ??
-			null;
-		const lines: string[] = [
-			`# ${channel.title}`,
-			"",
-			"## Info",
-			"",
-		];
+			channel.follower_count ?? channel.followers_count ?? null;
+		const lines: string[] = [`# ${channel.title}`, "", "## Info", ""];
 		if (channelDescription) {
 			lines.push(channelDescription);
 			lines.push("");
@@ -502,7 +512,9 @@ export class SyncEngine {
 			lines.push("");
 			for (const ch of appearsInChannels) {
 				if (ch.slug) {
-					lines.push(`- [${ch.title}](https://www.are.na/channel/${ch.slug})`);
+					lines.push(
+						`- [${ch.title}](https://www.are.na/channel/${ch.slug})`,
+					);
 				} else {
 					lines.push(`- ${ch.title}`);
 				}
@@ -572,7 +584,9 @@ export class SyncEngine {
 			result.actions.push(`skip ${overviewPath}`);
 			return;
 		}
-		result.actions.push(`${existing ? "update" : "create"} ${overviewPath}`);
+		result.actions.push(
+			`${existing ? "update" : "create"} ${overviewPath}`,
+		);
 		result.fileDiffs.push({
 			path: overviewPath,
 			before,
@@ -665,7 +679,10 @@ export class SyncEngine {
 			}
 		}
 
-		if (this.settings.includeChannelBlockPreviewImage && block.class === "Channel") {
+		if (
+			this.settings.includeChannelBlockPreviewImage &&
+			block.class === "Channel"
+		) {
 			const slug = this.extractChannelSlugFromBlock(block);
 			if (slug) {
 				const previewUrl = await this.getChannelPreviewImage(slug);
@@ -688,7 +705,10 @@ export class SyncEngine {
 			this.blockDetailsCache.set(id, detail);
 			return detail;
 		} catch (error) {
-			console.warn(`[arena-sync] Failed to fetch block detail for ${id}:`, error);
+			console.warn(
+				`[arena-sync] Failed to fetch block detail for ${id}:`,
+				error,
+			);
 			this.blockDetailsCache.set(id, null);
 			return null;
 		}
@@ -702,7 +722,11 @@ export class SyncEngine {
 		const obj = detail as Record<string, unknown>;
 		const raw = obj?.comments;
 		if (!Array.isArray(raw)) return [];
-		const comments: Array<{ author: string; body: string; createdAt?: string }> = [];
+		const comments: Array<{
+			author: string;
+			body: string;
+			createdAt?: string;
+		}> = [];
 		for (const item of raw) {
 			if (!item || typeof item !== "object") continue;
 			const c = item as Record<string, unknown>;
@@ -814,7 +838,10 @@ export class SyncEngine {
 			const match = url.pathname.match(/\/channel\/([^/]+)/);
 			return match?.[1] ? decodeURIComponent(match[1]) : null;
 		} catch (error) {
-			console.debug(`[arena-sync] Error parsing URL ${sourceUrl}, falling back to regex:`, error);
+			console.debug(
+				`[arena-sync] Error parsing URL ${sourceUrl}, falling back to regex:`,
+				error,
+			);
 			const match = sourceUrl.match(/\/channel\/([^/?#]+)/);
 			if (!match?.[1]) return null;
 			try {
@@ -844,20 +871,25 @@ export class SyncEngine {
 				}
 			}
 		} catch (error) {
-				console.warn(`[arena-sync] Failed to fetch channel preview for ${slug}:`, error);
+			console.warn(
+				`[arena-sync] Failed to fetch channel preview for ${slug}:`,
+				error,
+			);
 			// best effort only
 		}
 		this.channelPreviewCache.set(slug, null);
 		return null;
 	}
 
+	private getRecordKey(blockId: number, channelId: number): string {
+		return `${channelId}-${blockId}`;
+	}
+
 	private findRecord(
 		blockId: number,
 		channelId: number,
 	): SyncRecord | undefined {
-		return this.settings.syncRecords.find(
-			(r) => r.blockId === blockId && r.channelId === channelId,
-		);
+		return this.syncRecordMap.get(this.getRecordKey(blockId, channelId));
 	}
 
 	private upsertRecord(
@@ -867,20 +899,26 @@ export class SyncEngine {
 		localHash: string,
 		remoteHash: string,
 	): void {
-		const idx = this.settings.syncRecords.findIndex(
-			(r) => r.blockId === blockId && r.channelId === channelId,
-		);
-		const record: SyncRecord = {
-			blockId,
-			channelId,
-			localPath,
-			lastSyncedAt: new Date().toISOString(),
-			localHash,
-			remoteHash,
-		};
-		if (idx >= 0) {
-			this.settings.syncRecords[idx] = record;
+		const key = this.getRecordKey(blockId, channelId);
+		const existing = this.syncRecordMap.get(key);
+
+		if (existing) {
+			Object.assign(existing, {
+				localPath,
+				lastSyncedAt: new Date().toISOString(),
+				localHash,
+				remoteHash,
+			});
 		} else {
+			const record: SyncRecord = {
+				blockId,
+				channelId,
+				localPath,
+				lastSyncedAt: new Date().toISOString(),
+				localHash,
+				remoteHash,
+			};
+			this.syncRecordMap.set(key, record);
 			this.settings.syncRecords.push(record);
 		}
 	}
@@ -889,7 +927,9 @@ export class SyncEngine {
 		const release = await new Promise<() => void>((resolve) => {
 			let releaseNext: () => void;
 			this.ensureFolderMutex.then(() => resolve(releaseNext));
-			this.ensureFolderMutex = new Promise((r) => { releaseNext = r; });
+			this.ensureFolderMutex = new Promise((r) => {
+				releaseNext = r;
+			});
 		});
 
 		try {
