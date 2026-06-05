@@ -7,6 +7,7 @@ import {
 	resolveChannelFolder,
 	resolveAttachmentBaseFolder,
 	sanitiseFilename,
+	pMap,
 } from "../utils";
 import type {ArenaBlock, ArenaSyncSettings} from "../types";
 import {DEFAULT_SETTINGS} from "../types";
@@ -416,5 +417,61 @@ describe("resolveAttachmentBaseFolder,", () => {
 		};
 		const result = resolveAttachmentBaseFolder(s, m);
 		expect(result).toBe("Specific/Override");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  pMap                                                              */
+/* ------------------------------------------------------------------ */
+
+describe("pMap", () => {
+	it("maps items correctly and preserves order", async () => {
+		const items = [1, 2, 3, 4, 5];
+		const results = await pMap(items, 2, async (x) => {
+			// Random delay to test order preservation
+			await new Promise((r) => setTimeout(r, (5 - x) * 5));
+			return x * 2;
+		});
+		expect(results).toEqual([2, 4, 6, 8, 10]);
+	});
+
+	it("respects the concurrency limit", async () => {
+		const items = [1, 2, 3, 4, 5];
+		let active = 0;
+		let maxActive = 0;
+		const limit = 2;
+
+		await pMap(items, limit, async (x) => {
+			active++;
+			maxActive = Math.max(maxActive, active);
+			await new Promise((r) => setTimeout(r, 10));
+			active--;
+			return x;
+		});
+
+		expect(maxActive).toBe(limit);
+	});
+
+	it("handles an empty array", async () => {
+		const results = await pMap([], 2, async (x) => x);
+		expect(results).toEqual([]);
+	});
+
+	it("handles a limit larger than the number of items", async () => {
+		const items = [1, 2, 3];
+		const results = await pMap(items, 10, async (x) => x);
+		expect(results).toEqual([1, 2, 3]);
+	});
+
+	it("propagates errors from the mapping function", async () => {
+		const items = [1, 2, 3];
+		const pMapPromise = pMap(items, 2, async (x) => {
+			if (x === 2) {
+				throw new Error("Test error");
+			}
+			return x;
+		});
+
+		await expect(pMapPromise).rejects.toThrow("Test error");
 	});
 });
