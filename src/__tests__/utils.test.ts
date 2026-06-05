@@ -463,15 +463,22 @@ describe("pMap", () => {
 		expect(results).toEqual([1, 2, 3]);
 	});
 
-	it("propagates errors from the mapping function", async () => {
-		const items = [1, 2, 3];
+	it("propagates errors from the mapping function and halts further execution", async () => {
+		const items = [1, 2, 3, 4];
+		const executed: number[] = [];
 		const pMapPromise = pMap(items, 2, async (x) => {
-			if (x === 2) {
+			executed.push(x);
+			if (x === 1) {
 				throw new Error("Test error");
 			}
 			return x;
 		});
 
 		await expect(pMapPromise).rejects.toThrow("Test error");
+
+		// Wait briefly to ensure no background tasks are unexpectedly spawned/run
+		await new Promise((r) => setTimeout(r, 10));
+		expect(executed).not.toContain(3);
+		expect(executed).not.toContain(4);
 	});
 });

@@ -306,11 +306,17 @@ export async function pMap<T, R>(
 ): Promise<R[]> {
 	const results: R[] = new Array(items.length);
 	let i = 0;
+	let failed = false;
 
 	const workers = new Array(Math.min(items.length, limit)).fill(0).map(async () => {
-		while (i < items.length) {
+		while (i < items.length && !failed) {
 			const index = i++;
-			results[index] = await fn(items[index]);
+			try {
+				results[index] = await fn(items[index]);
+			} catch (err) {
+				failed = true;
+				throw err;
+			}
 		}
 	});
 
