@@ -131,7 +131,6 @@ export class ArenaApi {
 	}
 
 	private buildApiUrl(path: string): string {
-		if (/^https?:\/\//.test(path)) return path;
 		const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 		if (normalizedPath.startsWith("/v")) {
 			return `${BASE_URL}${normalizedPath}`;

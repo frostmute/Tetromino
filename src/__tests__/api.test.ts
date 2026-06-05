@@ -148,7 +148,39 @@ describe("ArenaApi security", () => {
 		requestUrlMock.mockRestore();
 	});
 
+	it("not vulnerable to SSRF: absolute URLs in path are prefixed with BASE_URL", async () => {
+		const requestUrlMock = jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			json: { data: { success: true } },
+			arrayBuffer: new ArrayBuffer(0),
+		});
+
+		const api = new ArenaApi("secret-token");
+		const maliciousUrl = "https://malicious.com/stolen-token";
+		// @ts-ignore - accessing private method for testing
+		await (api as any).request("GET", maliciousUrl);
+
+		expect(requestUrlMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				// It should now be prefixed with BASE_URL and version
+				url: "https://api.are.na/v3/https://malicious.com/stolen-token",
+			}),
+		);
+		requestUrlMock.mockRestore();
+	});
+
 	describe("verifyToken", () => {
+		let requestUrlMock: jest.SpyInstance;
+
+		beforeEach(() => {
+			requestUrlMock = jest.spyOn(obsidian, "requestUrl");
+		});
+
+		afterEach(() => {
+			requestUrlMock.mockRestore();
+		});
+
 		it("returns true when /me returns 200", async () => {
 			requestUrlMock.mockResolvedValueOnce({
 				status: 200,
