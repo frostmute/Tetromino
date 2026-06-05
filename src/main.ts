@@ -134,9 +134,6 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.checkForMigrationPrompt(false);
 	}
 
-	onunload(): void {
-	}
-
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
