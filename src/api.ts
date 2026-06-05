@@ -46,6 +46,25 @@ export class ArenaApi {
 		this.debug = debug;
 	}
 
+
+	private log(message: string, ...args: unknown[]): void {
+		if (this.debug) {
+			if (args.length > 0) {
+				console.log(`[arena-sync] ${message}`, ...args);
+			} else {
+				console.log(`[arena-sync] ${message}`);
+			}
+		}
+	}
+
+	private logError(message: string, error?: unknown): void {
+		if (error !== undefined) {
+			console.error(`[arena-sync] ${message}`, error);
+		} else {
+			console.error(`[arena-sync] ${message}`);
+		}
+	}
+
 	private headers(): Record<string, string> {
 		const h: Record<string, string> = {
 			"Content-Type": "application/json",
@@ -73,9 +92,7 @@ export class ArenaApi {
 				params.body = JSON.stringify(body);
 			}
 
-			if (this.debug) {
-				console.log(`[arena-sync] ${method} ${params.url}`);
-			}
+			this.log(`${method} ${params.url}`);
 
 			let res;
 			try {
@@ -98,13 +115,11 @@ export class ArenaApi {
 					throw new Error(this.getErrorMessage(RATE_LIMIT_STATUS));
 				}
 
-				if (this.debug) {
-					console.log(
-						`[arena-sync] Rate limited (429). ` +
+				this.log(
+						`Rate limited (429). ` +
 							`Retrying after ${retryAfter}s ` +
 							`(attempt ${attempts}/${MAX_RETRIES})`,
 					);
-				}
 
 				await delay(retryAfter * 1000);
 				continue;
@@ -267,9 +282,7 @@ export class ArenaApi {
 			await this.request("GET", "/me");
 			return true;
 		} catch (err) {
-			if (this.debug) {
-				console.log(`[arena-sync] Token verification failed:`, err);
-			}
+			this.log(`Token verification failed:`, err);
 			return false;
 		}
 	}
@@ -313,9 +326,9 @@ export class ArenaApi {
 		const stop =
 			emptyPage || lastPageByCount || lastPageByTotal || duplicatePage;
 
-		if (stop && this.debug) {
-			console.log(
-				`[arena-sync] Stopping pagination for ${slug}: ` +
+		if (stop) {
+			this.log(
+				`Stopping pagination for ${slug}: ` +
 					`page=${pageNumber}, totalPages=${reportedTotalPages ?? "unknown"}, ` +
 					`blocksOnPage=${pageLength}, ` +
 					`newBlocks=${newBlocksCount}, ` +
@@ -343,8 +356,8 @@ export class ArenaApi {
 				return page;
 			} catch (error) {
 				consecutiveErrors++;
-				console.error(
-					`[arena-sync] Error fetching page ${pageNumber} for ${slug} ` +
+				this.logError(
+					`Error fetching page ${pageNumber} for ${slug} ` +
 						`(attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
 					error instanceof Error ? error.message : String(error),
 				);
@@ -406,12 +419,10 @@ export class ArenaApi {
 			}
 		}
 
-		if (this.debug) {
-			console.log(
-				`[arena-sync] Fetched ${blocks.length} unique blocks from ${slug} ` +
-					`across ${pageNumber} page(s)`,
-			);
-		}
+		this.log(
+			`Fetched ${blocks.length} unique blocks from ${slug} ` +
+				`across ${pageNumber} page(s)`,
+		);
 
 		return blocks.sort((a, b) => {
 			const aPos = typeof a.position === "number" ? a.position : Number.MAX_SAFE_INTEGER;
@@ -480,13 +491,11 @@ export class ArenaApi {
 					);
 				}
 
-				if (this.debug) {
-					console.log(
-						`[arena-sync] Download rate limited. ` +
+				this.log(
+						`Download rate limited. ` +
 							`Retrying after ${retryAfter}s ` +
 							`(attempt ${attempts}/${MAX_RETRIES})`,
 					);
-				}
 
 				await delay(retryAfter * 1000);
 				continue;
