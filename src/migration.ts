@@ -1,6 +1,10 @@
 import { App, normalizePath, TFile, Vault } from "obsidian";
 import { unifiedDiff } from "./diff";
-import { resolveAttachmentBaseFolder, resolveChannelFolder } from "./utils";
+import {
+	pMap,
+	resolveAttachmentBaseFolder,
+	resolveChannelFolder,
+} from "./utils";
 import type { ArenaSyncSettings, ChannelMapping } from "./types";
 
 export interface MigrationMove {
@@ -75,7 +79,9 @@ export async function buildMigrationPlan(
 			mapping.lastAttachmentBase ||
 				resolveAttachmentBaseFolder(settings, mapping),
 		);
-		const toBase = normalizePath(resolveAttachmentBaseFolder(settings, mapping));
+		const toBase = normalizePath(
+			resolveAttachmentBaseFolder(settings, mapping),
+		);
 		if (!fromBase || fromBase === toBase) continue;
 
 		const oldPrefix = ensureTrailingSlash(fromBase);
@@ -86,30 +92,28 @@ export async function buildMigrationPlan(
 			isMarkdownFile(file, channelFolder),
 		);
 
-		await Promise.all(
-			noteFiles.map(async (note) => {
-				const before = await app.vault.read(note);
-				if (!before.includes(oldPrefix)) return;
-				const after = before.split(oldPrefix).join(newPrefix);
-				if (after === before) return;
+		await pMap(noteFiles, 10, async (note) => {
+			const before = await app.vault.read(note);
+			if (!before.includes(oldPrefix)) return;
+			const after = before.split(oldPrefix).join(newPrefix);
+			if (after === before) return;
 
-				updates.push({
-					path: note.path,
-					before,
-					after,
-					diff: unifiedDiff(before, after, note.path, note.path),
-				});
+			updates.push({
+				path: note.path,
+				before,
+				after,
+				diff: unifiedDiff(before, after, note.path, note.path),
+			});
 
-				const paths = extractWikiPaths(before);
-				for (const p of paths) {
-					if (!p.startsWith(oldPrefix)) continue;
-					const suffix = p.slice(oldPrefix.length);
-					const from = normalizePath(p);
-					const to = normalizePath(`${toBase}/${suffix}`);
-					if (from && to) movesMap.set(from, to);
-				}
-			})
-		);
+			const paths = extractWikiPaths(before);
+			for (const p of paths) {
+				if (!p.startsWith(oldPrefix)) continue;
+				const suffix = p.slice(oldPrefix.length);
+				const from = normalizePath(p);
+				const to = normalizePath(`${toBase}/${suffix}`);
+				if (from && to) movesMap.set(from, to);
+			}
+		});
 
 		const moves = Array.from(movesMap.entries()).map(([from, to]) => ({
 			from,
@@ -128,10 +132,7 @@ export async function buildMigrationPlan(
 	}
 
 	const totalMoves = channels.reduce((sum, c) => sum + c.moves.length, 0);
-	const totalUpdates = channels.reduce(
-		(sum, c) => sum + c.updates.length,
-		0,
-	);
+	const totalUpdates = channels.reduce((sum, c) => sum + c.updates.length, 0);
 	return { channels, totalMoves, totalUpdates };
 }
 
