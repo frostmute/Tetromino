@@ -158,7 +158,7 @@ describe("ArenaApi security", () => {
 
 		const api = new ArenaApi("secret-token");
 		const maliciousUrl = "https://malicious.com/stolen-token";
-		// @ts-ignore - accessing private method for testing
+		// @ts-expect-error - accessing private method for testing
 		await (api as any).request("GET", maliciousUrl);
 
 		expect(requestUrlMock).toHaveBeenCalledWith(
