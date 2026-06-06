@@ -49,20 +49,12 @@ export class ArenaApi {
 
 	private log(message: string, ...args: unknown[]): void {
 		if (this.debug) {
-			if (args.length > 0) {
-				console.log(`[arena-sync] ${message}`, ...args);
-			} else {
-				console.log(`[arena-sync] ${message}`);
-			}
+			console.log(`[arena-sync] ${message}`, ...args);
 		}
 	}
 
-	private logError(message: string, error?: unknown): void {
-		if (error !== undefined) {
-			console.error(`[arena-sync] ${message}`, error);
-		} else {
-			console.error(`[arena-sync] ${message}`);
-		}
+	private logError(message: string, ...args: unknown[]): void {
+		console.error(`[arena-sync] ${message}`, ...args);
 	}
 
 	private headers(): Record<string, string> {
