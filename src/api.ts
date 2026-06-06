@@ -108,10 +108,10 @@ export class ArenaApi {
 				}
 
 				this.log(
-						`Rate limited (429). ` +
-							`Retrying after ${retryAfter}s ` +
-							`(attempt ${attempts}/${MAX_RETRIES})`,
-					);
+					`Rate limited (429). ` +
+						`Retrying after ${retryAfter}s ` +
+						`(attempt ${attempts}/${MAX_RETRIES})`
+				);
 
 				await delay(retryAfter * 1000);
 				continue;
