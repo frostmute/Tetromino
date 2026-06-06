@@ -484,10 +484,10 @@ export class ArenaApi {
 				}
 
 				this.log(
-						`Download rate limited. ` +
-							`Retrying after ${retryAfter}s ` +
-							`(attempt ${attempts}/${MAX_RETRIES})`,
-					);
+					`Download rate limited. ` +
+						`Retrying after ${retryAfter}s ` +
+						`(attempt ${attempts}/${MAX_RETRIES})`
+				);
 
 				await delay(retryAfter * 1000);
 				continue;
