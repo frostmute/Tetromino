@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { copyToVaults } from "./scripts/copy-to-vault.mjs";
 
 const banner = `/*
 Arena Sync for Obsidian
@@ -22,7 +23,7 @@ const context = await esbuild.context({
 		"@codemirror/collab",
 		"@codemirror/commands",
 		"@codemirror/language",
-		"@codemirror/lint",
+		"codemirror/lint",
 		"@codemirror/search",
 		"@codemirror/state",
 		"@codemirror/view",
@@ -38,6 +39,21 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
+	plugins: [
+		...(!process.env.CI ? [
+			{
+				name: 'watch-deploy',
+				setup(build) {
+					build.onEnd(result => {
+						if (result.errors.length === 0) {
+							console.log('Build successful, deploying to vaults...');
+							copyToVaults();
+						}
+					});
+				},
+			}
+		] : []),
+	],
 });
 
 if (prod) {
