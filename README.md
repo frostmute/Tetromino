@@ -129,6 +129,10 @@ npm run lint
 npm test
 ```
 
+## Companion Tools
+
+If you are looking for a similar tool that imports Raindrop.io bookmarks instead of Are.na blocks, check out [Make It Rain](https://github.com/frostmute/make-it-rain), the sister-tool to this plugin built on the same core sync engine and template parsing logic.
+
 ## Security
 
 - API tokens are masked in the UI and stored in Obsidian plugin data.
@@ -169,3 +173,9 @@ For details, see [SECURITY.md](SECURITY.md).
 ## License
 
 MIT
+
+## Features Updated (v1.0.0 parity)
+* Uses the **Are.na v3 GraphQL API** under the hood for more robust metadata querying.
+* Includes **Handlebars-lite templating** allowing full control over how blocks map to markdown notes.
+* Contains advanced **Security sanitization**, preventing executable Obsidian logic (Templater/Dataview) from escaping the content block into the vault.
+* **Native Downloading**: Directly downloads images, PDFs, videos, and external assets directly into Obsidian's internal filesystem via direct `vault.adapter` bridges while circumventing standard AWS S3 redirect issues.

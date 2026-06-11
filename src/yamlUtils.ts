@@ -1,0 +1,227 @@
+import { Notice } from "obsidian";
+
+/**
+ * YAML Utilities for Make It Rain
+ * ==============================
+ *
+ * This module provides utilities for safely creating YAML frontmatter in Markdown files.
+ * These functions handle proper escaping and formatting of various data types to ensure
+ * valid YAML is generated regardless of input content.
+ */
+
+/**
+ * Type guard to check if a value is a plain object
+ *
+ * @param value - Value to check
+ * @returns True if the value is a plain object (not null, not an array)
+ */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    !(value instanceof Date)
+  );
+}
+
+/**
+ * Formats a JavaScript value as a YAML string with proper escaping
+ *
+ * @param value - The value to format as YAML
+ * @param indentLevel - Current indentation level (for nested structures)
+ * @param seen - Set of seen objects to handle circular references
+ * @returns Properly formatted and escaped YAML string
+ */
+export function formatYamlValue(value: unknown, indentLevel: number = 0, seen?: Set<unknown>): string {
+  const indent = "  ".repeat(indentLevel);
+
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  // Handle booleans
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  // Handle numbers
+  if (typeof value === "number") {
+    return value.toString();
+  }
+
+  // Handle strings - the most common case
+  if (typeof value === "string") {
+    // Check if the string looks like a date (YYYY-MM-DD format) - don't quote it
+    if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?/.test(value)) {
+      return value;
+    }
+
+    // Check if the string needs special handling
+    if (
+      value.includes("\n") ||
+      value.includes(":") ||
+      value.includes("{") ||
+      value.includes("}") ||
+      value.includes("[") ||
+      value.includes("]") ||
+      value.includes("#") ||
+      value.includes("*") ||
+      value.includes("&") ||
+      value.includes("!") ||
+      value.includes("|") ||
+      value.includes(">") ||
+      value.includes("`") ||
+      value.trim() === "" ||
+      /^["']/.test(value) || // Starts with a quote char (would be parsed as a quoted scalar)
+      /^[0-9]/.test(value) || // Starts with number
+      /^(?:true|false|yes|no|on|off|null|~|y|n)$/i.test(value) // Looks like a boolean or null
+    ) {
+      // If the string contains newlines, use the block scalar syntax
+      if (value.includes("\n")) {
+        // Use the literal block scalar (|) for preserving line breaks
+        const lines = value.split("\n");
+        const formattedLines = lines.map((line) => `${indent}  ${line}`);
+        return "|\n" + formattedLines.join("\n");
+      }
+
+      // Otherwise use quoted string with escaping
+      return `"${escapeYamlString(value)}"`;
+    }
+
+    // For simple strings, no quotes needed
+    return value;
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "[]";
+    }
+
+    const currentSeen = seen || new Set<unknown>();
+    if (currentSeen.has(value)) {
+      return '"[Circular Reference]"';
+    }
+    currentSeen.add(value);
+
+    const items = value.map((item) => `${indent}- ${formatYamlValue(item, indentLevel + 1, currentSeen)}`);
+    currentSeen.delete(value);
+    return "\n" + items.join("\n");
+  }
+
+  // Handle objects
+  if (isPlainObject(value)) {
+    const keys = Object.keys(value);
+    if (keys.length === 0) {
+      return "{}";
+    }
+
+    const currentSeen = seen || new Set<unknown>();
+    if (currentSeen.has(value)) {
+      return '"[Circular Reference]"';
+    }
+    currentSeen.add(value);
+
+    const formattedKeys = keys.map((key) => {
+      const formattedValue = formatYamlValue(value[key], indentLevel + 1, currentSeen);
+      return formattedValue.startsWith("\n")
+        ? `${indent}${key}:${formattedValue}`
+        : `${indent}${key}: ${formattedValue}`;
+    });
+    currentSeen.delete(value);
+    return "\n" + formattedKeys.join("\n");
+  }
+
+  // Fallback for any other types
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    console.error("Error formatting YAML value:", error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error)));
+    return `"Error formatting value"`;
+  }
+}
+
+/**
+ * Escapes special characters in a string for YAML
+ *
+ * @param str - String to escape
+ * @returns Escaped string safe for YAML
+ */
+export function escapeYamlString(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\") // Escape backslashes first
+    .replace(/"/g, '\\"') // Escape double quotes
+    .replace(/\t/g, "\\t") // Escape tabs
+    .replace(/\r/g, "\\r"); // Escape carriage returns
+  // Note: We don't escape newlines because they're handled separately
+}
+
+/**
+ * Formats a value as a YAML string scalar, always quoting it (or using a block
+ * scalar for multi-line text).
+ *
+ * Use this for caller-controlled fields that must always be strings — e.g.
+ * user-provided `title`/`description` — so a value that happens to look like a
+ * date, number, boolean, or null keyword is not silently re-typed by the YAML
+ * parser (e.g. a title of `null` becoming an actual null, or `2024-01-15`
+ * becoming a date).
+ *
+ * An explicit `null`/`undefined` value is serialized as the unquoted `null`
+ * keyword (rather than an empty quoted string) so a genuinely absent value stays
+ * distinct from an empty string.
+ *
+ * @param value - Value to serialize as a YAML string
+ * @returns A quoted (or block) YAML scalar, or `null` for null/undefined
+ */
+export function formatYamlString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  const str = typeof value === "string" ? value : String(value);
+
+  if (str.includes("\n")) {
+    const lines = str.split("\n");
+    return "|\n" + lines.map((line) => `  ${line}`).join("\n");
+  }
+
+  return `"${escapeYamlString(str)}"`;
+}
+
+/**
+ * Creates a YAML frontmatter section for a Markdown file
+ *
+ * @param data - Object containing the frontmatter data
+ * @param stringFields - Keys whose values must always be serialized as YAML
+ *   strings (force-quoted), regardless of their content
+ * @returns Formatted YAML frontmatter as a string
+ */
+export function createYamlFrontmatter(
+  data: Record<string, unknown>,
+  stringFields: string[] = [],
+): string {
+  try {
+    let frontmatter = "---\n";
+    const stringFieldSet = new Set(stringFields);
+
+    for (const [key, value] of Object.entries(data)) {
+      const formattedValue = stringFieldSet.has(key)
+        ? formatYamlString(value)
+        : formatYamlValue(value);
+      // If the formatted value starts with a newline, it's a complex value
+      if (formattedValue.startsWith("\n")) {
+        frontmatter += `${key}:${formattedValue}\n`;
+      } else {
+        frontmatter += `${key}: ${formattedValue}\n`;
+      }
+    }
+
+    frontmatter += "---\n\n";
+    return frontmatter;
+  } catch (error) {
+    console.error("Error creating YAML frontmatter:", error instanceof Error ? error.message : (typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error)));
+    new Notice("Error creating note frontmatter. Check console for details.");
+    return '---\ntitle: "Error creating frontmatter"\n---\n\n';
+  }
+}
