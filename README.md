@@ -95,6 +95,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Optional enrichments (description, comments, connected channels, channel preview image).
 - Image and attachment rendering controls.
 - Attachment storage controls (global defaults and per-channel overrides).
+- Template engine toggle and custom template string.
 - Frontmatter, notifications, and debug logging toggles.
 - Channel mapping management and migration actions.
 
@@ -188,7 +189,7 @@ MIT
 
 ## Features Updated (v1.0.0 parity)
 
-- **Are.na v3 GraphQL API**: Uses the v3 endpoint under the hood for more robust metadata querying and stable deep channel traversals.
-- **Handlebars-lite templating**: Allows full programmatic control over how blocks map to markdown notes, using AST-based AST parsing instead of rigid line-by-line building.
+- **Handlebars-lite templating**: Allows full programmatic control over how blocks map to markdown notes, using AST-based parsing instead of rigid line-by-line building.
 - **Security sanitization**: Prevents executable Obsidian logic (like Templater or Dataview injections) from escaping the content block into the vault.
-- **Native Vault Downloading**: Directly downloads images, PDFs, videos, and external assets into Obsidian's internal filesystem via direct `vault.adapter` bridges while circumventing standard AWS S3 redirect `Authorization` header rejection issues.
+- **Download utilities**: Binary download helpers with magic-byte validation and safe redirect handling (available for future integration with vault-native downloads).
+- **GraphQL API utilities**: Rate-limited GraphQL client for Are.na's v3 endpoint (available for future integration).

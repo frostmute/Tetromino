@@ -16,7 +16,7 @@ export function createRateLimiter(
     let lastRefill = Date.now();
     let activeRequests = 0;
     
-    // We are adapting Make-it-rain's Token Bucket approach for Are.na
+    // Token Bucket rate limiter for Are.na API
     return {
         checkLimit: async () => {
             while (activeRequests >= maxConcurrency || tokens <= 0) {
@@ -63,10 +63,14 @@ export async function arenaGraphQLRequest<T>(
             body: JSON.stringify({ query, variables })
         });
         
-        const data = response.json;
+        const data = response.json as Record<string, unknown> | null | undefined;
+        if (!data) {
+            throw new Error('No response data received from Are.na GraphQL API');
+        }
         if (data.errors) {
             console.error("GraphQL Errors:", data.errors);
-            throw new Error(`Are.na GraphQL Error: ${data.errors[0]?.message}`);
+            const errors = data.errors as Array<{ message?: string }>;
+            throw new Error(`Are.na GraphQL Error: ${errors[0]?.message ?? 'Unknown error'}`);
         }
         
         return data.data as T;

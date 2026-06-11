@@ -141,11 +141,13 @@ export function blockToMarkdown(
 				break;
 		}
 		vars.content = contentPart;
+		vars.comments = context.comments || [];
+		vars.connected_channels = context.connectedChannels || [];
 
 		if (block.class === "Image" && block.image) {
 			const embedUrl = resolveImageEmbedUrl(block);
 			if (settings.imageHandling === "download" && context.assetPath) {
-				vars.image = `[[${context.assetPath}]]`;
+				vars.image = context.assetPath;
 			} else if (settings.imageHandling === "embed" && embedUrl) {
 				vars.image = embedUrl;
 			} else if (embedUrl) {
@@ -163,6 +165,12 @@ export function blockToMarkdown(
 		}
 
 		const rendered = renderTemplate(ast, vars);
+
+		// Sanitize only the body, preserving YAML frontmatter
+		const fmMatch = rendered.match(/^(---\n[\s\S]*?\n---\n?)(\s*[\s\S]*)$/);
+		if (fmMatch) {
+			return fmMatch[1] + sanitizeMarkdownContent(fmMatch[2]);
+		}
 		return sanitizeMarkdownContent(rendered);
 	}
 

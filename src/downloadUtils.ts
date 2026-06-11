@@ -145,12 +145,20 @@ export async function downloadBinaryFile(
     apiToken: string
 ): Promise<{ status: number; arrayBuffer?: ArrayBuffer; error?: string; redirectUrl?: string }> {
     try {
+        const initialHeaders: Record<string, string> = {};
+        try {
+            const parsedUrl = new URL(url);
+            if (parsedUrl.hostname === 'api.are.na') {
+                initialHeaders['Authorization'] = `Bearer ${apiToken}`;
+            }
+        } catch {
+            // If URL parsing fails, don't send credentials to be safe
+        }
+
         const response = await requestUrl({
             url: url,
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiToken}`
-            },
+            headers: initialHeaders,
             throw: false
         });
 
@@ -161,9 +169,14 @@ export async function downloadBinaryFile(
             }
             
             const headers: Record<string, string> = {};
-            // DO NOT send Raindrop auth headers to S3 pre-signed URLs or they will fail signature validation
-            if (!location.includes('amazonaws.com') && !location.includes('X-Amz-Signature=')) {
-                headers['Authorization'] = `Bearer ${apiToken}`;
+            try {
+                const originalOrigin = new URL(url).origin;
+                const redirectOrigin = new URL(location, url).origin;
+                if (originalOrigin === redirectOrigin) {
+                    headers['Authorization'] = `Bearer ${apiToken}`;
+                }
+            } catch {
+                // If URL parsing fails, don't send credentials to be safe
             }
 
             const redirectResponse = await requestUrl({

@@ -1,8 +1,8 @@
 import { App } from 'obsidian';
 
 /**
- * File Utilities for Make It Rain
- * ==============================
+ * File Utilities for Are.na Importer
+ * ==================================
  * 
  * This module provides file and folder manipulation utilities designed for Obsidian's vault system.
  * These functions implement a functional programming approach and handle common operations like:
@@ -83,7 +83,7 @@ export function sanitizeFileName(fileName: string): string {
     const replacement = '';
     
     const isStringEmpty = !fileName || fileName.trim() === '';
-    if (isStringEmpty) return "Unnamed_Raindrop";
+    if (isStringEmpty) return "Unnamed_Block";
     
     // Strip known file extensions from the title before sanitizing
     const withoutExt = fileName.replace(KNOWN_FILE_EXTENSIONS, '').trim() || fileName.trim();
@@ -93,7 +93,7 @@ export function sanitizeFileName(fileName: string): string {
     
     // Enforce maximum length to avoid overly long file names
     const maxLength = 200;
-    return (isSanitizedEmpty ? "Unnamed_Raindrop" : sanitizedName).substring(0, maxLength);
+    return (isSanitizedEmpty ? "Unnamed_Block" : sanitizedName).substring(0, maxLength);
 }
 
 /**
@@ -113,17 +113,7 @@ export async function createFolderStructure(app: App, fullPath: string): Promise
         
         for (const segment of pathSegments) {
             currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-
-            const doesExist = await doesPathExist(app, currentPath);
-
-            if (doesExist) {
-                const isFolder = await isPathAFolder(app, currentPath);
-                if (!isFolder) {
-                    throw new Error(`Path exists but is not a folder: ${currentPath}`);
-                }
-            } else {
-                await createFolder(app, currentPath);
-            }
+            await createFolder(app, currentPath);
         }
         
         return true;

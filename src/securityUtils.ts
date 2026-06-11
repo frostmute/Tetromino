@@ -1,5 +1,5 @@
 /**
- * Security utilities for Make It Rain
+ * Security utilities for Are.na Importer
  */
 
 /**
@@ -58,16 +58,11 @@ export function sanitizeMarkdownContent(content: unknown): string {
     sanitized = sanitized.replace(/\bon[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
 
     // 5. Neutralize dangerous URL protocols in markdown links/images and HTML attributes
-    // We add a backslash to break the protocol while keeping it readable in markdown
-    sanitized = sanitized.replace(/(javascript|vbscript|data)\s*:/gi, '$1\\:');
-
-    // Handle HTML entities that might try to bypass the above (e.g. javascript&#58;)
-    // We do a simple pass to decode basic entities and then check for dangerous protocols
-    // If we decode it and it matches a dangerous protocol, we replace the whole entity string with ''
-    sanitized = sanitized.replace(/(javascript|vbscript|data)(?:&#[0-9]+;|&#x[0-9a-fA-F]+;|&[a-zA-Z]+;)/gi, (match) => {
-        const decoded = decodeHTMLEntity(match);
-        if (/(javascript|vbscript|data)\s*:/i.test(decoded)) {
-            return match.replace(/(&#[0-9]+;|&#x[0-9a-fA-F]+;|&[a-zA-Z]+;)/, ''); // Drop the entity
+    // First decode all HTML entities, then check for dangerous protocols
+    sanitized = sanitized.replace(/(?:[a-zA-Z]|&#[0-9]+;|&#x[0-9a-fA-F]+;|&[a-zA-Z]+;)+\s*:/gi, (match) => {
+        const decoded = decodeAllHTMLEntities(match);
+        if (/^\s*(javascript|vbscript|data)\s*:/i.test(decoded)) {
+            return decoded.replace(/(javascript|vbscript|data)\s*:/i, '$1\\:');
         }
         return match;
     });
@@ -75,28 +70,29 @@ export function sanitizeMarkdownContent(content: unknown): string {
     return sanitized;
 }
 
-const NAMED_ENTITIES = [
-    { key: '&colon;', val: ':', regex: /&colon;/ig },
-    { key: '&tab;', val: '\t', regex: /&tab;/ig },
-    { key: '&newline;', val: '\n', regex: /&newline;/ig }
-];
+const NAMED_ENTITIES: Record<string, string> = {
+    '&colon;': ':',
+    '&tab;': '\t',
+    '&newline;': '\n',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&apos;': "'",
+};
 
 /**
- * Helper to do basic HTML entity decoding for security checks.
+ * Decodes all HTML entities in a string for security validation.
+ * This handles numeric (&#58;), hex (&#x3a;), and named (&colon;) entities.
  */
-function decodeHTMLEntity(entity: string): string {
-    const hexMatch = entity.match(/&#x([0-9a-fA-F]+);/i);
-    if (hexMatch) return entity.replace(/&#x[0-9a-fA-F]+;/i, String.fromCharCode(parseInt(hexMatch[1], 16)));
-
-    const decMatch = entity.match(/&#([0-9]+);/);
-    if (decMatch) return entity.replace(/&#[0-9]+;/, String.fromCharCode(parseInt(decMatch[1], 10)));
-
-    const lowerEntity = entity.toLowerCase();
-    for (const { key, val, regex } of NAMED_ENTITIES) {
-        if (lowerEntity.includes(key)) {
-            return entity.replace(regex, val);
+function decodeAllHTMLEntities(str: string): string {
+    return str.replace(/&#x([0-9a-fA-F]+);|&#([0-9]+);|&([a-zA-Z]+);/gi, (match, hex, dec, named) => {
+        if (hex) return String.fromCharCode(parseInt(hex, 16));
+        if (dec) return String.fromCharCode(parseInt(dec, 10));
+        if (named) {
+            const key = `&${named.toLowerCase()};`;
+            return NAMED_ENTITIES[key] ?? match;
         }
-    }
-
-    return entity;
+        return match;
+    });
 }

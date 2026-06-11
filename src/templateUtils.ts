@@ -143,7 +143,7 @@ export function renderTemplate(ast: ASTNode[], data: Record<string, unknown>): s
             const arrayVal = getNestedValue(data, node.arrayVar || '');
             if (Array.isArray(arrayVal)) {
                 for (const item of arrayVal) {
-                    result += renderTemplate(node.thenBranch || [], typeof item === 'object' ? item : { this: item });
+                    result += renderTemplate(node.thenBranch || [], (item !== null && typeof item === 'object') ? item as Record<string, unknown> : { this: item });
                 }
             }
         }

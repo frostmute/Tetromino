@@ -1,8 +1,8 @@
 import { Notice } from "obsidian";
 
 /**
- * YAML Utilities for Make It Rain
- * ==============================
+ * YAML Utilities for Are.na Importer
+ * ====================================
  *
  * This module provides utilities for safely creating YAML frontmatter in Markdown files.
  * These functions handle proper escaping and formatting of various data types to ensure
@@ -53,7 +53,7 @@ export function formatYamlValue(value: unknown, indentLevel: number = 0, seen?: 
   // Handle strings - the most common case
   if (typeof value === "string") {
     // Check if the string looks like a date (YYYY-MM-DD format) - don't quote it
-    if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?/.test(value)) {
+    if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(value)) {
       return value;
     }
 
@@ -105,7 +105,12 @@ export function formatYamlValue(value: unknown, indentLevel: number = 0, seen?: 
     }
     currentSeen.add(value);
 
-    const items = value.map((item) => `${indent}- ${formatYamlValue(item, indentLevel + 1, currentSeen)}`);
+    const items = value.map((item) => {
+      const formatted = formatYamlValue(item, indentLevel + 1, currentSeen);
+      return formatted.startsWith("\n")
+        ? `${indent}-${formatted}`
+        : `${indent}- ${formatted}`;
+    });
     currentSeen.delete(value);
     return "\n" + items.join("\n");
   }

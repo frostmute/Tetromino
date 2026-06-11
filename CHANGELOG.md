@@ -7,8 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Handlebars-lite AST templating engine (`templateUtils.ts`) with `#if`, `#each`, `#extends`, `#block`, and `#include` directives.
+- Security sanitization utilities (`securityUtils.ts`) to neutralize executable Obsidian syntax (Dataview, Templater) in imported content.
+- Binary download utilities (`downloadUtils.ts`) with magic-byte validation and safe redirect handling.
+- GraphQL API utilities (`arenaApiUtils.ts`) with rate-limited client for Are.na v3 endpoint.
+- YAML frontmatter formatting utilities (`yamlUtils.ts`) with proper escaping and circular reference handling.
+- File utilities (`fileUtils.ts`) with safe filename sanitization and folder structure creation.
+- `templateEnabled` and `templateString` settings for custom block-to-markdown rendering.
+
 ### Fixed
 - `pMap` now stops spawning new tasks once a mapping function rejects, preventing wasted work and unhandled rejections after an error.
+- Fixed credential leak in `downloadBinaryFile` that sent API token to external CDN/S3 URLs.
+- Fixed XSS filter bypass via HTML entities inside protocol names (e.g., `java&#x09;script:`).
+- Fixed template mode producing malformed Obsidian markdown for downloaded images (double-bracketed paths).
+- Fixed `sanitizeMarkdownContent` corrupting YAML frontmatter values in template mode output.
+- Fixed `renderTemplate` `#each` passing `null` array items as data context.
+- Fixed template mode silently dropping comments and connected channels enrichment data.
+- Fixed `sanitizeFileName` using wrong fallback name ("Unnamed_Raindrop" → "Unnamed_Block").
+- Fixed YAML date regex matching partial date-like strings (missing `$` anchor).
+- Fixed trailing spaces in YAML array formatting for nested objects.
+- Fixed redundant async I/O in `createFolderStructure`.
+- Fixed GraphQL response handler crashing on null/empty responses.
+- Removed accidentally committed `scripts/copy-to-vault 2.mjs` targeting wrong plugin directory.
 
 ### Tests
 - Added unit tests for the `pMap` concurrency utility (order preservation, concurrency limit, empty arrays, limit larger than item count, and error propagation with halting).
