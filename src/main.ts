@@ -27,6 +27,7 @@ export default class ArenaSyncPlugin extends Plugin {
 	private isSyncing = false;
 	private statusBarItem: HTMLElement | null = null;
 	private isMigrating = false;
+	private syncIntervalId: number | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -132,6 +133,29 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
 
 		this.checkForMigrationPrompt(false);
+
+		if (this.settings.syncOnStartup) {
+			this.app.workspace.onLayoutReady(() => {
+				this.runSync(false);
+			});
+		}
+
+		this.rescheduleInterval();
+	}
+
+	private rescheduleInterval(): void {
+		if (this.syncIntervalId !== null) {
+			window.clearInterval(this.syncIntervalId);
+			this.syncIntervalId = null;
+		}
+		if (this.settings.syncInterval > 0) {
+			this.syncIntervalId = this.registerInterval(
+				window.setInterval(
+					() => this.runSync(false),
+					this.settings.syncInterval * 60 * 1000,
+				),
+			);
+		}
 	}
 
 	async loadSettings(): Promise<void> {
@@ -156,6 +180,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			this.settings,
 			(progress) => this.updateProgressStatus(progress),
 		);
+		this.rescheduleInterval();
 		await this.checkForMigrationPrompt(false);
 	}
 
@@ -311,21 +336,21 @@ export default class ArenaSyncPlugin extends Plugin {
 			minute: "2-digit",
 			second: "2-digit",
 		});
-			const lines: string[] = [
-				`## ${timestamp} (${scope})`,
-				"",
-				`- created: ${result.created}`,
-				`- updated: ${result.updated}`,
-				`- moved: ${result.moved}`,
-				`- deleted: ${result.deleted}`,
-				`- downloaded: ${result.downloaded}`,
-				`- skipped: ${result.skipped}`,
-				`- errors: ${result.errors.length}`,
-				`- duration_ms: ${result.duration}`,
-				"",
-				"### Actions",
-				...result.actions.map((a) => `- ${a}`),
-				"",
+		const lines: string[] = [
+			`## ${timestamp} (${scope})`,
+			"",
+			`- created: ${result.created}`,
+			`- updated: ${result.updated}`,
+			`- moved: ${result.moved}`,
+			`- deleted: ${result.deleted}`,
+			`- downloaded: ${result.downloaded}`,
+			`- skipped: ${result.skipped}`,
+			`- errors: ${result.errors.length}`,
+			`- duration_ms: ${result.duration}`,
+			"",
+			"### Actions",
+			...result.actions.map((a) => `- ${a}`),
+			"",
 			];
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
 		if (!existing) {

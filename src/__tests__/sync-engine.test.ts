@@ -70,12 +70,12 @@ describe("SyncEngine", () => {
 				{
 					channelSlug: "disabled-channel",
 					enabled: false,
-					folderPrefix: "",
+					localFolder: "",
 				} as ChannelMapping,
 				{
 					channelSlug: "enabled-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				} as ChannelMapping,
 			];
 
@@ -121,7 +121,7 @@ describe("SyncEngine", () => {
 				{
 					channelSlug: "error-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				} as ChannelMapping,
 			];
 
@@ -150,17 +150,17 @@ describe("SyncEngine", () => {
 				{
 					channelSlug: "success-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				},
 				{
 					channelSlug: "fail-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				},
 				{
 					channelSlug: "another-success-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				},
 			];
 
@@ -201,7 +201,7 @@ describe("SyncEngine", () => {
 				{
 					channelSlug: "string-error-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				},
 			];
 
@@ -228,7 +228,7 @@ describe("SyncEngine", () => {
 				{
 					channelSlug: "partial-error-channel",
 					enabled: true,
-					folderPrefix: "",
+					localFolder: "",
 				},
 			];
 
@@ -273,7 +273,7 @@ describe("SyncEngine", () => {
 			const mapping = {
 				channelSlug: "test-channel",
 				enabled: true,
-				folderPrefix: "",
+				localFolder: "",
 			} as ChannelMapping;
 
 			await engine.syncChannel(mapping, { dryRun: false });
@@ -297,7 +297,7 @@ describe("SyncEngine", () => {
 			const mapping = {
 				channelSlug: "test-channel",
 				enabled: true,
-				folderPrefix: "",
+				localFolder: "",
 			} as ChannelMapping;
 
 			await engine.syncChannel(mapping, { dryRun: true });
@@ -338,7 +338,7 @@ describe("SyncEngine", () => {
 			const mapping = {
 				channelSlug: "test-channel",
 				enabled: true,
-				folderPrefix: "",
+				localFolder: "",
 			} as ChannelMapping;
 
 			const result = await engine.syncChannel(mapping);

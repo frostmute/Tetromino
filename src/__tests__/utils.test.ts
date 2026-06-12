@@ -215,6 +215,67 @@ describe("blockToMarkdown", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  blockToMarkdown with templateEnabled                              */
+/* ------------------------------------------------------------------ */
+
+describe("blockToMarkdown with templateEnabled", () => {
+	const base: ArenaSyncSettings = {
+		...DEFAULT_SETTINGS,
+		templateEnabled: true,
+		templateString: "---\ntitle: {{title}}\narena_id: {{id}}\n---\n\n{{content}}",
+	};
+
+	it("renders via template when templateEnabled is true", () => {
+		const block = makeBlock({ title: "My Block", content: "Hello" });
+		const md = blockToMarkdown(block, base);
+		expect(md).toContain("title: My Block");
+		expect(md).toContain("arena_id: 12345");
+		expect(md).toContain("Hello");
+	});
+
+	it("falls back to legacy path when templateEnabled is false", () => {
+		const s = { ...base, templateEnabled: false };
+		const md = blockToMarkdown(makeBlock(), s);
+		expect(md).toContain("arena_id: 12345");
+		expect(md).toContain("# Test Block");
+	});
+
+	it("template: #if guard works for optional description", () => {
+		const tmpl = "{{#if description}}desc: {{description}}{{/if}}";
+		const s = { ...base, templateString: tmpl };
+		expect(blockToMarkdown(makeBlock({ description: "Cool" }), s)).toContain("desc: Cool");
+		expect(blockToMarkdown(makeBlock({ description: null }), s)).toBe("");
+	});
+
+	it("template: image block sets image variable with download path", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...base, templateString: "{{image}}", imageHandling: "download" as const };
+		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
+		expect(md).toBe("Are.na/Attachments/12345-photo.jpg");
+	});
+
+	it("template: preserves YAML frontmatter and sanitizes body", () => {
+		const tmpl = "---\ntitle: {{title}}\n---\n\n{{content}}";
+		const s = { ...base, templateString: tmpl };
+		const block = makeBlock({ content: "<script>evil()</script>safe" });
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("title: Test Block");
+		expect(md).not.toContain("<script>");
+		expect(md).toContain("safe");
+	});
+});
+
+/* ------------------------------------------------------------------ */
 /*  markdownToBlockContent                                            */
 /* ------------------------------------------------------------------ */
 

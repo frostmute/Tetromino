@@ -390,22 +390,29 @@ export async function pMap<T, R>(
 	limit: number,
 	fn: (item: T) => Promise<R>
 ): Promise<R[]> {
+	if (items.length === 0) return [];
 	const results: R[] = new Array(items.length);
 	let i = 0;
-	let failed = false;
+	let hasFailed = false;
+	let firstError: unknown;
 
 	const workers = new Array(Math.min(items.length, limit)).fill(0).map(async () => {
-		while (i < items.length && !failed) {
+		while (!hasFailed) {
 			const index = i++;
+			if (index >= items.length) return;
 			try {
 				results[index] = await fn(items[index]);
 			} catch (err) {
-				failed = true;
-				throw err;
+				if (!hasFailed) {
+					hasFailed = true;
+					firstError = err;
+				}
+				return;
 			}
 		}
 	});
 
 	await Promise.all(workers);
+	if (hasFailed) throw firstError;
 	return results;
 }

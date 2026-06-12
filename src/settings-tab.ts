@@ -341,6 +341,32 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			"Control notices and troubleshooting output.",
 		);
 		new Setting(containerEl)
+			.setName("Sync on startup")
+			.setDesc("Automatically run import when Obsidian opens.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.syncOnStartup)
+					.onChange(async (value) => {
+						this.plugin.settings.syncOnStartup = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Sync interval (minutes)")
+			.setDesc("Auto-import on a repeating schedule. Set to 0 to disable.")
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(String(this.plugin.settings.syncInterval))
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						this.plugin.settings.syncInterval = Number.isFinite(n) && n >= 0 ? n : 0;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Show notifications")
 			.setDesc("Show notices for import progress, completion, and failures.")
 			.addToggle((toggle) =>

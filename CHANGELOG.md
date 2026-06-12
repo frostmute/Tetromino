@@ -8,13 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Handlebars-lite AST templating engine (`templateUtils.ts`) with `#if`, `#each`, `#extends`, `#block`, and `#include` directives.
-- Security sanitization utilities (`securityUtils.ts`) to neutralize executable Obsidian syntax (Dataview, Templater) in imported content.
-- Binary download utilities (`downloadUtils.ts`) with magic-byte validation and safe redirect handling.
-- GraphQL API utilities (`arenaApiUtils.ts`) with rate-limited client for Are.na v3 endpoint.
-- YAML frontmatter formatting utilities (`yamlUtils.ts`) with proper escaping and circular reference handling.
-- File utilities (`fileUtils.ts`) with safe filename sanitization and folder structure creation.
-- `templateEnabled` and `templateString` settings for custom block-to-markdown rendering.
+- Sync-on-startup capability and periodic background sync intervals.
+- `markMissing` feature now handles deleted/missing blocks properly by clearing their sync records.
 
 ### Fixed
 - `pMap` now stops spawning new tasks once a mapping function rejects, preventing wasted work and unhandled rejections after an error.
@@ -30,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed redundant async I/O in `createFolderStructure`.
 - Fixed GraphQL response handler crashing on null/empty responses.
 - Removed accidentally committed `scripts/copy-to-vault 2.mjs` targeting wrong plugin directory.
+
+### Removed
+- Removed unused template directive files (`#extends`, `#block`, `#include`) and utility files (`downloadUtils.ts`, `arenaApiUtils.ts`, `yamlUtils.ts`, `fileUtils.ts`) that were superseded or unused.
 
 ### Tests
 - Added unit tests for the `pMap` concurrency utility (order preservation, concurrency limit, empty arrays, limit larger than item count, and error propagation with halting).

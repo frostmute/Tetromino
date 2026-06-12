@@ -25,7 +25,7 @@ function withJitter(ms: number): number {
 }
 
 function transientBackoffMs(attempts: number): number {
-	return Math.min(1000 * Math.pow(2, attempts), 10000) + withJitter(0);
+	return Math.min(1000 * Math.pow(2, attempts), 10000) + Math.floor(Math.random() * JITTER);
 }
 
 function isRecord(val: unknown): val is Record<string, unknown> {
