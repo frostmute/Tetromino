@@ -2,6 +2,16 @@
 <p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 
 <div align="center">
+  <img src="https://raw.githubusercontent.com/frostmute/Are.na-Importer/main/assets/hero-banner.svg" alt="Are.na Importer Banner" width="600" />
+</div>
+
+<div align="center">
+  <a href="https://github.com/frostmute/Are.na-Importer/releases"><img src="https://img.shields.io/github/v/release/frostmute/Are.na-Importer?style=for-the-badge&color=blue" alt="GitHub release" /></a>
+  <a href="https://github.com/frostmute/Are.na-Importer/actions"><img src="https://img.shields.io/github/actions/workflow/status/frostmute/Are.na-Importer/ci.yml?style=for-the-badge" alt="CI Status" /></a>
+  <a href="https://github.com/frostmute/Are.na-Importer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/frostmute/Are.na-Importer?style=for-the-badge" alt="License" /></a>
+</div>
+
+<div align="center">
 
 One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run previews • User-controlled output
 
@@ -26,6 +36,8 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - It does not auto-delete local notes when remote blocks disappear.
 
 ## Feature Highlights
+
+<img src="https://raw.githubusercontent.com/frostmute/Are.na-Importer/main/assets/hero-square.svg" alt="App Preview" align="right" width="250" />
 
 ### Import Engine
 
@@ -83,6 +95,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Optional enrichments (description, comments, connected channels, channel preview image).
 - Image and attachment rendering controls.
 - Attachment storage controls (global defaults and per-channel overrides).
+- Template engine toggle and custom template string.
 - Frontmatter, notifications, and debug logging toggles.
 - Channel mapping management and migration actions.
 
@@ -129,6 +142,10 @@ npm run lint
 npm test
 ```
 
+## Companion Tools
+
+If you are looking for a similar tool that imports Raindrop.io bookmarks instead of Are.na blocks, check out [Make It Rain](https://github.com/frostmute/make-it-rain), the sister-tool to this plugin built on the same core sync engine and template parsing logic.
+
 ## Security
 
 - API tokens are masked in the UI and stored in Obsidian plugin data.
@@ -169,3 +186,10 @@ For details, see [SECURITY.md](SECURITY.md).
 ## License
 
 MIT
+
+## Features Updated (v1.0.0 parity)
+
+- **Handlebars-lite templating**: Allows full programmatic control over how blocks map to markdown notes, using AST-based parsing instead of rigid line-by-line building.
+- **Security sanitization**: Prevents executable Obsidian logic (like Templater or Dataview injections) from escaping the content block into the vault.
+- **Download utilities**: Binary download helpers with magic-byte validation and safe redirect handling (available for future integration with vault-native downloads).
+- **GraphQL API utilities**: Rate-limited GraphQL client for Are.na's v3 endpoint (available for future integration).

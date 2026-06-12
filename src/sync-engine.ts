@@ -176,7 +176,7 @@ export class SyncEngine {
 		const channelFolder = resolveChannelFolder(mapping);
 		const blocks = await this.api.getAllChannelBlocksWithProgress(
 			mapping.channelSlug,
-			(currentPage, totalPages) => {
+			(currentPage: number, totalPages: number) => {
 				this.onProgress?.({
 					channelSlug: mapping.channelSlug,
 					phase: "pages",

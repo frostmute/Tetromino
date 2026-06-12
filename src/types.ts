@@ -184,6 +184,8 @@ export interface ArenaSyncSettings {
 	excludeClasses: string[];
 	notifyOnSync: boolean;
 	debugLogging: boolean;
+	templateEnabled: boolean;
+	templateString: string;
 }
 
 export const DEFAULT_SETTINGS: ArenaSyncSettings = {
@@ -212,4 +214,6 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	excludeClasses: [],
 	notifyOnSync: true,
 	debugLogging: false,
+	templateEnabled: false,
+	templateString: `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{#if image}}![{{title}}]({{image}}){{/if}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`
 };
