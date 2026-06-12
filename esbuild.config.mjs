@@ -23,7 +23,7 @@ const context = await esbuild.context({
 		"@codemirror/collab",
 		"@codemirror/commands",
 		"@codemirror/language",
-		"codemirror/lint",
+		"@codemirror/lint",
 		"@codemirror/search",
 		"@codemirror/state",
 		"@codemirror/view",

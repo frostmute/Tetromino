@@ -242,10 +242,7 @@ export class SyncEngine {
 		const importedBlockIds: number[] = [];
 
 		let completed = 0;
-		const CONCURRENCY_LIMIT = 5;
-		const workers = new Set<Promise<void>>();
-
-		for (const block of blocks) {
+		const blocksToProcess = blocks.filter((block) => {
 			if (this.shouldExclude(block)) {
 				completed++;
 				result.skipped++;
@@ -255,46 +252,39 @@ export class SyncEngine {
 					current: completed,
 					total: blocks.length,
 				});
-				continue;
+				return false;
 			}
+			return true;
+		});
 
-			const worker = (async () => {
-				try {
-					const path = await this.pullBlock(
-						block,
-						mapping,
-						channel,
-						result,
-						dryRun,
-					);
-					importedPaths.push(path);
-					importedBlockIds.push(block.id);
-				} catch (err) {
-					result.errors.push({
-						blockId: block.id,
-						channelSlug: mapping.channelSlug,
-						message: (err as Error).message,
-						recoverable: true,
-					});
-				} finally {
-					completed++;
-					this.onProgress?.({
-						channelSlug: mapping.channelSlug,
-						phase: "blocks",
-						current: completed,
-						total: blocks.length,
-					});
-				}
-			})();
-
-			workers.add(worker);
-			worker.then(() => workers.delete(worker));
-			if (workers.size >= CONCURRENCY_LIMIT) {
-				await Promise.race(workers);
+		await pMap(blocksToProcess, 5, async (block) => {
+			try {
+				const path = await this.pullBlock(
+					block,
+					mapping,
+					channel,
+					result,
+					dryRun,
+				);
+				importedPaths.push(path);
+				importedBlockIds.push(block.id);
+			} catch (err) {
+				result.errors.push({
+					blockId: block.id,
+					channelSlug: mapping.channelSlug,
+					message: (err as Error).message,
+					recoverable: true,
+				});
+			} finally {
+				completed++;
+				this.onProgress?.({
+					channelSlug: mapping.channelSlug,
+					phase: "blocks",
+					current: completed,
+					total: blocks.length,
+				});
 			}
-		}
-
-		await Promise.all(workers);
+		});
 
 		await this.updateChannelIndex(
 			mapping,
@@ -924,13 +914,11 @@ export class SyncEngine {
 	}
 
 	private async ensureFolder(path: string): Promise<void> {
-		const release = await new Promise<() => void>((resolve) => {
-			let releaseNext: () => void;
-			this.ensureFolderMutex.then(() => resolve(releaseNext));
-			this.ensureFolderMutex = new Promise((r) => {
-				releaseNext = r;
-			});
-		});
+		let release!: () => void;
+		const next = new Promise<void>((r) => { release = r; });
+		const prev = this.ensureFolderMutex;
+		this.ensureFolderMutex = next;
+		await prev;
 
 		try {
 			const normalized = normalizePath(path);
@@ -974,6 +962,12 @@ export class SyncEngine {
 			result.deleted++;
 			result.missingPaths.push(record.localPath);
 			result.actions.push(`missing ${record.localPath}`);
+			this.syncRecordMap.delete(this.getRecordKey(record.blockId, record.channelId));
 		}
+		this.settings.syncRecords = this.settings.syncRecords.filter(
+			(record) =>
+				record.channelId !== mapping.channelId ||
+				imported.has(record.blockId),
+		);
 	}
 }

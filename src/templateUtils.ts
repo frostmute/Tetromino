@@ -1,13 +1,11 @@
 export interface ASTNode {
-    type: 'text' | 'var' | 'if' | 'each' | 'extends' | 'block' | 'include';
+    type: 'text' | 'var' | 'if' | 'each';
     raw?: string;
     name?: string;
     cond?: string;
     arrayVar?: string;
     thenBranch?: ASTNode[];
     elseBranch?: ASTNode[];
-    templateName?: string;
-    blockName?: string;
 }
 
 export const parseTemplate = (tmpl: string): ASTNode[] => {
@@ -77,32 +75,8 @@ export const parseTemplate = (tmpl: string): ASTNode[] => {
                         throw new Error(`Unclosed #each tag (expected {{/each}})`);
                     }
                     nodes.push({ type: 'each', arrayVar, thenBranch });
-                } else if (val.startsWith('#extends ')) {
-                    const templateName = val.substring(9).trim().replace(/['"]/g, '');
-                    tokenIdx++;
-                    const thenBranch = parseNodes('/extends');
-                    if (tokenIdx < tokens.length && tokens[tokenIdx].value === '/extends') {
-                        tokenIdx++;
-                    } else {
-                        throw new Error(`Unclosed #extends tag (expected {{/extends}})`);
-                    }
-                    nodes.push({ type: 'extends', templateName, thenBranch });
-                } else if (val.startsWith('#block ')) {
-                    const blockName = val.substring(7).trim().replace(/['"]/g, '');
-                    tokenIdx++;
-                    const thenBranch = parseNodes('/block');
-                    if (tokenIdx < tokens.length && tokens[tokenIdx].value === '/block') {
-                        tokenIdx++;
-                    } else {
-                        throw new Error(`Unclosed #block tag (expected {{/block}})`);
-                    }
-                    nodes.push({ type: 'block', blockName, thenBranch });
-                } else if (val.startsWith('#include ')) {
-                    const templateName = val.substring(9).trim().replace(/['"]/g, '');
-                    tokenIdx++;
-                    nodes.push({ type: 'include', templateName });
-                } else if (val === '/if' || val === '/each' || val === 'else' || val === '/extends' || val === '/block') {
-                    // This handles unexpected closing tags by treating them as literal text
+                } else if (val === '/if' || val === '/each' || val === 'else') {
+                    // unexpected closing tag — treat as literal text
                     nodes.push({ type: 'text', raw: `{{${val}}}` });
                     tokenIdx++;
                 } else {
