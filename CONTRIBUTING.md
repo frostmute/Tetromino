@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to `Are.na-Importer`.
+Thanks for contributing to `Tetromino`.
 
 ## Scope and product behavior
 
@@ -14,8 +14,8 @@ Please keep changes aligned with that behavior unless maintainers explicitly dec
 ## Setup
 
 ```bash
-git clone https://github.com/frostmute/Are.na-Importer.git
-cd Are.na-Importer
+git clone https://github.com/frostmute/Tetromino.git
+cd Tetromino
 npm install
 ```
 

@@ -186,7 +186,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runSync(dryRun = false): Promise<void> {
 		if (this.isSyncing) {
-			new Notice("Are.na Importer is already running...");
+			new Notice("Tetromino is already running...");
 			return;
 		}
 		if (this.isMigrating) {
@@ -194,7 +194,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			return;
 		}
 		if (!this.settings.apiToken) {
-			new Notice("Are.na Importer: Please set your API token in settings.");
+			new Notice("Tetromino: Please set your API token in settings.");
 			return;
 		}
 		const validMappings = this.settings.channelMappings.filter(
@@ -202,7 +202,7 @@ export default class ArenaSyncPlugin extends Plugin {
 		);
 		if (validMappings.length === 0) {
 			new Notice(
-				"Are.na Importer: No valid channels configured (check that channel slug is not empty).",
+				"Tetromino: No valid channels configured (check that channel slug is not empty).",
 			);
 			return;
 		}
@@ -219,7 +219,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			this.notifySyncResult(result);
 			this.showSummaryModal(result, dryRun ? "Preview" : "Sync");
 		} catch (err) {
-			new Notice(`Are.na Importer failed: ${(err as Error).message}`);
+			new Notice(`Tetromino failed: ${(err as Error).message}`);
 		} finally {
 			this.isSyncing = false;
 			this.updateStatusBar("idle");
@@ -228,7 +228,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runChannelSync(slug: string, dryRun = false): Promise<void> {
 		if (this.isSyncing) {
-			new Notice("Are.na Importer is already running...");
+			new Notice("Tetromino is already running...");
 			return;
 		}
 		if (this.isMigrating) {
@@ -314,8 +314,8 @@ export default class ArenaSyncPlugin extends Plugin {
 		const summary = parts.length > 0 ? parts.join(", ") : "no changes";
 		const seconds = (result.duration / 1000).toFixed(1);
 		const prefix = result.dryRun
-			? "Are.na Importer preview"
-			: "Are.na Importer";
+			? "Tetromino preview"
+			: "Tetromino";
 		new Notice(`${prefix}: ${summary} (${seconds}s)`);
 	}
 
@@ -367,7 +367,7 @@ export default class ArenaSyncPlugin extends Plugin {
 	}
 
 	private showSummaryModal(result: SyncResult, label: string): void {
-		const title = `Are.na Importer ${label} Summary`;
+		const title = `Tetromino ${label} Summary`;
 		new SyncSummaryModal(this.app, result, title).open();
 	}
 
@@ -508,7 +508,7 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	async runMigration(planOverride?: Awaited<ReturnType<typeof buildMigrationPlan>>): Promise<void> {
 		if (this.isMigrating) {
-			new Notice("Are.na Importer migration is already running...");
+			new Notice("Tetromino migration is already running...");
 			return;
 		}
 		this.isMigrating = true;

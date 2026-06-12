@@ -1,10 +1,10 @@
 {
-	"id": "Are.na-Importer",
-	"name": "Are.na Importer",
+	"id": "Tetromino",
+	"name": "Tetromino",
 	"version": "1.0.0",
 	"minAppVersion": "1.4.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
 	"author": "frostmute",
-	"authorUrl": "https://github.com/frostmute/Are.na-Importer/",
+	"authorUrl": "https://github.com/frostmute/Tetromino/",
 	"isDesktopOnly": false
 }

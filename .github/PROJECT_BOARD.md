@@ -1,11 +1,11 @@
 # Project Board Structure
 
-Use this file to bootstrap a GitHub Projects board for **Are.na Importer for Obsidian**.
-Create the board at: https://github.com/frostmute/Are.na-Importer/projects/new
+Use this file to bootstrap a GitHub Projects board for **Tetromino for Obsidian**.
+Create the board at: https://github.com/frostmute/Tetromino/projects/new
 
 ---
 
-## Board: Are.na Importer Roadmap
+## Board: Tetromino Roadmap
 
 **View**: Table + Board (Kanban)
 

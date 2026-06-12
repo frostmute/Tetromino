@@ -5817,7 +5817,7 @@ got this on run dev: node:internal/modules/package_json_reader:301
   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
         ^
 
-Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'esbuild' imported from /home/frost/Are.na-Importer/esbuild.config.mjs
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'esbuild' imported from /home/frost/Tetromino/esbuild.config.mjs
     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)
     at packageResolve (node:internal/modules/esm/resolve:764:81)
     at moduleResolve (node:internal/modules/esm/resolve:855:18)
@@ -5848,7 +5848,7 @@ Process exited with code 0
 Original token count: 265
 Output:
 {
-  "name": "Are.na Importer",
+  "name": "Tetromino",
   "version": "1.0.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault.",
   "main": "main.js",
@@ -5920,23 +5920,23 @@ npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and cont
 npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
 npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
 npm error code 1
-npm error path /home/frost/Are.na-Importer/node_modules/esbuild
+npm error path /home/frost/Tetromino/node_modules/esbuild
 npm error command failed
 npm error command sh -c node install.js
 npm error node:internal/child_process:1127
 npm error     result.error = new ErrnoException(result.error, 'spawnSync ' + options.file);
 npm error                    ^
 npm error
-npm error <ref *1> Error: spawnSync /home/frost/Are.na-Importer/node_modules/esbuild/bin/esbuild EPERM
+npm error <ref *1> Error: spawnSync /home/frost/Tetromino/node_modules/esbuild/bin/esbuild EPERM
 npm error     at Object.spawnSync (node:internal/child_process:1127:20)
 npm error     at spawnSync (node:child_process:911:24)
 npm error     at Object.execFileSync (node:child_process:954:15)
-npm error     at validateBinaryVersion (/home/frost/Are.na-Importer/node_modules/esbuild/install.js:99:28)
-npm error     at /home/frost/Are.na-Importer/node_modules/esbuild/install.js:286:5 {
+npm error     at validateBinaryVersion (/home/frost/Tetromino/node_modules/esbuild/install.js:99:28)
+npm error     at /home/frost/Tetromino/node_modules/esbuild/install.js:286:5 {
 npm error   errno: -1,
 npm error   code: 'EPERM',
-npm error   syscall: 'spawnSync /home/frost/Are.na-Importer/node_modules/esbuild/bin/esbuild',
-npm error   path: '/home/frost/Are.na-Importer/node_modules/esbuild/bin/esbuild',
+npm error   syscall: 'spawnSync /home/frost/Tetromino/node_modules/esbuild/bin/esbuild',
+npm error   path: '/home/frost/Tetromino/node_modules/esbuild/bin/esbuild',
 npm error   spawnargs: [ '--version' ],
 npm error   error: [Circular *1],
 npm error   status: 0,
@@ -6005,7 +6005,7 @@ You can re‑run `npm run dev` now. If you want, I can also run it here and conf
 
 _**User (2026-03-31 00:08:56Z)**_
 
- Are.na Importer@1.0.0 dev
+ Tetromino@1.0.0 dev
 > node esbuild.config.mjs
 
 ✘ [ERROR] Syntax error '"'
@@ -6741,7 +6741,7 @@ If you want me to run `npm run build` here and confirm the zip is produced, say 
 
 _**User (2026-03-31 00:15:43Z)**_
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
 node:internal/child_process:1127
@@ -6752,7 +6752,7 @@ node:internal/child_process:1127
     at Object.spawnSync (node:internal/child_process:1127:20)
     at spawnSync (node:child_process:911:24)
     at execFileSync (node:child_process:954:15)
-    at file:///home/frost/Are.na-Importer/scripts/package.mjs:22:1
+    at file:///home/frost/Tetromino/scripts/package.mjs:22:1
     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
     at async node:internal/modules/esm/loader:639:26
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
@@ -6762,10 +6762,10 @@ node:internal/child_process:1127
   path: 'zip',
   spawnargs: [
     '-j',
-    '/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip',
-    '/home/frost/Are.na-Importer/main.js',
-    '/home/frost/Are.na-Importer/manifest.json',
-    '/home/frost/Are.na-Importer/styles.css'
+    '/home/frost/Tetromino/dist/Tetromino-1.0.0.zip',
+    '/home/frost/Tetromino/main.js',
+    '/home/frost/Tetromino/manifest.json',
+    '/home/frost/Tetromino/styles.css'
   ],
   error: [Circular *1],
   status: null,
@@ -7015,7 +7015,7 @@ _**Agent (gpt-5.2-codex 2026-03-31 00:17:14Z)**_
 
 _**User (2026-03-31 00:24:19Z)**_
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
 node:internal/child_process:1127
@@ -7026,7 +7026,7 @@ node:internal/child_process:1127
     at Object.spawnSync (node:internal/child_process:1127:20)
     at spawnSync (node:child_process:911:24)
     at execFileSync (node:child_process:954:15)
-    at file:///home/frost/Are.na-Importer/scripts/package.mjs:22:1
+    at file:///home/frost/Tetromino/scripts/package.mjs:22:1
     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
     at async node:internal/modules/esm/loader:639:26
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
@@ -7036,10 +7036,10 @@ node:internal/child_process:1127
   path: 'zip',
   spawnargs: [
     '-j',
-    '/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip',
-    '/home/frost/Are.na-Importer/main.js',
-    '/home/frost/Are.na-Importer/manifest.json',
-    '/home/frost/Are.na-Importer/styles.css'
+    '/home/frost/Tetromino/dist/Tetromino-1.0.0.zip',
+    '/home/frost/Tetromino/main.js',
+    '/home/frost/Tetromino/manifest.json',
+    '/home/frost/Tetromino/styles.css'
   ],
   error: [Circular *1],
   status: null,
@@ -7106,7 +7106,7 @@ const buffer = await zip.generateAsync({
 writeFileSync(zipPath, buffer);
 console.log(`Packaged ${zipPath}`);
 {
-  "name": "Are.na Importer",
+  "name": "Tetromino",
   "version": "1.0.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault.",
   "main": "main.js",
@@ -7283,9 +7283,9 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 37
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 total 44
--rw-r--r-- 1 frost frost 41755 Mar 30 19:24 Are.na-Importer-1.0.0.zip
+-rw-r--r-- 1 frost frost 41755 Mar 30 19:24 Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -7301,7 +7301,7 @@ Process running with session ID 5704
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -7317,7 +7317,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -7330,11 +7330,11 @@ What I changed:
 - Kept `build` script as-is: it now runs bundling, then packaging reliably.
 
 Verified:
-- `node scripts/package.mjs` creates `dist/Are.na-Importer-1.0.0.zip`
+- `node scripts/package.mjs` creates `dist/Tetromino-1.0.0.zip`
 - `npm run build` now succeeds end-to-end and also produces the zip.
 
 Your package is at:
-- `dist/Are.na-Importer-1.0.0.zip`
+- `dist/Tetromino-1.0.0.zip`
 
 ---
 
@@ -8853,7 +8853,7 @@ Process running with session ID 15608
 Original token count: 108
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -8933,7 +8933,7 @@ Process running with session ID 31593
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -8949,7 +8949,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -8975,17 +8975,17 @@ Great set of asks. I implemented all three and verified with tests + build.
 - `imageHandling = link` now writes a normal link to the display image URL.
 
 **Files updated**
-- [api.ts](/home/frost/Are.na-Importer/src/api.ts)
-- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
-- [types.ts](/home/frost/Are.na-Importer/src/types.ts)
-- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
+- [api.ts](/home/frost/Tetromino/src/api.ts)
+- [utils.ts](/home/frost/Tetromino/src/utils.ts)
+- [types.ts](/home/frost/Tetromino/src/types.ts)
+- [settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Tetromino/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Tetromino/README.md)
 
 **Validation**
 - `npm test -- --runInBand` passed (20/20)
 - `npm run build` passed
-- Zip artifact produced: `dist/Are.na-Importer-1.0.0.zip`
+- Zip artifact produced: `dist/Tetromino-1.0.0.zip`
 
 If you want, next I can add one extra setting for banner fallback priority (`thumb` vs `display`) so you can tune exactly which image the Banners plugin uses.
 
@@ -9546,7 +9546,7 @@ Process running with session ID 66723
 Original token count: 108
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -9627,7 +9627,7 @@ Process running with session ID 1411
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -9643,7 +9643,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -9664,16 +9664,16 @@ Love this refinement. I added it.
   - `display-first`: `display -> thumb -> original`
 
 **Updated files**
-- [types.ts](/home/frost/Are.na-Importer/src/types.ts)
-- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
-- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
+- [types.ts](/home/frost/Tetromino/src/types.ts)
+- [utils.ts](/home/frost/Tetromino/src/utils.ts)
+- [settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Tetromino/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Tetromino/README.md)
 
 **Verification**
 - Tests passed: `21/21`
 - Build passed
-- Zip artifact created: `dist/Are.na-Importer-1.0.0.zip`
+- Zip artifact created: `dist/Tetromino-1.0.0.zip`
 
 ---
 
@@ -10651,7 +10651,7 @@ Process running with session ID 17350
 Original token count: 402
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -10734,7 +10734,7 @@ Process running with session ID 99368
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -10750,7 +10750,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -10776,18 +10776,18 @@ Absolutely, and it’s now implemented.
 - Local folder input can be left blank (no more error for empty folder).
 
 **Code touched**
-- [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
-- [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
-- [main.ts](/home/frost/Are.na-Importer/src/main.ts)
-- [migration.ts](/home/frost/Are.na-Importer/src/migration.ts)
-- [settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
+- [utils.ts](/home/frost/Tetromino/src/utils.ts)
+- [sync-engine.ts](/home/frost/Tetromino/src/sync-engine.ts)
+- [main.ts](/home/frost/Tetromino/src/main.ts)
+- [migration.ts](/home/frost/Tetromino/src/migration.ts)
+- [settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [utils.test.ts](/home/frost/Tetromino/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Tetromino/README.md)
 
 **Validation**
 - Tests: passed (`23/23`)
 - Build: passed
-- Zip produced: `dist/Are.na-Importer-1.0.0.zip`
+- Zip produced: `dist/Tetromino-1.0.0.zip`
 
 ---
 
@@ -11156,7 +11156,7 @@ Process running with session ID 13268
 Original token count: 399
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -11239,7 +11239,7 @@ Process running with session ID 88595
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -11255,7 +11255,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -11281,17 +11281,17 @@ Default folder behavior (already aligned with your earlier request) still applie
 - Explicit folder => custom path is used
 
 Updated files:
-- [src/main.ts](/home/frost/Are.na-Importer/src/main.ts)
-- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [src/api.ts](/home/frost/Are.na-Importer/src/api.ts)
-- [src/types.ts](/home/frost/Are.na-Importer/src/types.ts)
-- [src/utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
+- [src/main.ts](/home/frost/Tetromino/src/main.ts)
+- [src/settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [src/api.ts](/home/frost/Tetromino/src/api.ts)
+- [src/types.ts](/home/frost/Tetromino/src/types.ts)
+- [src/utils.ts](/home/frost/Tetromino/src/utils.ts)
+- [README.md](/home/frost/Tetromino/README.md)
 
 Validation:
 - `npm test -- --runInBand` passed
 - `npm run build` passed
-- Zip artifact: `dist/Are.na-Importer-1.0.0.zip`
+- Zip artifact: `dist/Tetromino-1.0.0.zip`
 
 ---
 
@@ -11395,7 +11395,7 @@ Process running with session ID 36961
 Original token count: 404
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -11464,10 +11464,10 @@ Snapshots:   0 total
 Time:        1.27 s
 Ran all test suites.
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -11479,8 +11479,8 @@ You found a real bug, and I fixed it.
 - Pagination logic could stop at exactly 100 blocks, so only page 1 imported for some channels.
 
 **What I changed**
-- Fixed channel pagination in [api.ts](/home/frost/Are.na-Importer/src/api.ts) so it keeps fetching until the true last page.
-- Rebuilt successfully; new zip is at `dist/Are.na-Importer-1.0.0.zip`.
+- Fixed channel pagination in [api.ts](/home/frost/Tetromino/src/api.ts) so it keeps fetching until the true last page.
+- Rebuilt successfully; new zip is at `dist/Tetromino-1.0.0.zip`.
 
 **Why this likely affected everything you saw**
 - If only first 100 blocks imported, you’d miss:
@@ -12781,7 +12781,7 @@ Process running with session ID 32793
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -12798,7 +12798,7 @@ Process exited with code 0
 Original token count: 858
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -12856,10 +12856,10 @@ Snapshots:   0 total
 Time:        1.658 s
 Ran all test suites.
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -12900,18 +12900,18 @@ This is exactly the kind of “make it actually useful in daily use” feature p
   - followers (if API provides it)
 
 **Files updated**
-- [src/sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
-- [src/utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
-- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [src/types.ts](/home/frost/Are.na-Importer/src/types.ts)
-- [src/__tests__/utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
+- [src/sync-engine.ts](/home/frost/Tetromino/src/sync-engine.ts)
+- [src/utils.ts](/home/frost/Tetromino/src/utils.ts)
+- [src/settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [src/types.ts](/home/frost/Tetromino/src/types.ts)
+- [src/__tests__/utils.test.ts](/home/frost/Tetromino/src/__tests__/utils.test.ts)
+- [README.md](/home/frost/Tetromino/README.md)
 
 **Validation**
 - `npm run lint` passed
 - `npm test -- --runInBand` passed (`25/25`)
 - `npm run build` passed
-- package zip generated: `dist/Are.na-Importer-1.0.0.zip`
+- package zip generated: `dist/Tetromino-1.0.0.zip`
 
 If you want, next I can add one more option: “import comments/connected-channels only for new/updated blocks” to reduce API load on very large channels.
 
@@ -13035,7 +13035,7 @@ Process running with session ID 97256
 Original token count: 32
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 ```
 </details></tool-use>
@@ -13051,7 +13051,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 17
 Output:
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -13064,8 +13064,8 @@ Channel index notes now include a new section in the note body when data exists:
 - `## This Channel Appears In`
 - each connected channel listed as clickable external link to Are.na
 
-I implemented this in [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts), and verified build passes.  
-New package is ready at `dist/Are.na-Importer-1.0.0.zip`.
+I implemented this in [sync-engine.ts](/home/frost/Tetromino/src/sync-engine.ts), and verified build passes.  
+New package is ready at `dist/Tetromino-1.0.0.zip`.
 
 If Are.na doesn’t return those connection arrays for a specific channel, the section is simply omitted (best-effort behavior).
 
@@ -13520,13 +13520,13 @@ Process exited with code 0
 Original token count: 79
 Output:
 {
-	"id": "Are.na-Importer",
-	"name": "Are.na Importer",
+	"id": "Tetromino",
+	"name": "Tetromino",
 	"version": "1.0.0",
 	"minAppVersion": "1.4.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
 	"author": "frostmute",
-	"authorUrl": "https://github.com/frostmute/Are.na-Importer/",
+	"authorUrl": "https://github.com/frostmute/Tetromino/",
 	"isDesktopOnly": false
 }
 ```
@@ -13709,7 +13709,7 @@ Process running with session ID 90487
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -13726,7 +13726,7 @@ Process exited with code 0
 Original token count: 865
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -13784,10 +13784,10 @@ Snapshots:   0 total
 Time:        1.389 s
 Ran all test suites.
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -13807,30 +13807,30 @@ Great call, and this repo is now fully documented for the changes we made today.
 - CONTRIBUTING updated to reflect build outputs and doc-sync expectations.
 
 **Docs touched**
-- [README.md](/home/frost/Are.na-Importer/README.md)
-- [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
-- [CONTRIBUTING.md](/home/frost/Are.na-Importer/CONTRIBUTING.md)
+- [README.md](/home/frost/Tetromino/README.md)
+- [CHANGELOG.md](/home/frost/Tetromino/CHANGELOG.md)
+- [CONTRIBUTING.md](/home/frost/Tetromino/CONTRIBUTING.md)
 
 **Verification**
 - `npm run lint` passed
 - `npm test -- --runInBand` passed
 - `npm run build` passed
-- package artifact: `dist/Are.na-Importer-1.0.0.zip`
+- package artifact: `dist/Tetromino-1.0.0.zip`
 
-If you want, next I can do a final wording polish pass so naming is consistently `Are.na Importer` (vs legacy `Are.na Sync`) everywhere in docs/UI.
+If you want, next I can do a final wording polish pass so naming is consistently `Tetromino` (vs legacy `Are.na Sync`) everywhere in docs/UI.
 
 ---
 
 _**User (2026-03-31 02:40:05Z)**_
 
-do a final wording polish pass so naming is consistently Are.na Importer (vs legacy Are.na Sync) everywhere in docs/UI.  ... also, just give the entire repo a once-over for polish, consistancy and professioinalism....  also, the settings menu for the plugin in obsidian; can we clean it up and format it better? maybe more detailed explanations somehow?
+do a final wording polish pass so naming is consistently Tetromino (vs legacy Are.na Sync) everywhere in docs/UI.  ... also, just give the entire repo a once-over for polish, consistancy and professioinalism....  also, the settings menu for the plugin in obsidian; can we clean it up and format it better? maybe more detailed explanations somehow?
 
 
 ---
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
 
-Love this request. I’m going to do this in three passes: first fix naming consistency (`Are.na Importer`) across docs/UI text, then refine settings layout/copy for clarity, then do a final repo polish sweep for professionalism and consistency.
+Love this request. I’m going to do this in three passes: first fix naming consistency (`Tetromino`) across docs/UI text, then refine settings layout/copy for clarity, then do a final repo polish sweep for professionalism and consistency.
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:40:17Z)**_
 
@@ -14548,7 +14548,7 @@ wontfix       #ffffff   This will not be worked on
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:40:35Z)**_
 
-I’m now doing the UI polish pass directly in `settings-tab.ts`: clearer section headers, quick-start guidance, cleaner mapping labels, and more explicit descriptions/tradeoffs for each advanced option. Then I’ll harmonize `Are.na Importer` wording in notices/commands/docs.
+I’m now doing the UI polish pass directly in `settings-tab.ts`: clearer section headers, quick-start guidance, cleaner mapping labels, and more explicit descriptions/tradeoffs for each advanced option. Then I’ll harmonize `Tetromino` wording in notices/commands/docs.
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:40:36Z)**_
 
@@ -14592,7 +14592,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:06Z)**_
 -		containerEl.createEl("h1", { text: "Are.na Import" });
 -		containerEl.createEl("p", {
 -			text: "One-way import from Are.na into this vault.",
-+		containerEl.createEl("h1", { text: "Are.na Importer" });
++		containerEl.createEl("h1", { text: "Tetromino" });
 +		containerEl.createEl("p", {
 +			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 +			cls: "setting-item-description",
@@ -14751,39 +14751,39 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:17Z)**_
 @@
  		if (this.isSyncing) {
 -			new Notice("Are.na Import is already running...");
-+			new Notice("Are.na Importer is already running...");
++			new Notice("Tetromino is already running...");
  			return;
  		}
 @@
 -			new Notice("Are.na Import: Please set your API token in settings.");
-+			new Notice("Are.na Importer: Please set your API token in settings.");
++			new Notice("Tetromino: Please set your API token in settings.");
 @@
  			new Notice(
 -				"Are.na Import: No valid channels configured (check that channel slug is not empty).",
-+				"Are.na Importer: No valid channels configured (check that channel slug is not empty).",
++				"Tetromino: No valid channels configured (check that channel slug is not empty).",
  			);
 @@
 -			new Notice(`Are.na Import failed: ${(err as Error).message}`);
-+			new Notice(`Are.na Importer failed: ${(err as Error).message}`);
++			new Notice(`Tetromino failed: ${(err as Error).message}`);
 @@
  		if (this.isSyncing) {
 -			new Notice("Are.na Import is already running...");
-+			new Notice("Are.na Importer is already running...");
++			new Notice("Tetromino is already running...");
  			return;
  		}
 @@
  		const prefix = result.dryRun
 -			? "Are.na Import preview"
 -			: "Are.na Import";
-+			? "Are.na Importer preview"
-+			: "Are.na Importer";
++			? "Tetromino preview"
++			: "Tetromino";
 @@
 -		const title = `Are.na Import ${label} Summary`;
-+		const title = `Are.na Importer ${label} Summary`;
++		const title = `Tetromino ${label} Summary`;
 @@
  		if (this.isMigrating) {
 -			new Notice("Are.na Import migration is already running...");
-+			new Notice("Are.na Importer migration is already running...");
++			new Notice("Tetromino migration is already running...");
  			return;
  		}
 ```
@@ -14802,7 +14802,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:21Z)**_
 ```diff
 @@
 -# Are.na Import for Obsidian
-+# Are.na Importer for Obsidian
++# Tetromino for Obsidian
 @@
 -- Manually trigger with Command Palette: `Sync all channels now`
 +- Manually trigger with Command Palette: `Import all channels now`
@@ -14819,7 +14819,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:24Z)**_
 @@
  1. Put `main.js`, `manifest.json`, and `styles.css` in:
 -   `<your-vault>/.obsidian/plugins/arena-sync/`
-+   `<your-vault>/.obsidian/plugins/Are.na-Importer/`
++   `<your-vault>/.obsidian/plugins/Tetromino/`
 ```
 </details></tool-use>
 
@@ -14832,10 +14832,10 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:29Z)**_
 ```diff
 @@
 -If you discover a security vulnerability in Are.na Sync for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
-+If you discover a security vulnerability in Are.na Importer for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
++If you discover a security vulnerability in Tetromino for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
 @@
 -Only the latest version of Are.na Sync receives security updates. We recommend always updating to the latest version as soon as possible.
-+Only the latest version of Are.na Importer receives security updates. We recommend always updating to the latest version as soon as possible.
++Only the latest version of Tetromino receives security updates. We recommend always updating to the latest version as soon as possible.
 ```
 </details></tool-use>
 
@@ -14848,12 +14848,12 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:33Z)**_
 ```diff
 @@
 -Thanks for contributing to `arena-sync-obsidian`.
-+Thanks for contributing to `Are.na-Importer`.
++Thanks for contributing to `Tetromino`.
 @@
 -git clone https://github.com/arena-sync/arena-sync-obsidian.git
 -cd arena-sync-obsidian
-+git clone https://github.com/frostmute/Are.na-Importer.git
-+cd Are.na-Importer
++git clone https://github.com/frostmute/Tetromino.git
++cd Tetromino
 ```
 </details></tool-use>
 
@@ -14866,12 +14866,12 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:38Z)**_
 ```diff
 @@
 -All notable changes to **Are.na Sync for Obsidian** will be documented in this file.
-+All notable changes to **Are.na Importer for Obsidian** will be documented in this file.
++All notable changes to **Tetromino for Obsidian** will be documented in this file.
 @@
 -[Unreleased]: https://github.com/yourusername/arena-sync-obsidian/compare/v1.0.0...HEAD
 -[1.0.0]: https://github.com/yourusername/arena-sync-obsidian/releases/tag/v1.0.0
-+[Unreleased]: https://github.com/frostmute/Are.na-Importer/compare/v1.0.0...HEAD
-+[1.0.0]: https://github.com/frostmute/Are.na-Importer/releases/tag/v1.0.0
++[Unreleased]: https://github.com/frostmute/Tetromino/compare/v1.0.0...HEAD
++[1.0.0]: https://github.com/frostmute/Tetromino/releases/tag/v1.0.0
 ```
 </details></tool-use>
 
@@ -14884,23 +14884,23 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:47Z)**_
 ```diff
 @@
 -# 🚀 Are.na Sync for Obsidian v{{VERSION}}
-+# 🚀 Are.na Importer for Obsidian v{{VERSION}}
++# 🚀 Tetromino for Obsidian v{{VERSION}}
 @@
  1. Open **Settings → Community plugins → Browse**.
 -2. Search for **"Are.na Sync"**.
-+2. Search for **"Are.na Importer"**.
++2. Search for **"Tetromino"**.
  3. Click **Update** (or **Install** + **Enable** for first-time users).
 @@
  1. Download `main.js`, `manifest.json`, and `styles.css` from the assets below.
 -2. Copy them to `<your-vault>/.obsidian/plugins/arena-sync/`.
-+2. Copy them to `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
++2. Copy them to `<your-vault>/.obsidian/plugins/Tetromino/`.
  3. Reload Obsidian.
 @@
 -See the [project board](https://github.com/arena-sync/arena-sync-obsidian/projects/1) for upcoming work, or [open an issue](https://github.com/arena-sync/arena-sync-obsidian/issues/new/choose) to request a feature.
-+See the [project board](https://github.com/frostmute/Are.na-Importer/projects/1) for upcoming work, or [open an issue](https://github.com/frostmute/Are.na-Importer/issues/new/choose) to request a feature.
++See the [project board](https://github.com/frostmute/Tetromino/projects/1) for upcoming work, or [open an issue](https://github.com/frostmute/Tetromino/issues/new/choose) to request a feature.
  
 -**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/arena-sync/arena-sync-obsidian/compare/v{{PREV_VERSION}}...v{{VERSION}})
-+**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/frostmute/Are.na-Importer/compare/v{{PREV_VERSION}}...v{{VERSION}})
++**Full changelog**: [`v{{PREV_VERSION}}...v{{VERSION}}`](https://github.com/frostmute/Tetromino/compare/v{{PREV_VERSION}}...v{{VERSION}})
 ```
 </details></tool-use>
 
@@ -14914,11 +14914,11 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:41:51Z)**_
 @@
        label: Plugin version
 -      description: "Find this in Settings → Community plugins → Are.na Sync"
-+      description: "Find this in Settings → Community plugins → Are.na Importer"
++      description: "Find this in Settings → Community plugins → Tetromino"
 @@
        label: Console logs
 -      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Sync → Debug logging** for verbose output."
-+      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Are.na Importer → Debug logging** for verbose output."
++      description: "Open the developer console (Ctrl/Cmd+Shift+I) and paste any errors. Enable **Settings → Tetromino → Debug logging** for verbose output."
        render: shell
 ```
 </details></tool-use>
@@ -14943,12 +14943,12 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:42:26Z)**_
 ```diff
 +# Project Board Structure
 +
-+Use this file to bootstrap a GitHub Projects board for **Are.na Importer for Obsidian**.
-+Create the board at: https://github.com/frostmute/Are.na-Importer/projects/new
++Use this file to bootstrap a GitHub Projects board for **Tetromino for Obsidian**.
++Create the board at: https://github.com/frostmute/Tetromino/projects/new
 +
 +---
 +
-+## Board: Are.na Importer Roadmap
++## Board: Tetromino Roadmap
 +
 +**View**: Table + Board (Kanban)
 +
@@ -15120,7 +15120,7 @@ Process running with session ID 92299
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -15137,7 +15137,7 @@ Process exited with code 0
 Original token count: 863
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -15195,10 +15195,10 @@ Snapshots:   0 total
 Time:        1.624 s
 Ran all test suites.
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -15208,7 +15208,7 @@ This was a really worthwhile polish pass, and it’s now in a much more professi
 
 **What I completed**
 
-1. Naming consistency: `Are.na Importer` everywhere (docs + UI copy)
+1. Naming consistency: `Tetromino` everywhere (docs + UI copy)
 - Updated user-facing text in notices, headings, and templates.
 - Removed legacy `Are.na Sync` wording across docs and issue/release templates.
 
@@ -15225,21 +15225,21 @@ This was a really worthwhile polish pass, and it’s now in a much more professi
 - Updated `.github` templates and roadmap doc to match current one-way importer scope.
 
 **Key files updated**
-- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts)
-- [src/main.ts](/home/frost/Are.na-Importer/src/main.ts)
-- [README.md](/home/frost/Are.na-Importer/README.md)
-- [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
-- [CONTRIBUTING.md](/home/frost/Are.na-Importer/CONTRIBUTING.md)
-- [SECURITY.md](/home/frost/Are.na-Importer/SECURITY.md)
-- [.github/release-template.md](/home/frost/Are.na-Importer/.github/release-template.md)
-- [.github/ISSUE_TEMPLATE/bug_report.yml](/home/frost/Are.na-Importer/.github/ISSUE_TEMPLATE/bug_report.yml)
-- [.github/PROJECT_BOARD.md](/home/frost/Are.na-Importer/.github/PROJECT_BOARD.md)
+- [src/settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts)
+- [src/main.ts](/home/frost/Tetromino/src/main.ts)
+- [README.md](/home/frost/Tetromino/README.md)
+- [CHANGELOG.md](/home/frost/Tetromino/CHANGELOG.md)
+- [CONTRIBUTING.md](/home/frost/Tetromino/CONTRIBUTING.md)
+- [SECURITY.md](/home/frost/Tetromino/SECURITY.md)
+- [.github/release-template.md](/home/frost/Tetromino/.github/release-template.md)
+- [.github/ISSUE_TEMPLATE/bug_report.yml](/home/frost/Tetromino/.github/ISSUE_TEMPLATE/bug_report.yml)
+- [.github/PROJECT_BOARD.md](/home/frost/Tetromino/.github/PROJECT_BOARD.md)
 
 **Verification**
 - `npm run lint` passed
 - `npm test -- --runInBand` passed
 - `npm run build` passed
-- package artifact: `dist/Are.na-Importer-1.0.0.zip`
+- package artifact: `dist/Tetromino-1.0.0.zip`
 
 If you want, I can do one more ultra-final polish: normalize tone and punctuation in every settings description to a strict style guide (same sentence length/capitalization cadence).
 
@@ -15376,7 +15376,7 @@ Wall time: 0.0000 seconds
 Process exited with code 0
 Original token count: 1729
 Output:
-# Are.na Importer for Obsidian
+# Tetromino for Obsidian
 
 Import Are.na channel content into your Obsidian vault as Markdown notes.
 
@@ -15516,7 +15516,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("h1", { text: "Tetromino" });
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",
@@ -16056,7 +16056,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("h1", { text: "Tetromino" });
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",
@@ -16379,7 +16379,7 @@ Wall time: 0.0420 seconds
 Process exited with code 0
 Original token count: 1729
 Output:
-# Are.na Importer for Obsidian
+# Tetromino for Obsidian
 
 Import Are.na channel content into your Obsidian vault as Markdown notes.
 
@@ -16898,13 +16898,13 @@ Process exited with code 0
 Original token count: 79
 Output:
 {
-	"id": "Are.na-Importer",
-	"name": "Are.na Importer",
+	"id": "Tetromino",
+	"name": "Tetromino",
 	"version": "1.0.0",
 	"minAppVersion": "1.4.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault as Markdown notes.",
 	"author": "frostmute",
-	"authorUrl": "https://github.com/frostmute/Are.na-Importer/",
+	"authorUrl": "https://github.com/frostmute/Tetromino/",
 	"isDesktopOnly": false
 }
 ```
@@ -16954,7 +16954,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 
 ```diff
 @@
--# Are.na Importer for Obsidian
+-# Tetromino for Obsidian
 -
 -Import Are.na channel content into your Obsidian vault as Markdown notes.
 -
@@ -17060,7 +17060,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 -## Installation
 -
 -1. Put `main.js`, `manifest.json`, and `styles.css` in:
--   `<your-vault>/.obsidian/plugins/Are.na-Importer/`
+-   `<your-vault>/.obsidian/plugins/Tetromino/`
 -2. Enable the plugin in Obsidian Community Plugins.
 -3. Open plugin settings and add:
 -	- Are.na API token
@@ -17133,7 +17133,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 -## License
 -
 -MIT
-+<h1 align="center">Are.na Importer for Obsidian</h1>
++<h1 align="center">Tetromino for Obsidian</h1>
 +<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 +
 +<div align="center">
@@ -17142,7 +17142,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 +
 +</div>
 +
-+Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
++Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 +
 +## Quick Navigation
 +
@@ -17232,8 +17232,8 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 +
 +## Installation
 +
-+1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
-+2. Enable **Are.na Importer** in Obsidian Community Plugins.
++1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Tetromino/`.
++2. Enable **Tetromino** in Obsidian Community Plugins.
 +3. Open settings and add your API token.
 +4. Add at least one channel mapping, or run `Import my channels`.
 +
@@ -17307,7 +17307,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:50:46Z)**_
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
 
-README is now restructured in the stronger centered/sectioned style and aligned to Are.na Importer language. I’m running lint, tests, and build next to confirm the final copy pass didn’t introduce any regressions.
+README is now restructured in the stronger centered/sectioned style and aligned to Tetromino language. I’m running lint, tests, and build next to confirm the final copy pass didn’t introduce any regressions.
 
 _**Agent (gpt-5.3-codex 2026-03-31 02:50:51Z)**_
 
@@ -17321,7 +17321,7 @@ Process exited with code 0
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -17338,7 +17338,7 @@ Process exited with code 0
 Original token count: 824
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -17410,10 +17410,10 @@ Process exited with code 0
 Original token count: 49
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -17434,7 +17434,7 @@ index 1ea1bf6..0fc4367 100644
 +++ b/README.md
 @@ -1,45 +1,67 @@
 -# Are.na Import for Obsidian
-+<h1 align="center">Are.na Importer for Obsidian</h1>
++<h1 align="center">Tetromino for Obsidian</h1>
 +<p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
  
 -Import Are.na channel content into your Obsidian vault as Markdown notes.
@@ -17447,7 +17447,7 @@ index 1ea1bf6..0fc4367 100644
 +</div>
  
 -## What it does
-+Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
++Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
  
 -- Imports mapped Are.na channels into mapped vault folders
 -- Creates Markdown files for Are.na blocks
@@ -17531,22 +17531,22 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:51:05Z)**_
 Completed. I applied the ultra-final polish pass and verified everything still builds cleanly.
 
 ### Updated
-- Normalized settings copy in [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts) to a stricter, consistent style:
+- Normalized settings copy in [src/settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts) to a stricter, consistent style:
   - sentence-case tone
   - consistent punctuation
   - clearer action/outcome wording
   - added missing descriptions for `Show notifications` and `Debug logging`
-- Reworked [README.md](/home/frost/Are.na-Importer/README.md) to match the style direction you shared:
+- Reworked [README.md](/home/frost/Tetromino/README.md) to match the style direction you shared:
   - centered title/tagline presentation
   - cleaner quick navigation
   - tighter, more professional section cadence
-  - consistent naming as **Are.na Importer** throughout
+  - consistent naming as **Tetromino** throughout
 
 ### Validation
 - `npm run lint` ✅
 - `npm test -- --runInBand` ✅ (all tests pass; existing `ts-jest` interop warning still appears but does not fail)
 - `npm run build` ✅
-- Package produced: `/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip`
+- Package produced: `/home/frost/Tetromino/dist/Tetromino-1.0.0.zip`
 
 
 
@@ -17588,7 +17588,7 @@ src/settings-tab.ts:44:				"Use a personal token from https://dev.are.na/oauth/a
 src/settings-tab.ts:47:				text.setPlaceholder("Enter your Are.na token")
 src/settings-tab.ts:59:						new Notice("Please enter an API token first");
 src/settings-tab.ts:63:					new Notice(ok ? "Token is valid" : "Invalid token");
-src/main.ts:175:			new Notice("Are.na Importer: Please set your API token in settings.");
+src/main.ts:175:			new Notice("Tetromino: Please set your API token in settings.");
 src/main.ts:395:			throw new Error("Please set your API token first.");
 src/api.ts:32:	private token: string;
 src/api.ts:35:	constructor(token: string, debug = false) {
@@ -17644,7 +17644,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("h1", { text: "Tetromino" });
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",
@@ -17911,8 +17911,8 @@ _**Agent (gpt-5.3-codex 2026-03-31 02:56:55Z)**_
 
 Updated. The token source now points to the correct personal-access-token page in both places:
 
-- [src/settings-tab.ts](/home/frost/Are.na-Importer/src/settings-tab.ts): API token setting description
-- [README.md](/home/frost/Are.na-Importer/README.md): troubleshooting step for invalid token
+- [src/settings-tab.ts](/home/frost/Tetromino/src/settings-tab.ts): API token setting description
+- [README.md](/home/frost/Tetromino/README.md): troubleshooting step for invalid token
 
 New URL used everywhere: `https://www.are.na/developers/personal-access-tokens`
 
@@ -17956,7 +17956,7 @@ CHANGELOG.md:52:  - `Auto-enable imported channels` toggle (granular manual cont
 CHANGELOG.md:63:  - import connected channels where block appears, with clickable external links
 CHANGELOG.md:64:  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
 CHANGELOG.md:79:- Fixed pagination edge case where some channels could stop after the first 100 blocks.
-README.md:10:Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+README.md:10:Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 README.md:24:- It does not auto-delete local notes when remote blocks disappear.
 README.md:30:- Imports mapped Are.na channels into mapped vault folders.
 README.md:31:- Supports full pagination for large channels (not limited to the first 100 blocks).
@@ -20250,7 +20250,7 @@ Wall time: 0.0181 seconds
 Process exited with code 0
 Original token count: 1450
 Output:
-<h1 align="center">Are.na Importer for Obsidian</h1>
+<h1 align="center">Tetromino for Obsidian</h1>
 <p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 
 <div align="center">
@@ -20259,7 +20259,7 @@ One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run p
 
 </div>
 
-Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 
 ## Quick Navigation
 
@@ -20349,8 +20349,8 @@ Are.na Importer brings channels, blocks, metadata, and attachments into your vau
 
 ## Installation
 
-1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
-2. Enable **Are.na Importer** in Obsidian Community Plugins.
+1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Tetromino/`.
+2. Enable **Tetromino** in Obsidian Community Plugins.
 3. Open settings and add your API token.
 4. Add at least one channel mapping, or run `Import my channels`.
 
@@ -20401,7 +20401,7 @@ Original token count: 1284
 Output:
 # Changelog
 
-All notable changes to **Are.na Importer for Obsidian** will be documented in this file.
+All notable changes to **Tetromino for Obsidian** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -20577,7 +20577,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 03:05:10Z)**_
 
 ```diff
 @@
- Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+ Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 +
 +API compatibility targets the current Are.na REST API v3 documentation: <https://www.are.na/developers/explore>.
 ```
@@ -20617,7 +20617,7 @@ Process exited with code 0
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -20634,7 +20634,7 @@ Process exited with code 0
 Original token count: 841
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -20707,7 +20707,7 @@ Process exited with code 2
 Original token count: 222
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
 src/api.ts(199,8): error TS2352: Conversion of type 'Record<string, unknown>' to type 'ArenaChannel' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
@@ -20755,10 +20755,10 @@ Process exited with code 0
 Original token count: 49
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -20769,45 +20769,45 @@ Completed. I shipped a focused Are.na API v3 migration pass across client, types
 ### What changed
 
 - API client now targets v3 routes on `https://api.are.na` with `/v3/...` prefix by default:
-  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+  - [api.ts](/home/frost/Tetromino/src/api.ts)
 
 - Added response compatibility adapters so importer internals still use stable `contents/current_page/total_pages`:
   - Supports v3 pagination shape: `data + meta`
   - Still supports legacy shape: `contents + total_pages`
   - Added robust `data` unwrapping for single-resource responses (`/channels/:slug`, `/blocks/:id`)
-  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+  - [api.ts](/home/frost/Tetromino/src/api.ts)
 
 - Hardened channel normalization for v3 field variability:
   - `length` fallback from alternate count fields
   - `description` + `metadata.description` normalization
-  - [api.ts](/home/frost/Are.na-Importer/src/api.ts)
+  - [api.ts](/home/frost/Tetromino/src/api.ts)
 
 - Updated URL normalization to handle both v2 and v3 API links:
-  - [utils.ts](/home/frost/Are.na-Importer/src/utils.ts)
+  - [utils.ts](/home/frost/Tetromino/src/utils.ts)
 
 - Updated types for safer v3 compatibility:
   - `ArenaBlock.position` optional
   - `ArenaChannel.description` optional
   - `ArenaChannel.contents` optional
   - `ArenaChannel.metadata` optional
-  - [types.ts](/home/frost/Are.na-Importer/src/types.ts)
+  - [types.ts](/home/frost/Tetromino/src/types.ts)
 
 - Channel index description now also falls back to top-level `channel.description`:
-  - [sync-engine.ts](/home/frost/Are.na-Importer/src/sync-engine.ts)
+  - [sync-engine.ts](/home/frost/Tetromino/src/sync-engine.ts)
 
 - Added/updated tests for v3 URL normalization:
-  - [utils.test.ts](/home/frost/Are.na-Importer/src/__tests__/utils.test.ts)
+  - [utils.test.ts](/home/frost/Tetromino/src/__tests__/utils.test.ts)
 
 - Documentation updated to explicitly state v3 doc target:
-  - [README.md](/home/frost/Are.na-Importer/README.md)
-  - [CHANGELOG.md](/home/frost/Are.na-Importer/CHANGELOG.md)
+  - [README.md](/home/frost/Tetromino/README.md)
+  - [CHANGELOG.md](/home/frost/Tetromino/CHANGELOG.md)
 
 ### Verification
 
 - `npm run lint` ✅
 - `npm test -- --runInBand` ✅ (26 passing)
 - `npm run build` ✅
-- Package output: `/home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip`
+- Package output: `/home/frost/Tetromino/dist/Tetromino-1.0.0.zip`
 
 If you want, next I can add a small integration test fixture for v3 `data/meta` payload parsing in `api.ts` so this adapter behavior is permanently regression-tested.
 
@@ -20842,7 +20842,7 @@ Process exited with code 0
 Original token count: 282
 Output:
 {
-  "name": "Are.na Importer",
+  "name": "Tetromino",
   "version": "1.0.0",
 	"description": "One-way import from Are.na channels into your Obsidian vault.",
   "main": "main.js",
@@ -20943,7 +20943,7 @@ drwxr-xr-x 1 frost frost   208 Mar 30 19:10 ..
 ./assets/forum-post.md:42:- GitHub: https://github.com/arena-sync/arena-sync-obsidian
 ./assets/forum-post.md:43:- Changelog: https://github.com/arena-sync/arena-sync-obsidian/blob/main/CHANGELOG.md
 ./assets/forum-post.md:44:- Contributing: https://github.com/arena-sync/arena-sync-obsidian/blob/main/CONTRIBUTING.md
-./README.md:102:1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
+./README.md:102:1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Tetromino/`.
 ./package.json:12:    "test": "jest --coverage",
 ./package.json:13:    "test:watch": "jest --watch",
 ./package.json:18:    "obsidian",
@@ -21249,11 +21249,11 @@ Process exited with code 1
 Original token count: 59
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 
 
-/home/frost/Are.na-Importer/src/__mocks__/obsidian.ts
+/home/frost/Tetromino/src/__mocks__/obsidian.ts
   12:34  error  '_params' is defined but never used  @typescript-eslint/no-unused-vars
 
 ✖ 1 problem (1 error, 0 warnings)
@@ -21272,7 +21272,7 @@ Process exited with code 0
 Original token count: 716
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -21313,10 +21313,10 @@ Process exited with code 0
 Original token count: 49
 Output:
 
-> Are.na Importer@1.0.0 build
+> Tetromino@1.0.0 build
 > tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/package.mjs
 
-Packaged /home/frost/Are.na-Importer/dist/Are.na-Importer-1.0.0.zip
+Packaged /home/frost/Tetromino/dist/Tetromino-1.0.0.zip
 ```
 </details></tool-use>
 
@@ -21369,7 +21369,7 @@ Process exited with code 0
 Original token count: 14
 Output:
 
-> Are.na Importer@1.0.0 lint
+> Tetromino@1.0.0 lint
 > eslint "src/**/*.ts"
 ```
 </details></tool-use>
@@ -21386,7 +21386,7 @@ Process exited with code 0
 Original token count: 720
 Output:
 
-> Are.na Importer@1.0.0 test
+> Tetromino@1.0.0 test
 > jest --coverage --runInBand
 
 ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
@@ -21419,7 +21419,7 @@ _**Agent (gpt-5.3-codex 2026-03-31 03:28:06Z)**_
 
 Done. I added a permanent v3 adapter regression fixture in:
 
-- [api.test.ts](/home/frost/Are.na-Importer/src/__tests__/api.test.ts)
+- [api.test.ts](/home/frost/Tetromino/src/__tests__/api.test.ts)
 
 ### What it tests
 - v3 paginated payload parsing:
@@ -21433,7 +21433,7 @@ Done. I added a permanent v3 adapter regression fixture in:
   - asserts `Authorization: Bearer <token>` header is sent
 
 ### Supporting mock update
-- Expanded [obsidian.ts](/home/frost/Are.na-Importer/src/__mocks__/obsidian.ts) to include `requestUrl` and `RequestUrlParam` for API tests.
+- Expanded [obsidian.ts](/home/frost/Tetromino/src/__mocks__/obsidian.ts) to include `requestUrl` and `RequestUrlParam` for API tests.
 
 ### Validation
 - `npm run lint` ✅
@@ -21452,19 +21452,19 @@ _**User (2026-03-31 03:29:23Z)**_
 
 ## My request for Codex:
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 zsh: parse error near `\n'
-❯ <h1 align="center">Are.na Importer for Obsidian</h1>
+❯ <h1 align="center">Tetromino for Obsidian</h1>
 
 
 ---
@@ -21476,7 +21476,7 @@ That error is expected in `zsh` because `<...>` is treated as shell redirection 
 Use one of these instead:
 
 ```bash
-echo '<h1 align="center">Are.na Importer for Obsidian</h1>'
+echo '<h1 align="center">Tetromino for Obsidian</h1>'
 ```
 
 or if you’re editing the README, just paste the line directly into the file (not into terminal).  

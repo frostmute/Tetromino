@@ -1,14 +1,14 @@
-<h1 align="center">Are.na Importer for Obsidian</h1>
+<h1 align="center">Tetromino for Obsidian</h1>
 <p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/frostmute/Are.na-Importer/main/assets/hero-banner.svg" alt="Are.na Importer Banner" width="600" />
+  <img src="https://raw.githubusercontent.com/frostmute/Tetromino/main/assets/hero-banner.svg" alt="Tetromino Banner" width="600" />
 </div>
 
 <div align="center">
-  <a href="https://github.com/frostmute/Are.na-Importer/releases"><img src="https://img.shields.io/github/v/release/frostmute/Are.na-Importer?style=for-the-badge&color=blue" alt="GitHub release" /></a>
-  <a href="https://github.com/frostmute/Are.na-Importer/actions"><img src="https://img.shields.io/github/actions/workflow/status/frostmute/Are.na-Importer/ci.yml?style=for-the-badge" alt="CI Status" /></a>
-  <a href="https://github.com/frostmute/Are.na-Importer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/frostmute/Are.na-Importer?style=for-the-badge" alt="License" /></a>
+  <a href="https://github.com/frostmute/Tetromino/releases"><img src="https://img.shields.io/github/v/release/frostmute/Tetromino?style=for-the-badge&color=blue" alt="GitHub release" /></a>
+  <a href="https://github.com/frostmute/Tetromino/actions"><img src="https://img.shields.io/github/actions/workflow/status/frostmute/Tetromino/ci.yml?style=for-the-badge" alt="CI Status" /></a>
+  <a href="https://github.com/frostmute/Tetromino/blob/main/LICENSE"><img src="https://img.shields.io/github/license/frostmute/Tetromino?style=for-the-badge" alt="License" /></a>
 </div>
 
 <div align="center">
@@ -17,7 +17,7 @@ One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run p
 
 </div>
 
-Are.na Importer brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
 
 API compatibility targets the current Are.na REST API v3 documentation: <https://www.are.na/developers/explore>.
 
@@ -37,7 +37,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 ## Feature Highlights
 
-<img src="https://raw.githubusercontent.com/frostmute/Are.na-Importer/main/assets/hero-square.svg" alt="App Preview" align="right" width="250" />
+<img src="https://raw.githubusercontent.com/frostmute/Tetromino/main/assets/hero-square.svg" alt="App Preview" align="right" width="250" />
 
 ### Import Engine
 
@@ -112,8 +112,8 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 ## Installation
 
-1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Are.na-Importer/`.
-2. Enable **Are.na Importer** in Obsidian Community Plugins.
+1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Tetromino/`.
+2. Enable **Tetromino** in Obsidian Community Plugins.
 3. Open settings and add your API token.
 4. Add at least one channel mapping, or run `Import my channels`.
 

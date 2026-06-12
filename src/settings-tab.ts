@@ -23,7 +23,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Are.na Importer" });
+		containerEl.createEl("h1", { text: "Tetromino" });
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",

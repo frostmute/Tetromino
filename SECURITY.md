@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Are.na Importer for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
+If you discover a security vulnerability in Tetromino for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
@@ -49,7 +49,7 @@ The following are **not** the responsibility of this plugin:
 
 ## Supported Versions
 
-Only the latest version of Are.na Importer receives security updates. We recommend always updating to the latest version as soon as possible.
+Only the latest version of Tetromino receives security updates. We recommend always updating to the latest version as soon as possible.
 
 ## Security Practices
 

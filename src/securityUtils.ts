@@ -1,5 +1,5 @@
 /**
- * Security utilities for Are.na Importer
+ * Security utilities for Tetromino
  */
 
 /**
