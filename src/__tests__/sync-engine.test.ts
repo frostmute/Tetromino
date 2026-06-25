@@ -338,7 +338,8 @@ describe("SyncEngine", () => {
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
 
 			const pullBlockSpy = jest.spyOn(engine as any, "pullBlock");
-			pullBlockSpy.mockImplementation(async (block: ArenaBlock | unknown) => {
+			pullBlockSpy.mockImplementation(async (blockArg: unknown) => {
+				const block = blockArg as ArenaBlock;
 				if (block.id === 1) {
 					throw new Error("Failed to pull block 1");
 				}
