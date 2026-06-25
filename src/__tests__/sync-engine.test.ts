@@ -99,7 +99,7 @@ describe("SyncEngine", () => {
 			});
 
 			// Mock updateMasterOverview since we just want to test syncAll logic
-			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined as any);
 
 			const result = await engine.syncAll();
 
@@ -128,7 +128,7 @@ describe("SyncEngine", () => {
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
 
 			const syncChannelSpy = jest.spyOn(engine, "syncChannel").mockRejectedValue(new Error("API failure"));
-			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined as any);
 
 			const result = await engine.syncAll();
 
@@ -148,16 +148,25 @@ describe("SyncEngine", () => {
 		it("should handle multiple channels and aggregate results and errors", async () => {
 			defaultSettings.channelMappings = [
 				{
+					channelId: 1,
+					channelTitle: "Success Channel",
+					lastSyncedAt: new Date().toISOString(),
 					channelSlug: "success-channel",
 					enabled: true,
 					localFolder: "",
 				},
 				{
+					channelId: 2,
+					channelTitle: "Fail Channel",
+					lastSyncedAt: new Date().toISOString(),
 					channelSlug: "fail-channel",
 					enabled: true,
 					localFolder: "",
 				},
 				{
+					channelId: 3,
+					channelTitle: "Another Success Channel",
+					lastSyncedAt: new Date().toISOString(),
 					channelSlug: "another-success-channel",
 					enabled: true,
 					localFolder: "",
@@ -178,7 +187,7 @@ describe("SyncEngine", () => {
 					dryRun: false, actions: ["success 2"], moves: [], fileDiffs: [], missingPaths: [], errors: [], duration: 5
 				});
 
-			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined as any);
 
 			const result = await engine.syncAll();
 
@@ -199,6 +208,9 @@ describe("SyncEngine", () => {
 		it("should handle non-Error exceptions gracefully", async () => {
 			defaultSettings.channelMappings = [
 				{
+					channelId: 4,
+					channelTitle: "String Error Channel",
+					lastSyncedAt: new Date().toISOString(),
 					channelSlug: "string-error-channel",
 					enabled: true,
 					localFolder: "",
@@ -209,7 +221,7 @@ describe("SyncEngine", () => {
 
 			// Mock syncChannel to throw a string instead of an Error object
 			const syncChannelSpy = jest.spyOn(engine, "syncChannel").mockRejectedValue("Literal string error");
-			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined as any);
 
 			const result = await engine.syncAll();
 
@@ -226,6 +238,9 @@ describe("SyncEngine", () => {
 		it("should aggregate errors returned from syncChannel (non-throwing)", async () => {
 			defaultSettings.channelMappings = [
 				{
+					channelId: 5,
+					channelTitle: "Partial Error Channel",
+					lastSyncedAt: new Date().toISOString(),
 					channelSlug: "partial-error-channel",
 					enabled: true,
 					localFolder: "",
@@ -247,7 +262,7 @@ describe("SyncEngine", () => {
 				],
 				duration: 5
 			});
-			const updateMasterOverviewSpy = jest.spyOn(engine as unknown as Record<string, unknown>, "updateMasterOverview").mockResolvedValue(undefined);
+			const updateMasterOverviewSpy = jest.spyOn(engine as any, "updateMasterOverview").mockResolvedValue(undefined as any);
 
 			const result = await engine.syncAll();
 

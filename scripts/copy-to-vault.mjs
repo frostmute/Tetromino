@@ -8,7 +8,7 @@ export const copyToVaults = () => {
     }
 
     const targetVaultPaths = [
-        '/Users/thewytchhaus/Documents/Obsidian Vault/.obsidian/plugins/are.na-importer/',
+        '/Users/thewytchhaus/Documents/GitHub/Nexus Vault/.obsidian/plugins/are.na-importer/',
     ];
     const sourceFiles = [
         'main.js',
