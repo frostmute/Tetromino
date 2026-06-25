@@ -244,7 +244,7 @@ describe("SyncEngine", () => {
 					channelSlug: "partial-error-channel",
 					enabled: true,
 					localFolder: "",
-				},
+				} as ChannelMapping,
 			];
 
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
@@ -338,7 +338,7 @@ describe("SyncEngine", () => {
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
 
 			const pullBlockSpy = jest.spyOn(engine as any, "pullBlock");
-			pullBlockSpy.mockImplementation(async (block: ArenaBlock) => {
+			pullBlockSpy.mockImplementation(async (block: ArenaBlock | unknown) => {
 				if (block.id === 1) {
 					throw new Error("Failed to pull block 1");
 				}
