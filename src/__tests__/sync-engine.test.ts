@@ -154,7 +154,7 @@ describe("SyncEngine", () => {
 					channelSlug: "success-channel",
 					enabled: true,
 					localFolder: "",
-				},
+				} as ChannelMapping,
 				{
 					channelId: 2,
 					channelTitle: "Fail Channel",
@@ -162,7 +162,7 @@ describe("SyncEngine", () => {
 					channelSlug: "fail-channel",
 					enabled: true,
 					localFolder: "",
-				},
+				} as ChannelMapping,
 				{
 					channelId: 3,
 					channelTitle: "Another Success Channel",
@@ -170,7 +170,7 @@ describe("SyncEngine", () => {
 					channelSlug: "another-success-channel",
 					enabled: true,
 					localFolder: "",
-				},
+				} as ChannelMapping,
 			];
 
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
@@ -214,7 +214,7 @@ describe("SyncEngine", () => {
 					channelSlug: "string-error-channel",
 					enabled: true,
 					localFolder: "",
-				},
+				} as ChannelMapping,
 			];
 
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
