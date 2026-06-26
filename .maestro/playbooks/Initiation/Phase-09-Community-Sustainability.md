@@ -94,14 +94,14 @@ This phase establishes practices for engaging with the community, managing issue
   - Added tools and GitHub search shortcuts to make metric collection efficient.
   - Linked the new document from `README.md`, `ISSUE_MANAGEMENT.md`, `COMMUNITY_ENGAGEMENT.md`, and `MAINTAINERS.md`.
 
-- [ ] Create a security policy for responsible disclosure: Protect users:
-  - Review existing `SECURITY.md` for vulnerability reporting process
-  - Document in SECURITY.md:
-    - How to report security vulnerabilities (private email, not public GitHub issues)
-    - Timeline for fixing security issues (critical: ASAP, high: 1 week, medium: 2 weeks)
-    - How to stay updated on security advisories
-    - Commit to transparent communication (if a vulnerability is disclosed, explain what was affected)
-  - Have a way to contact maintainers privately (email, security.txt, etc.)
+- [x] Create a security policy for responsible disclosure: Protect users:
+  - Reviewed existing `SECURITY.md` and enhanced it with missing sections
+  - Documented in SECURITY.md:
+    - How to report security vulnerabilities (private email, not public GitHub issues) — added clear private contact section referencing GitHub Private Vulnerability Reporting and MAINTAINERS.md
+    - Timeline for fixing security issues (critical: ASAP, high: 1 week, medium: 2 weeks) — added Response Timeline table with severity levels and target fix times
+    - How to stay updated on security advisories — added Security Advisories section with 4 channels (watch repo, GitHub advisories, CHANGELOG, Dependabot)
+    - Commit to transparent communication — added Disclosure Policy section covering what we disclose, coordinated disclosure timeline, credit policy, and no-retaliation pledge
+  - Added private contact methods: GitHub Private Vulnerability Reporting and email via MAINTAINERS.md
 
 - [ ] Celebrate milestones and contributors publicly: Build community pride:
   - When hitting milestones (100 stars, 1000 downloads, major release), announce it in Discussions

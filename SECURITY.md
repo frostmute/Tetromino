@@ -2,9 +2,14 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Tetromino for Obsidian, please report it responsibly by emailing the maintainers directly rather than using the public issue tracker.
+If you discover a security vulnerability in Tetromino for Obsidian, please report it responsibly through a private channel rather than using the public issue tracker.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
+
+### How to Contact Us Privately
+
+- **GitHub Private Vulnerability Reporting**: Use GitHub's built-in [private vulnerability reporting](https://github.com/frostmute/Tetromino/security/advisories/new) if available.
+- **Email**: Contact the maintainers directly via the contact information in [MAINTAINERS.md](MAINTAINERS.md) or through the email listed on the lead maintainer's GitHub profile.
 
 When reporting a vulnerability, please include:
 - A clear description of the vulnerability
@@ -12,7 +17,38 @@ When reporting a vulnerability, please include:
 - Potential impact
 - Any suggested fixes or mitigations
 
-We will acknowledge your report within 48 hours and work with you to understand and address the issue.
+We will acknowledge your report within **48 hours** and work with you to understand and address the issue.
+
+## Response Timeline
+
+Once a vulnerability is confirmed, we aim to address it according to the following timeline:
+
+| Severity | Target Fix Time | Description |
+|----------|----------------|-------------|
+| **Critical** | ASAP (within 48 hours) | Vulnerabilities that could lead to data loss, unauthorized access, or system compromise. |
+| **High** | Within 1 week | Vulnerabilities that significantly impact security but have limited exploitability or require specific conditions. |
+| **Medium** | Within 2 weeks | Vulnerabilities with moderate impact or those that require non-standard configurations to exploit. |
+| **Low** | Next scheduled release | Minor issues, defense-in-depth improvements, or informational findings. |
+
+If a fix will take longer than the target timeline, we will communicate the delay and provide interim mitigations or workarounds when possible.
+
+## Security Advisories
+
+To stay updated on security issues:
+
+- **Watch this repository**: Enable GitHub notifications (Watch → Custom → Security alerts) to receive alerts about published security advisories.
+- **Check GitHub Security Advisories**: Visit the [Security Advisories](https://github.com/frostmute/Tetromino/security/advisories) page for a history of disclosed vulnerabilities.
+- **Read release notes**: Security fixes are clearly marked in [CHANGELOG.md](CHANGELOG.md) with a `### Security` section.
+- **Enable Dependabot alerts**: If you fork this repository, ensure Dependabot alerts are enabled to receive notifications about dependency vulnerabilities.
+
+## Disclosure Policy
+
+We are committed to transparent communication about security issues:
+
+- **What we disclose**: When a vulnerability is fixed and disclosed, we will explain what was affected, the severity, the versions impacted, and how to upgrade or mitigate.
+- **Timeline**: We follow a coordinated disclosure approach. After a fix is released, we will publish a security advisory within 7 days, giving users time to update before full technical details are shared.
+- **Credit**: We will credit the reporter by name (or pseudonym, if requested) in the security advisory and release notes, unless they prefer to remain anonymous.
+- **No retaliation**: We will not take legal action or retaliate against anyone who reports a vulnerability in good faith.
 
 ## Security Considerations
 
