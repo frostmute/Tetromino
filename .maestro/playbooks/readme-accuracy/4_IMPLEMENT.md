@@ -99,10 +99,10 @@ After implementing, append to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.m
 ```
 
 ### Verification
-- [ ] Change matches the proposed fix from LOOP_00001_PLAN.md
-- [ ] Formatting matches existing README style
-- [ ] No broken links or references introduced
-- [ ] Content is accurate based on code review
+- [x] Change matches the proposed fix from LOOP_00001_PLAN.md
+- [x] Formatting matches existing README style
+- [x] No broken links or references introduced
+- [x] Content is accurate based on code review
 ```
 
 ## Update Plan Status
