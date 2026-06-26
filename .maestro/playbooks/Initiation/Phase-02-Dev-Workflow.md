@@ -127,7 +127,20 @@ With the development environment verified, this phase establishes best practices
 
   **Completed:** Expanded the existing "Pull requests" section in `CONTRIBUTING.md` into a structured "Pull request checklist" with checkbox items organized into **Required** (focused scope, TypeScript compilation, linting, tests, changelog) and **When applicable** (docs sync, settings consistency, security review, migration impact) categories. Also added a **PR description** template section covering what/why, issue references, and behavior changes. The checklist replaces the previous five-bullet list with nine actionable items and a description guide.
 
-- [ ] Set up pre-commit validation script understanding: Review any existing git hooks or scripts (e.g., `scripts/` directory). Understand the release script at `scripts/release.sh` and version-bumping logic at `version-bump.mjs`. Document the release checklist for maintainers.
+- [x] Set up pre-commit validation script understanding: Review any existing git hooks or scripts (e.g., `scripts/` directory). Understand the release script at `scripts/release.sh` and version-bumping logic at `version-bump.mjs`. Document the release checklist for maintainers.
+
+  **Completed:** Reviewed all four scripts in `scripts/` (`release.sh`, `package.mjs`, `copy-to-vault.mjs`, `record-demo.sh`), `version-bump.mjs`, and `esbuild.config.mjs`. Confirmed no automated git hooks are installed (only sample hooks in `.git/hooks/`). Added three new sections to `CONTRIBUTING.md`:
+
+  1. **Scripts and pre-commit validation** — documents the manual pre-commit checklist (lint:fix, lint, test, build), provides an optional pre-commit hook snippet, and includes a script inventory table covering all 7 scripts/commands with their files and purposes.
+  2. **Release process** — documents the full `release.sh` workflow: pre-flight checks (branch, clean tree, pull), interactive version bump, quality gates, version-bump.mjs sync, production build, commit/tag/push, and the downstream CI release workflow that creates GitHub Releases with changelog extraction.
+  3. **Maintainer release checklist** — actionable before/after checklists covering changelog preparation, minAppVersion verification, local validation, and post-release verification.
+
+  Key findings:
+  - `release.sh` enforces branch=`main`, clean working tree, lint+test gates before any version bump.
+  - `version-bump.mjs` is a npm `version` lifecycle hook that syncs `manifest.json` and `versions.json` from `package.json`.
+  - `package.mjs` implements a zero-dependency ZIP writer (no system `zip` required) using raw ZIP format bytes.
+  - `copy-to-vault.mjs` auto-deploys to local vaults during dev builds (esbuild `watch-deploy` plugin) but is skipped in CI.
+  - `record-demo.sh` is a utility for recording demo GIFs — not part of the build/release pipeline.
 
 - [ ] Create a debugging and local testing workflow: Document how to test plugin behavior locally:
   - Load the plugin in a test Obsidian vault using the built `main.js`
