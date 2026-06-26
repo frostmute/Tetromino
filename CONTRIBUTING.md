@@ -2,6 +2,8 @@
 
 Thanks for contributing to `Tetromino`.
 
+All contributors are expected to adhere to our [Code of Conduct](../CODE_OF_CONDUCT.md). Please read it before participating.
+
 ## Scope and product behavior
 
 This plugin is intentionally **one-way import only**:

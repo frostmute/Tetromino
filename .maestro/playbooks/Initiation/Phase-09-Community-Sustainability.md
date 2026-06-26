@@ -4,7 +4,7 @@ This phase establishes practices for engaging with the community, managing issue
 
 ## Tasks
 
-- [ ] Create a comprehensive CODE_OF_CONDUCT: Establish community standards:
+- [x] Create a comprehensive CODE_OF_CONDUCT: Establish community standards:
   - Create `CODE_OF_CONDUCT.md` with:
     - Statement of commitment to inclusive, respectful community
     - Expected behavior: be respectful, assume good intentions, be constructive in feedback
