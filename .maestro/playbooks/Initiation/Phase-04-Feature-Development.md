@@ -13,12 +13,18 @@ This phase guides developers through adding new features to Tetromino while main
   - Observe that API → Sync Engine → Main is the natural flow; changes to sync logic stay in sync-engine.ts
   - *Reviewed all core files; architecture is well-layered with clear separation of concerns.*
 
-- [ ] Define the feature scope and acceptance criteria: For a new feature:
+- [x] Define the feature scope and acceptance criteria: For a new feature:
   - Write a clear problem statement: what problem does this solve? (e.g., "Users want to import specific block types only")
   - Define acceptance criteria: what does success look like? (e.g., "Users can filter import by block type in settings; only matching blocks appear in output")
   - Check if the feature aligns with Tetromino's philosophy: one-way, manual, deterministic, vault-first (features that auto-sync or push back are out of scope)
   - Estimate complexity: is it a setting change, a new API method, a new sync strategy, or an architectural change?
   - Create a feature branch: `git checkout -b feature/<feature-name>`
+  - **Completed:** Scoped the "Choose backup file for channel mapping restore" feature (v1.1 #6 from project board). Full scope document written to `.maestro/playbooks/Working/feature-choose-backup-file.md`.
+  - **Problem:** Users cannot restore from a specific historical backup; only the latest is available.
+  - **Acceptance criteria:** New "Restore from file..." button in settings, Obsidian file picker for `.json` backups, validation, success/error notices, backwards compatibility preserved.
+  - **Philosophy alignment:** Fully aligned — local-only, manual, deterministic, vault-first.
+  - **Complexity:** SMALL effort (setting/UI change, ~1–4 hours). Touches `settings-tab.ts` and `main.ts` only. No migration or API changes needed.
+  - **Branch created:** `feature/choose-backup-file`
 
 - [ ] Design the data flow and dependencies: Plan where the feature touches code:
   - Does it need new Are.na API calls? Add methods to `api.ts` with full pagination and error handling
