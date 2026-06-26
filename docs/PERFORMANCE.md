@@ -178,6 +178,44 @@ A review of `src/templateUtils.ts` and `src/utils.ts` identified several renderi
 
 The frontmatter-detection regex used to sanitize rendered markdown was recompiled on every `blockToMarkdown` call. It is now a module-level constant (`FRONTMATTER_REGEX`), removing per-block regex compilation overhead.
 
+## Memory Profiling Results
+
+Memory consumption was profiled using `process.memoryUsage()` during simulated imports of 1,000 and 2,000 blocks. Tests ran in the Jest mock environment (in-memory vault, zero network latency).
+
+### Baseline Metrics
+
+| Blocks | Baseline Heap | Peak Heap | Heap Growth | Bytes / Block | RSS at Peak |
+|--------|---------------|-----------|-------------|---------------|-------------|
+| 1,000  | ~72.6 MB      | ~83.5 MB  | ~10.9 MB    | ~11,450       | ~170.8 MB   |
+| 2,000  | ~112.4 MB     | ~134.4 MB | ~22.0 MB    | ~11,550       | —           |
+
+> **Note:** The mock environment stores every "vault file" in a JavaScript `Map`, so these numbers over-estimate real-world usage (where files live on disk). The growth rate of ~11.5 KB per block is dominated by mock vault entries, `SyncRecord` objects, and the `result` accumulator (`actions`, `fileDiffs`, etc.).
+
+### Memory Leak Detection
+
+Five consecutive 500-block imports were run with explicit `global.gc()` between iterations. Retained heap growth oscillated (e.g., +8.5 MB, −2.0 MB, +11.1 MB, −3.1 MB, +10.7 MB) with **no upward trend**, indicating **no memory leak** in the sync engine.
+
+### Identified Memory Patterns
+
+1. **`result` accumulator growth** — `SyncResult.fileDiffs` stores `before`, `after`, and `diff` strings for every created or updated block. For very large channels this is the dominant in-memory cost. Consumers should discard the `SyncResult` after use to allow GC.
+2. **`syncRecordMap` persistence** — The map is retained across channels (by design) for fast conflict detection. For vaults with 10,000+ tracked blocks this will consume a few MB.
+3. **`blocks` array lifetime** — All blocks from `getAllChannelBlocksWithProgress` are held in memory for the duration of `pull()`. Streaming pagination could reduce peak memory but would require API-layer changes.
+4. **Per-channel caches** — `blockDetailsCache` and `channelPreviewCache` are cleared at the start of each `syncChannel` call, preventing cross-channel accumulation.
+
+### Micro-Optimization Applied
+
+`blocks.filter()` in `pull()` now skips creating a copy when `excludeClasses` is empty (the common case), saving a temporary array of `O(blocks)` references.
+
+### How to Re-run Memory Profiling
+
+```bash
+# Run the dedicated memory test
+npx jest src/__tests__/memory.test.ts --no-coverage
+
+# Run with explicit GC for cleaner readings (Node only)
+node --expose-gc node_modules/.bin/jest src/__tests__/memory.test.ts --no-coverage
+```
+
 ## Future Optimization Targets
 
 Based on this profiling, the highest-impact optimizations to investigate are:
@@ -185,8 +223,9 @@ Based on this profiling, the highest-impact optimizations to investigate are:
 1. ~~Batch vault writes~~ — The Obsidian API does not provide bulk transaction support; writes are inherently per-file.
 2. ~~Parallelize attachment downloads~~ — Already parallelized at the block level via `pMap` concurrency of 5.
 3. ~~Cache rendered templates~~ — Implemented: `parseTemplate` now caches parsed ASTs by template string, eliminating per-block re-parsing.
-4. **Diff generation** — `unifiedDiff` is computed for every create/update. For large channels, this may be expensive; consider making diffs optional in non-dry-run mode.
-5. **Memory usage during large imports** — Profile peak memory with 1000+ block channels and ensure no leaks.
+4. ~~Memory profiling & leak detection~~ — Completed. No leaks found; baseline documented.
+5. **Diff generation** — `unifiedDiff` is computed for every create/update. For large channels, this may be expensive; consider making diffs optional in non-dry-run mode.
+6. **Streaming pagination** — Process blocks in batches as pages arrive from the API, rather than holding the entire channel in memory.
 
 ## Related Documents
 

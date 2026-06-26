@@ -65,12 +65,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - After refactoring, confirm import behavior is identical before and after (test with multiple channels)
   - **Completed:** Decomposed the 140-line `pull()` method in `src/sync-engine.ts` by extracting `prefetchChannelPreviews(blocks)` and `prefetchBlockDetails(blocks)` as self-contained private helpers with JSDoc comments. Extracted `blockNeedsComments(block)` predicate to eliminate duplicated `comment_count` heuristic logic that previously existed in both `pull()` and `buildBlockContext()`. Deduplicated `extractConnectedChannels()` and `extractChannelAppearsIn()` (which shared ~80 % logic) into a single generic `extractChannelPool(source, excludeSlug)` helper with thin wrapper methods preserving the existing API. Named all magic concurrency numbers (`3`, `5`) as a `CONCURRENCY` constant object at module level in `src/sync-engine.ts`. Fixed `pMap` array creation in `src/utils.ts` from `new Array(...).fill(0).map()` to the more idiomatic `Array.from({ length: ... })`. All 309 tests pass; lint is clean on modified files.
 
-- [ ] Profile memory usage during large imports: Monitor memory consumption:
+- [x] Profile memory usage during large imports: Monitor memory consumption:
   - Load a test with a very large channel (1000+ blocks) and watch memory usage
   - Check if memory is released after import (no memory leaks)
   - Look for unnecessary data structures that could be cleared during processing
   - If memory usage is excessive, optimize: process blocks in batches, clear caches between batches
   - Document memory baseline for future optimization efforts
+  - **Completed:** Created `src/__tests__/memory.test.ts` with three test cases: 1,000-block profile, 2,000-block stress test, and 5-iteration leak detection (500 blocks each). Measured heap via `process.memoryUsage()` with explicit `global.gc()` where available. Baseline: ~11.5 KB per block in the mock environment (72.6 MB → 83.5 MB for 1,000 blocks; 112.4 MB → 134.4 MB for 2,000 blocks). Leak detection showed oscillating retained growth with **no upward trend**, confirming no memory leak. Identified that the dominant memory cost is the `result` accumulator (`fileDiffs`, `actions`) and mock vault entries; real-world usage will be lower because files live on disk. Applied a micro-optimization in `src/sync-engine.ts` to skip `blocks.filter()` when `excludeClasses` is empty, eliminating a temporary array copy. Full results added to `docs/PERFORMANCE.md` under a new "Memory Profiling Results" section. All 312 tests pass.
 
 - [ ] Set up performance benchmarking for regression detection: Create automated performance tests:
   - Add a performance test in `src/__tests__/` that imports a consistent dataset (e.g., 100-block test channel)

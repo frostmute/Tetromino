@@ -212,20 +212,24 @@ export class SyncEngine {
 		);
 
 		let completed = 0;
-		const blocksToProcess = blocks.filter((block) => {
-			if (this.shouldExclude(block)) {
-				completed++;
-				result.skipped++;
-				this.onProgress?.({
-					channelSlug: mapping.channelSlug,
-					phase: "blocks",
-					current: completed,
-					total: blocks.length,
-				});
-				return false;
-			}
-			return true;
-		});
+		// Avoid copying the blocks array when no exclusions are configured.
+		const hasExclusions = this.settings.excludeClasses.length > 0;
+		const blocksToProcess = hasExclusions
+			? blocks.filter((block) => {
+					if (this.shouldExclude(block)) {
+						completed++;
+						result.skipped++;
+						this.onProgress?.({
+							channelSlug: mapping.channelSlug,
+							phase: "blocks",
+							current: completed,
+							total: blocks.length,
+						});
+						return false;
+					}
+					return true;
+				})
+			: blocks;
 
 		await pMap(blocksToProcess, CONCURRENCY.BLOCK_PROCESS, async (block) => {
 			console.time(`arena-sync:block:${block.id}`);
