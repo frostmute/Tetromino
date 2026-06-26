@@ -25,7 +25,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - FAQ: answers to likely questions (two-way sync? auto-import? deletion behavior?)
   - **Completed 2026-06-26.** Created `docs/USER_GUIDE.md` with full overview, installation steps, first-import walkthrough, dry-run explanation, detailed settings reference tables, troubleshooting section, and FAQ. Cross-references to related docs (SETTINGS_REFERENCE, TROUBLESHOOTING, FAQ) included in YAML front matter.
 
-- [ ] Create developer documentation for contributors: Build onboarding docs for maintainers:
+- [x] Create developer documentation for contributors: Build onboarding docs for maintainers:
   - Create `docs/DEVELOPER_GUIDE.md` with:
     - Architecture overview: entry point → API → sync-engine → vault
     - Module guide: brief description of each file in src/ (main.ts, api.ts, sync-engine.ts, etc.)
@@ -34,6 +34,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Adding tests: how to mock Are.na API responses, structure test cases, achieve coverage
     - Debugging: how to add console logs, inspect plugin state, test locally
   - Cross-reference the Playbook phases (Phase 04 for features, Phase 05 for testing, etc.)
+  - **Completed 2026-06-26.** Created `docs/DEVELOPER_GUIDE.md` with full architecture overview, module guide for all 11 source files, TypeScript strict-mode conventions, error-handling patterns, determinism requirements, step-by-step feature workflow with review checklist, test quick-start with mock examples, debugging commands for DevTools and local testing, and a playbook phase cross-reference table. Links to existing `docs/testing/testing-guide.md` to avoid duplication.
 
 - [ ] Document API design and integration patterns: Help contributors understand the Are.na integration:
   - Create `docs/API_DESIGN.md` with:
