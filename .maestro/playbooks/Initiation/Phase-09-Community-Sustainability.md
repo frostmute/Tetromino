@@ -28,7 +28,7 @@ This phase establishes practices for engaging with the community, managing issue
     - Mark duplicates and close with reference to original issue
     - Thank reporters for their contribution
 
-- [ ] Create issue handling guidelines for maintainers: Document best practices:
+- [x] Create issue handling guidelines for maintainers: Document best practices:
   - Create `ISSUE_MANAGEMENT.md` with guidelines:
     - How to triage new issues (what questions to ask, what information is needed)
     - How to respond to bug reports (acknowledge, ask for reproduction steps, investigate)
