@@ -179,6 +179,622 @@ npm run lint
 npm test -- --watchAll=false
 ```
 
+## Debugging and local testing workflow
+
+### Overview
+
+Test plugin behavior in a real Obsidian vault environment to verify the plugin works correctly. This section covers loading the plugin, using preview imports, debugging logs, and verifying deterministic behavior.
+
+### Prerequisites
+
+1. **Install Obsidian**: Download and install [Obsidian](https://obsidian.md/download)
+
+2. **Create a test vault**: Make a dedicated Obsidian vault for testing (avoid using your main vault):
+
+   ```bash
+   mkdir ~/Obsidian-TestVault
+   cd ~/Obsidian-TestVault
+   obsidian
+   ```
+
+3. **Get the built plugin**: Build the plugin once:
+
+   ```bash
+   npm run build
+   ```
+
+   The output files (`main.js`, `manifest.json`, `styles.css`) will be in the repository root.
+
+### Loading the Plugin
+
+1. **Copy the plugin files** to your test vault:
+
+   ```bash
+   cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/Tetromino/
+   ```
+   Create the plugins directory if it doesn't exist:
+
+   ```bash
+   mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/Tetromino
+   ```
+
+2. **Enable the plugin**: In Obsidian, go to Settings → Community Plugins → Enable **Tetromino**
+
+3. **Set up the API token**: In plugin settings, add your Are.na API token and click "Verify"
+
+4. **Add a channel mapping**: In settings, add at least one channel mapping (provide the channel slug from Are.na)
+
+### Using Dry-Run (Preview) Commands
+
+The plugin provides two dry-run preview commands:
+
+1. **"Preview import (dry-run)"**: Preview imports of all configured channels
+2. **"Preview current channel import (dry-run)"**: Preview import of the channel that the active file belongs to
+
+#### How to use:
+
+1. Open Obsidian and open any note file that's in a channel-mapped folder
+2. Open Command Palette (`Ctrl/Cmd + P`)
+3. Type "Preview current channel import (dry-run)"
+4. The plugin will:
+   - Fetch channel data from Are.na
+   - Plan all file updates
+   - Show a diff summary (no files are actually written)
+   - Display a modal with actions like "download asset", "create file", "update file"
+
+#### What to check in dry-run:
+
+1. **No vault modifications**: Verify no files are created/modified
+2. **Correct actions**: Check that actions like "download asset", "create file", "update file" are accurate
+3. **Errors**: None should appear in console
+4. **Determinism**: Run the same dry-run multiple times - output should be identical
+
+### Debugging Logs
+
+Enable debug logging in plugin settings:
+
+1. Go to Settings → Tetromino
+2. Enable "Debug logging"
+3. Perform an import or dry-run
+4. Open Obsidian developer console:
+   - Press `Ctrl/Cmd + Shift + C` (Windows/Linux) or `Cmd + Option + C` (Mac)
+   - Look for logs starting with `[arena-sync]`
+
+#### Common debugging patterns:
+
+```typescript
+// In api.ts line 52 (debug log):
+console.log(`[arena-sync] ${message}`, ...args);
+
+// In api.ts line 57 (error log):
+console.error(`[arena-sync] ${message}`, ...args);
+```
+
+### Verifying Deterministic Output
+
+Tetromino's core promise is deterministic output: the same input should always produce the same output.
+
+#### Steps to verify:
+
+1. **Get stable channel data**: Ensure you're using the same Are.na channel (not varying parameters)
+2. **Run imports multiple times**: Perform the same full import operation 3-5 times
+3. **Compare outputs**: The generated Markdown files should be byte-for-byte identical
+4. **Check timestamps**: Generated dates and timestamps should not cause non-deterministic behavior
+
+#### How to check:
+
+1. Use Obsidian's Git integration to track changes to the vault
+2. After each import, run `git status` to see what changed
+3. Compare output folders (`/Are.na/`) between runs
+4. Verify import history (`Are.na/import-history.md`) for consistency
+
+### Setting Up Test Fixtures
+
+Create a test vault with:
+
+1. **Existing notes**: Add some existing Markdown files to test conflict resolution
+2. **Different file types**: Create files with various extensions to test import filtering
+3. **Special characters**: Test files with Unicode, spaces, and special characters
+4. **Different structures**: Mix of well-structured and malformed notes
+
+### Troubleshooting Common Issues
+
+#### Token verification fails:
+
+1. Ensure token has "read" access
+2. Verify token is copied correctly (no whitespace)
+3. Wait a moment after setting, then click Verify
+
+#### Dry-run shows errors:
+
+1. Check console for error messages
+2. Verify channel slug is correct in settings
+3. Ensure channel still exists on Are.na
+4. Check if channel is private (tokens may need additional permissions)
+
+#### Imports fail partially:
+
+1. Check API rate limits (Are.na limits requests)
+2. Look for logs about specific channels failing
+3. Try with a single, small channel first
+4. Enable debug logging to track progress
+
+### Integration Testing Checklist
+
+- [ ] Plugin loads in test vault
+- [ ] API token verification works
+- [ ] Dry-run preview runs successfully
+- [ ] Dry-run shows accurate planned actions
+- [ ] Dry-run makes no vault changes
+- [ ] Full imports work correctly
+- [ ] Generated files are deterministic across multiple runs
+- [ ] Console logs are informative and non-empty when debug is enabled
+- [ ] Error handling works for invalid tokens/network issues
+- [ ] Conflict resolution works with existing files
+
+### Reproduction Steps for Bugs
+
+To reproduce bugs effectively:
+
+1. Enable debug logging
+2. Run a specific action (dry-run or full import)
+3. Record all console logs to a file
+4. Note the exact time, channel, and action
+5. Try running with different conditions (empty channel, large channel, mixed block types)
+6. Share the logs when reporting bugs
+
+By following this workflow, you can thoroughly test Tetromino locally before making changes, ensuring reliability and catching bugs early.
+
+## Code style and patterns in Tetromino
+
+### Overview
+
+This document outlines the established code style and architectural patterns used throughout the Tetromino project. It serves as a reference for new contributors and provides consistency across the codebase.
+
+### TypeScript Conventions
+
+The project uses TypeScript with selective strictness. `tsconfig.json` enables
+`noImplicitAny`, `strictNullChecks`, and `strictFunctionTypes`, but does **not**
+set the blanket `"strict": true` flag.
+
+#### Type-Only Imports
+
+Use `import type` for imports that are only used for type annotations:
+
+```typescript
+// ✓ Correct - used only in type annotations
+import type { ChannelMapping, SyncOptions } from "./types";
+
+// ✓ Correct - used only for export type
+export type { ChannelMapping, SyncOptions } from "./types";
+
+// ✗ Incorrect - used for runtime values
+import { ChannelMapping } from "./types";
+```
+
+#### Variable and Function Declarations
+
+Preferred patterns from the codebase:
+
+```typescript
+// Class properties
+private readonly settings: ArenaSyncSettings;
+private isSyncing = false;
+
+// Method parameters (object destructuring)
+const { channelSlug, localFolder } = mapping;
+
+// Private methods
+private updateStatusBar(state: "idle" | "syncing", detail = ""): void
+
+// Type guard functions
+function isRecord(val: unknown): val is Record<string, unknown>
+```
+
+### Error Handling Patterns
+
+#### Error Propagation
+
+The plugin uses a consistent error handling approach:
+
+```typescript
+// ✓ Propagate error for caller to handle
+async function fetchData(): Promise<Data> {
+    const data = await this.api.request();
+    if (!data) {
+        throw new Error("Failed to fetch data");
+    }
+    return data;
+}
+
+// ✓ Log actionable error and propagate
+try {
+    await this.engine.syncChannel(mapping);
+} catch (err) {
+    new Notice(`Import failed: ${(err as Error).message}`);
+    return;
+}
+
+// ✓ Return error in result object (for recoverable errors)
+result.errors.push({
+    blockId: block.id,
+    channelSlug: mapping.channelSlug,
+    message: error.message || String(error),
+    recoverable: false,  // or true if recoverable
+});
+```
+
+#### Error Object Structure
+
+All sync errors use the `SyncError` shape defined in `src/types.ts`:
+
+```typescript
+interface SyncError {
+    blockId: number | null;
+    channelSlug: string;
+    message: string;
+    recoverable: boolean;
+}
+```
+
+### Runtime Validation
+
+Because the Are.na API returns loosely typed JSON, the codebase defensively
+validates payloads at runtime rather than casting blindly:
+
+```typescript
+// src/api.ts — type guards and coercion helpers
+function isRecord(val: unknown): val is Record<string, unknown> {
+    return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+function asNumber(val: unknown): number | null {
+    const n = typeof val === "string" ? parseInt(val, 10) : val;
+    return typeof n === "number" && !isNaN(n) ? n : null;
+}
+```
+
+API responses are normalized through `unwrapData`, `normalizeChannel`, and
+`normalizePaginatedResponse` so callers receive predictable shapes even when
+the upstream format varies (v2 vs v3).
+
+### Service/API Patterns
+
+#### API Client → Sync Engine → Plugin Entry
+
+The architecture follows a clear layer hierarchy:
+
+```typescript
+// src/api.ts - Low-level HTTP client, token management, rate limiting
+class ArenaApi {
+    private token: string;
+    private debug: boolean;
+    
+    async request<T>(method: string, path: string, body?: unknown): Promise<T> { ... }
+    async getChannel(slug: string): Promise<ArenaChannel> { ... }
+    async getAllChannelBlocksWithProgress(slug: string, handler: ProgressHandler): Promise<ArenaBlock[]> { ... }
+}
+
+// src/sync-engine.ts - Business logic, file operations, deterministic behavior
+class SyncEngine {
+    private api: ArenaApi;
+    private vault: Vault;
+    
+    async syncAll(options: SyncOptions = {}): Promise<SyncResult> { ... }
+    async syncChannel(mapping: ChannelMapping, options: SyncOptions = {}): Promise<SyncResult> { ... }
+}
+
+// src/main.ts - Obsidian plugin entry point, UI commands, settings
+export default class ArenaSyncPlugin extends Plugin {
+    private api!: ArenaApi;
+    private engine!: SyncEngine;
+    
+    async onload(): Promise<void> { ... }
+    async runSync(dryRun = false): Promise<void> { ... }
+}
+```
+
+#### Settings Patterns
+
+Settings are managed through:
+
+```typescript
+// The settings-tab.ts component renders the UI
+export class ArenaSyncSettingTab extends PluginSettingTab {
+    plugin: ArenaSyncPlugin;
+    
+    display(): void {
+        // Creates Setting objects for each configuration option
+        new Setting(containerEl)
+            .setName("API token")
+            .addText((text) => {
+                // Handle text input with password masking
+            });
+    }
+}
+
+// Settings are saved and reloaded by the parent plugin
+async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
+    this.api = new ArenaApi(this.settings.apiToken, this.settings.debugLogging);
+    this.engine = new SyncEngine(this.app, this.api, this.settings);
+}
+```
+
+### Vault Mutation Patterns
+
+#### Never Direct Mutations
+
+Never directly mutate the vault. All import/reconciliation must go through the `SyncEngine`:
+
+```typescript
+// ✓ Correct - use sync-engine for all mutations
+await this.engine.syncChannel(mapping, options);
+
+// ✗ Incorrect - direct vault mutation
+await this.vault.create(filePath, content);
+await this.vault.modify(file, newContent);
+```
+
+#### Dry-Run Mode
+
+Every mutating operation supports a `dryRun` flag. When `true`, the engine
+plans and reports actions without touching the vault:
+
+```typescript
+const result: SyncResult = {
+    created: 0, updated: 0, deleted: 0, moved: 0,
+    skipped: 0, downloaded: 0, dryRun, actions: [],
+    moves: [], fileDiffs: [], missingPaths: [], errors: [], duration: 0,
+};
+
+if (!dryRun) {
+    await this.vault.create(notePath, markdown);
+}
+```
+
+This pattern is applied consistently in `pullBlock`, `updateChannelIndex`,
+`updateMasterOverview`, and `ensureBlockAsset`.
+
+#### Use Normalization
+
+Use `normalizePath` for path operations:
+
+```typescript
+// ✓ Correct - normalize paths
+const normalized = normalizePath(path);
+
+// ✗ Incorrect - manual path manipulation
+const path1 = `Are.na/${channelId}`;
+const path2 = `Are.na/${channelId}/`;
+```
+
+### Testing and Mocking Patterns
+
+#### Test File Structure
+
+```typescript
+// src/__tests__/api.test.ts - API client tests
+import { ArenaApi } from "../api";
+import { jest } from "@jest/globals";
+
+describe("ArenaApi", () => {
+    let api: ArenaApi;
+    
+    beforeEach(() => {
+        api = new ArenaApi("test-token", false);
+        jest.mock("obsidian");
+    });
+    
+    it("should handle token authentication", async () => {
+        // API client tests
+    });
+});
+```
+
+#### Mocking Strategy
+
+The tests use these mocking patterns:
+
+1. **obsidian mock**: `src/__mocks__/obsidian.ts` provides stubs for Obsidian API
+2. **Module-level mocking**: `jest.mock("../api")` for isolated testing
+3. **Inline mocks**: `jest.mock("obsidian")` within specific test files
+
+#### Test Coverage Expectations
+
+- **Critical paths must be tested**: `api.ts`, `sync-engine.ts`, `utils.ts`
+- **Dry-run feature**: Fully tested to ensure no vault mutations
+- **Deterministic behavior**: Tested with same input repeated multiple times
+- **Error handling**: Tested for all error cases (401, 403, 404, rate limits)
+
+### Security Patterns
+
+#### Token Handling
+
+```typescript
+// Token is stored in plugin settings with secure masking
+new Setting(containerEl)
+    .setName("API token")
+    .addText((text) => {
+        text.inputEl.type = "password";  // Mask in UI
+        text.setValue(this.plugin.settings.apiToken);
+    });
+```
+
+#### XSS Prevention
+
+All user content is sanitized:
+
+```typescript
+// In securityUtils.ts - comprehensive sanitization
+function sanitizeMarkdownContent(content: string): string {
+    // Strip script tags, event handlers, javascript: protocol
+    // Preserve wiki-links and markdown links
+}
+```
+
+### Performance Patterns
+
+#### Debouncing and Throttling
+
+Use `pMap` for controlled concurrency:
+
+```typescript
+// Process mappings concurrently but limit concurrency
+const results = await pMap(enabledMappings, 3, async (mapping) => {
+    return await this.syncChannel(mapping, options);
+});
+```
+
+#### Deterministic Change Detection
+
+To guarantee reproducible output, the engine detects changes by comparing SHA-256
+hashes rather than timestamps:
+
+```typescript
+// src/utils.ts
+export function computeHash(input: string): string {
+    return createHash("sha256").update(input, "utf8").digest("hex").slice(0, 16);
+}
+```
+
+`sync-engine.ts` stores `localHash` and `remoteHash` in `SyncRecord`; a file is
+only rewritten when the hashes differ.
+
+#### Caching Strategy
+
+The plugin uses targeted caching:
+
+```typescript
+// Block details cache to avoid repeated API calls
+private blockDetailsCache = new Map<number, unknown>();
+
+// Channel preview cache for quick lookups
+private channelPreviewCache = new Map<string, string | null>();
+
+// Folder existence cache to skip redundant vault checks
+private folderCache = new Set<string>();
+```
+
+#### Concurrency Safety
+
+Folder creation is serialized with a mutex to prevent races when multiple
+blocks write to the same path simultaneously:
+
+```typescript
+// src/sync-engine.ts
+private ensureFolderMutex: Promise<void> = Promise.resolve();
+
+private async ensureFolder(path: string): Promise<void> {
+    let release!: () => void;
+    const next = new Promise<void>((r) => { release = r; });
+    const prev = this.ensureFolderMutex;
+    this.ensureFolderMutex = next;
+    await prev;
+    try { /* create folder */ } finally { release(); }
+}
+```
+
+### Documentation Patterns
+
+#### YAML Front Matter
+
+Documents use structured YAML front matter:
+
+```yaml
+---
+type: analysis
+title: Security Analysis
+created: 2024-01-15
+tags:
+  - security
+  - api
+related:
+  - '[[SECURITY.md]]'
+---
+```
+
+#### Wiki-Link Cross-References
+
+Use `[[Document-Name]]` syntax for intra-document linking.
+
+### Build and Release Patterns
+
+#### Build Script
+
+```bash
+# Development build (hot reload)
+npm run dev
+
+# Production build (for distribution)
+npm run build
+```
+
+#### Release Process
+
+Releases are handled through `scripts/release.sh` with interactive prompts and automated version bumping via `version-bump.mjs`.
+
+### Compliance
+
+#### Data Collection
+
+The plugin collects no telemetry and makes no external calls beyond:
+1. Are.na API (read-only, based on provided token)
+2. Direct file URLs for configured downloads
+
+#### Deterministic Output
+
+Same input always produces same output, ensuring reproducibility and auditability.
+
+### Code Review Checklist
+
+For code changes:
+
+- [ ] TypeScript strict mode checks pass (`npm run build`)
+- [ ] All new code has tests (`npm test`)
+- [ ] ESLint passes (`npm run lint:fix`)
+- [ ] Follows established patterns (see this document)
+- [ ] Use the debug-gated logging pattern (`this.log(...)`) rather than bare `console.log` — see `src/api.ts` for the reference implementation
+- [ ] Added or updated CHANGELOG.md entry
+- [ ] Updated Docs if behavior changed
+
+### Project Structure Overview
+
+```
+/src/
+├── api.ts                    # HTTP client, token management, rate limiting
+├── sync-engine.ts             # Core sync logic, file operations, conflict resolution
+├── utils.ts                   # Utility functions, template rendering, file handling
+├── main.ts                    # Plugin entry point, UI, settings
+├── settings-tab.ts            # Settings UI component
+├── modals.ts                  # Summary and migration modals
+├── migration.ts               # Attachment folder migration engine
+├── securityUtils.ts            # XSS and security sanitization
+├── diff.ts                   # Diff calculation and conflict detection
+└── types.ts                   # Type definitions
+
+/src/__tests__/
+├── api.test.ts                # API client tests
+├── sync-engine.test.ts        # Sync engine tests
+├── utils.test.ts              # Utility function tests
+├── templateUtils.test.ts      # Template rendering tests
+├── diff.test.ts               # Diff calculation tests
+├── migration.test.ts          # Migration engine tests
+└── securityUtils.test.ts      # Security sanitization tests
+
+/scripts/
+├── release.sh                 # Interactive release script
+├── package.mjs                # ZIP packaging utility
+├── copy-to-vault.mjs          # Development deployment to vaults
+└── record-demo.sh             # Demo GIF recording utility
+
+/.maestro/playbooks/           # Auto Run playbooks for agent orchestration
+├── Initiation/
+│   ├── Phase-01-Environment-Setup.md
+│   ├── Phase-02-Dev-Workflow.md
+│   └── ...
+```
+
 ### Script inventory
 
 | Script | File | Purpose |

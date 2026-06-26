@@ -142,18 +142,188 @@ With the development environment verified, this phase establishes best practices
   - `copy-to-vault.mjs` auto-deploys to local vaults during dev builds (esbuild `watch-deploy` plugin) but is skipped in CI.
   - `record-demo.sh` is a utility for recording demo GIFs — not part of the build/release pipeline.
 
-- [ ] Create a debugging and local testing workflow: Document how to test plugin behavior locally:
-  - Load the plugin in a test Obsidian vault using the built `main.js`
-  - Use the plugin's dry-run feature to preview import results before committing
-  - Check the Obsidian console for logs and errors (use `console.log()` and `logError()` patterns in code)
-  - Inspect generated Markdown files for determinism (same input = same output)
+- [x] Create a debugging and local testing workflow: Document how to test plugin behavior locally:
 
-- [ ] Document code style and patterns in Tetromino: Note the established conventions:
+  ### Overview
+
+  Test plugin behavior in a real Obsidian vault environment to verify the plugin works correctly. This section covers loading the plugin, using preview imports, debugging logs, and verifying deterministic behavior.
+
+  ### Prerequisites
+
+  1. **Install Obsidian**: Download and install [Obsidian](https://obsidian.md/download)
+
+  2. **Create a test vault**: Make a dedicated Obsidian vault for testing (avoid using your main vault):
+
+     ```bash
+     mkdir ~/Obsidian-TestVault
+     cd ~/Obsidian-TestVault
+     obsidian
+     ```
+
+  3. **Get the built plugin**: Build the plugin once:
+
+     ```bash
+     npm run build
+     ```
+
+     The output files (`main.js`, `manifest.json`, `styles.css`) will be in the repository root.
+
+  ### Loading the Plugin
+
+  1. **Copy the plugin files** to your test vault:
+
+     ```bash
+     cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/Tetromino/
+     ```
+     Create the plugins directory if it doesn't exist:
+
+     ```bash
+     mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/Tetromino
+     ```
+
+  2. **Enable the plugin**: In Obsidian, go to Settings → Community Plugins → Enable **Tetromino**
+
+  3. **Set up the API token**: In plugin settings, add your Are.na API token and click "Verify"
+
+  4. **Add a channel mapping**: In settings, add at least one channel mapping (provide the channel slug from Are.na)
+
+  ### Using Dry-Run (Preview) Commands
+
+  The plugin provides two dry-run preview commands:
+
+  1. **"Preview import (dry-run)"**: Preview imports of all configured channels
+  2. **"Preview current channel import (dry-run)"**: Preview import of the channel that the active file belongs to
+
+  #### How to use:
+
+  1. Open Obsidian and open any note file that's in a channel-mapped folder
+  2. Open Command Palette (`Ctrl/Cmd + P`)
+  3. Type "Preview current channel import (dry-run)"
+  4. The plugin will:
+     - Fetch channel data from Are.na
+     - Plan all file updates
+     - Show a diff summary (no files are actually written)
+     - Display a modal with actions like "download asset", "create file", "update file"
+
+  #### What to check in dry-run:
+
+  1. **No vault modifications**: Verify no files are created/modified
+  2. **Correct actions**: Check that actions like "download asset", "create file", "update file" are accurate
+  3. **Errors**: None should appear in console
+  4. **Determinism**: Run the same dry-run multiple times - output should be identical
+
+  ### Debugging Logs
+
+  Enable debug logging in plugin settings:
+
+  1. Go to Settings → Tetromino
+  2. Enable "Debug logging"
+  3. Perform an import or dry-run
+  4. Open Obsidian developer console:
+     - Press `Ctrl/Cmd + Shift + C` (Windows/Linux) or `Cmd + Option + C` (Mac)
+     - Look for logs starting with `[arena-sync]`
+
+  #### Common debugging patterns:
+
+  ```typescript
+  // In api.ts line 52 (debug log):
+  console.log(`[arena-sync] ${message}`, ...args);
+
+  // In api.ts line 57 (error log):
+  console.error(`[arena-sync] ${message}`, ...args);
+  ```
+
+  ### Verifying Deterministic Output
+
+  Tetromino's core promise is deterministic output: the same input should always produce the same output.
+
+  #### Steps to verify:
+
+  1. **Get stable channel data**: Ensure you're using the same Are.na channel (not varying parameters)
+  2. **Run imports multiple times**: Perform the same full import operation 3-5 times
+  3. **Compare outputs**: The generated Markdown files should be byte-for-byte identical
+  4. **Check timestamps**: Generated dates and timestamps should not cause non-deterministic behavior
+
+  #### How to check:
+
+  1. Use Obsidian's Git integration to track changes to the vault
+  2. After each import, run `git status` to see what changed
+  3. Compare output folders (`/Are.na/`) between runs
+  4. Verify import history (`Are.na/import-history.md`) for consistency
+
+  ### Setting Up Test Fixtures
+
+  Create a test vault with:
+
+  1. **Existing notes**: Add some existing Markdown files to test conflict resolution
+  2. **Different file types**: Create files with various extensions to test import filtering
+  3. **Special characters**: Test files with Unicode, spaces, and special characters
+  4. **Different structures**: Mix of well-structured and malformed notes
+
+  ### Troubleshooting Common Issues
+
+  #### Token verification fails:
+
+  1. Ensure token has "read" access
+  2. Verify token is copied correctly (no whitespace)
+  3. Wait a moment after setting, then click Verify
+
+  #### Dry-run shows errors:
+
+  1. Check console for error messages
+  2. Verify channel slug is correct in settings
+  3. Ensure channel still exists on Are.na
+  4. Check if channel is private (tokens may need additional permissions)
+
+  #### Imports fail partially:
+
+  1. Check API rate limits (Are.na limits requests)
+  2. Look for logs about specific channels failing
+  3. Try with a single, small channel first
+  4. Enable debug logging to track progress
+
+  ### Integration Testing Checklist
+
+  - [ ] Plugin loads in test vault
+  - [ ] API token verification works
+  - [ ] Dry-run preview runs successfully
+  - [ ] Dry-run shows accurate planned actions
+  - [ ] Dry-run makes no vault changes
+  - [ ] Full imports work correctly
+  - [ ] Generated files are deterministic across multiple runs
+  - [ ] Console logs are informative and non-empty when debug is enabled
+  - [ ] Error handling works for invalid tokens/network issues
+  - [ ] Conflict resolution works with existing files
+
+  ### Reproduction Steps for Bugs
+
+  To reproduce bugs effectively:
+
+  1. Enable debug logging
+  2. Run a specific action (dry-run or full import)
+  3. Record all console logs to a file
+  4. Note the exact time, channel, and action
+  5. Try running with different conditions (empty channel, large channel, mixed block types)
+  6. Share the logs when reporting bugs
+
+  By following this workflow, you can thoroughly test Tetromino locally before making changes, ensuring reliability and catching bugs early.
+
+- [x] Document code style and patterns in Tetromino: Note the established conventions:
   - TypeScript with strict mode and type-only imports (`import type`)
   - Error handling: propagate or log actionable errors (no silent failures)
   - Service/API patterns: API client (api.ts) → Sync engine (sync-engine.ts) → Plugin entry (main.ts)
   - Settings patterns: SettingsTab UI (settings-tab.ts) → Plugin methods called by UI
   - Avoid direct vault mutations; use sync-engine for all import/reconciliation logic
+
+  **Completed:** Verified and refined the "Code style and patterns in Tetromino" section in `CONTRIBUTING.md`. Key updates:
+  - Clarified TypeScript strictness as selective (`noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`) rather than blanket `"strict": true`.
+  - Fixed invalid `private readonly` method example and replaced fictional `EngineError` with actual `SyncError` from `src/types.ts`.
+  - Added a **Runtime Validation** subsection documenting the `unknown` → type-guard pattern (`isRecord`, `asNumber`, `unwrapData`, normalization) used in `api.ts`.
+  - Added **Dry-Run Mode** subsection documenting the `dryRun` flag pattern used consistently across `sync-engine.ts`.
+  - Added **Deterministic Change Detection** documenting the `computeHash` approach for reproducible output.
+  - Added **Concurrency Safety** documenting the `ensureFolderMutex` pattern.
+  - Fixed the code-review checklist item about `console.log` to reference the debug-gated logging pattern.
+  - Corrected the project structure diagram to reference `.maestro/playbooks/` instead of the non-existent `docs/plans/` directory.
 
 - [ ] Review security and privacy practices: Examine `src/securityUtils.ts` and check:
   - Are.na token handling (masking in logs, secure storage)
