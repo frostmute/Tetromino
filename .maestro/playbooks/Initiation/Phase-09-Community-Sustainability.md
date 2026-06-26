@@ -109,15 +109,16 @@ This phase establishes practices for engaging with the community, managing issue
   - Updated `docs/RELEASE_GUIDE.md` post-release tasks to reference thanking contributors and linking to the celebration guide.
   - Linked the new document from `README.md` Quick Navigation, `CONTRIBUTORS.md`, and `docs/COMMUNITY_ENGAGEMENT.md` related docs.
 
-- [ ] Create an annual community survey: Gather feedback and ideas:
-  - Each year (e.g., anniversary release), create a survey asking:
-    - What do you like most about Tetromino?
-    - What's missing or could be improved?
-    - Would you be interested in contributing?
-    - What Are.na content types would you like better support for?
-  - Share results in a blog post or discussion (transparency builds trust)
-  - Use feedback to inform roadmap decisions
-  - Thank survey respondents publicly
+- [x] Create an annual community survey: Gather feedback and ideas:
+  - Created `docs/COMMUNITY_SURVEY.md` documenting the full survey process:
+    - Survey purpose, timing (annually, aligned with major releases), and distribution method
+    - Core questions: what users like, what's missing, contributor interest, and Are.na content type priorities
+    - Optional questions: tenure, use case, NPS, and open feedback
+    - Results template for publishing in GitHub Discussions with themes, roadmap impact mapping, and thank-you section
+    - Process for acting on feedback: triage themes, map to roadmap, update ROADMAP.md, and follow up with potential contributors
+  - Linked the new document from `README.md` Quick Navigation, `docs/COMMUNITY_ENGAGEMENT.md`, and `ROADMAP.md`
+  - Added mention of the annual survey to `ROADMAP.md` in the "How to Propose Features" section
+  - Commit: `MAESTRO: add annual community survey documentation and process`
 
 - [ ] Document community values and philosophy: Clarify what Tetromino stands for:
   - Create `PHILOSOPHY.md` or add to README:

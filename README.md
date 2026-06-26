@@ -25,7 +25,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 - **For users:** [User Guide](docs/USER_GUIDE.md) | [Settings Reference](docs/SETTINGS_REFERENCE.md) | [FAQ](docs/FAQ.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
 - **For developers:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [API Design](docs/API_DESIGN.md) | [ADRs](docs/ADRs/)
-- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [FIRST_CONTRIBUTION](FIRST_CONTRIBUTION.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md) | [CONTRIBUTORS](CONTRIBUTORS.md) | [MAINTAINERS](MAINTAINERS.md) | [COMMUNITY HEALTH](docs/COMMUNITY_HEALTH.md) | [COMMUNITY CELEBRATION](docs/COMMUNITY_CELEBRATION.md)
+- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [FIRST_CONTRIBUTION](FIRST_CONTRIBUTION.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md) | [CONTRIBUTORS](CONTRIBUTORS.md) | [MAINTAINERS](MAINTAINERS.md) | [COMMUNITY HEALTH](docs/COMMUNITY_HEALTH.md) | [COMMUNITY CELEBRATION](docs/COMMUNITY_CELEBRATION.md) | [COMMUNITY SURVEY](docs/COMMUNITY_SURVEY.md)
 - **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
 - **Planning and reporting:** [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
 - **Community:** [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions)

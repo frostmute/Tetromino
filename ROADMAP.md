@@ -10,6 +10,7 @@ related:
   - '[[CHANGELOG]]'
   - '[[CONTRIBUTING]]'
   - '[[PROJECT_BOARD]]'
+  - '[[COMMUNITY_SURVEY]]'
 ---
 
 # Tetromino Roadmap
@@ -106,6 +107,7 @@ We use [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions) 
 3. **Explain the problem** before the solution. What workflow is painful? What can't you do today?
 4. **React with 👍** on discussions you support. We use vote counts as a signal, not a sole deciding factor.
 5. **Maintainers review** discussions quarterly when updating this roadmap. High-engagement ideas with clear scope are most likely to be scheduled.
+6. **Annual community survey** — Once per year we run a structured survey to gather feedback from a broader audience than active discussants. Results are published in GitHub Discussions and directly inform roadmap prioritization. See [COMMUNITY_SURVEY.md](COMMUNITY_SURVEY.md) for details.
 
 For bugs, use the [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml). For security issues, see [SECURITY.md](SECURITY.md).
 
