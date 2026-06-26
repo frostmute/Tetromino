@@ -79,7 +79,7 @@ This phase guides maintainers through the complete release process for Tetromino
   - The build script also auto-deployed the plugin files to the local test vault at `Nexus Vault/.obsidian/plugins/are.na-importer/`.
   - **Outstanding:** Manual verification inside an Obsidian vault (load plugin, test import, dry-run, settings) requires a GUI and cannot be completed by this CLI agent. Recommend the user open Obsidian, enable the plugin in the test vault, and run a dry-run import before proceeding to tag the release.
 
-- [ ] Create and tag the release commit: Update version files and create the release:
+- [x] Create and tag the release commit: Update version files and create the release:
   - Run `npm run version` which:
     - Updates version in manifest.json to the new version
     - Updates version in versions.json with the new version and release date
@@ -89,6 +89,15 @@ This phase guides maintainers through the complete release process for Tetromino
   - Commit with message: `chore(release): v<version>` (e.g., `chore(release): v1.0.1`)
   - Tag the commit: `git tag -a v<version> -m "Release v<version>"` (e.g., `git tag -a v1.0.1 -m "Release v1.0.1"`)
   - Push the commit and tag: `git push origin main && git push origin v<version>`
+
+  **Notes:**
+  - Fast-forwarded `main` from `00f9d38` to `10638cc` (feature/choose-backup-file) so all release-prep commits are included.
+  - Ran `npm version minor --no-git-tag-version` which bumped `package.json` and `package-lock.json` to `1.1.0`.
+  - The npm `version` lifecycle script automatically executed `version-bump.mjs`, updating `manifest.json` → `1.1.0` and appending `"1.1.0": "1.4.0"` to `versions.json`.
+  - Updated `CHANGELOG.md`: moved all `[Unreleased]` entries to a new `## [1.1.0] — 2025-06-26` section, inserted an empty `[Unreleased]` header above it, and updated comparison links.
+  - Committed all five files (`package.json`, `package-lock.json`, `manifest.json`, `versions.json`, `CHANGELOG.md`) with message `chore(release): v1.1.0`.
+  - Created annotated tag `v1.1.0` with message `Release v1.1.0`.
+  - Pushed `main` (`753aa86`) and tag `v1.1.0` to `origin`. GitHub Actions release workflow should trigger automatically on the tag.
 
 - [ ] Trigger the automated release workflow: After pushing the tag:
   - The GitHub Actions workflow (`.github/workflows/release.yml`) automatically triggers on the version tag
