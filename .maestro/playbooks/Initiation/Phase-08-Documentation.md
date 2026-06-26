@@ -4,13 +4,15 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
 
 ## Tasks
 
-- [ ] Audit existing documentation for completeness and accuracy: Review current docs:
+- [x] Audit existing documentation for completeness and accuracy: Review current docs:
   - `README.md`: Feature overview, quick start, setup instructions, contribution links
   - `CONTRIBUTING.md`: Setup, build commands, PR checklist, coding standards
   - `CHANGELOG.md`: Version history with feature/fix/breaking change notes
   - `SECURITY.md`: Security practices, vulnerability disclosure, token handling
   - Check if docs match the actual codebase (commands, file paths, feature descriptions)
   - Identify gaps: features documented in code but not in README, settings help text but no guide
+  - **Completed 2026-06-26.** Full audit report saved to `docs/research/documentation-audit.md`.
+  - **Fixes applied:** corrected background-sync contradiction in README, added missing Template Engine feature highlight, updated outdated "Only 100 blocks" troubleshooting tip, fixed CONTRIBUTING playbook filename reference, fixed `scripts/release.sh` hardcoded GitHub URL, and corrected misleading encryption claim in SECURITY.md. All changes committed and pushed.
 
 - [ ] Create a comprehensive user guide: Build documentation that helps users get started:
   - Create `docs/USER_GUIDE.md` with:
