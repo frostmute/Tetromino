@@ -47,12 +47,21 @@ This phase guides maintainers through the complete release process for Tetromino
     - "Contributors" section.
     - "Migration Guide" confirming backward compatibility.
 
-- [ ] Determine the next version number using semantic versioning: Analyze changes to decide on version bump:
+- [x] Determine the next version number using semantic versioning: Analyze changes to decide on version bump:
   - Patch version (1.0.x): Only bug fixes and non-breaking changes
   - Minor version (1.x.0): New features, but backward compatible
   - Major version (x.0.0): Breaking changes (changes to note structure, API, settings format)
   - Tetromino is at v1.0.0, so follow semantic versioning strictly to signal stability
   - Document the reasoning for the version bump (what changed that necessitates this version?)
+
+  **Notes:**
+  - Analyzed 38 unreleased entries across `Added`, `Changed`, `Fixed`, `Removed`, and `Tests` sections in `CHANGELOG.md`.
+  - **11 new features** (sync summary, overview note, attachment migration, channel management tools, banner frontmatter, block enrichment, channel index enhancements, background sync, etc.) necessitate a **minor** bump rather than patch.
+  - **18 bug fixes** and **2 security patches** (SSRF, directory traversal, token leaks) support the bump but alone would only warrant a patch.
+  - **No breaking changes** were identified; existing vaults and mappings remain fully compatible. Default folder resolution and optional mapping folders are backward compatible.
+  - **Determined version: 1.1.0** — signals new functionality while maintaining stability.
+  - Full reasoning documented in `.maestro/playbooks/Working/version-determination-v1.1.0.md`.
+  - Draft release notes at `.maestro/playbooks/Working/draft-release-notes-v1.1.0.md` updated to confirm `1.1.0` as the target version.
 
 - [ ] Run full quality gate before release: Execute all checks to ensure release quality:
   - Run `npm run lint` and verify zero lint errors

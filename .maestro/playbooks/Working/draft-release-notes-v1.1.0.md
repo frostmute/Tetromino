@@ -13,7 +13,7 @@ related:
 
 # Draft Release Notes — Tetromino v1.1.0
 
-> **Status:** Draft — pending version confirmation and quality gate passage.
+> **Status:** Confirmed — version 1.1.0 determined via semantic versioning analysis. Pending quality gate passage.
 > **Target Version:** 1.1.0 (minor — new features, backward compatible).
 
 ---
