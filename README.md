@@ -37,8 +37,6 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 ## Feature Highlights
 
-<img src="https://raw.githubusercontent.com/frostmute/Tetromino/main/assets/hero-square.svg" alt="App Preview" align="right" width="250" />
-
 ### Import Engine
 
 - Imports mapped Are.na channels into mapped vault folders.
