@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ArenaSyncPlugin from "./main";
+import { BackupFileSuggestModal } from "./modals";
 import type {
 	AttachmentHandling,
 	AttachmentStorage,
@@ -455,6 +456,28 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					} catch (err) {
 						new Notice(`Restore failed: ${(err as Error).message}`);
 					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Restore from file")
+			.setDesc("Choose a specific backup file to restore channel mappings from.")
+			.addButton((btn) =>
+				btn.setButtonText("Restore from file...").onClick(() => {
+					new BackupFileSuggestModal(this.app, async (file) => {
+						try {
+							const path =
+								await this.plugin.restoreChannelMappingsFromFile(
+									file.path,
+								);
+							new Notice(`Restored channel mappings from ${path}`);
+							this.display();
+						} catch (err) {
+							new Notice(
+								`Restore failed: ${(err as Error).message}`,
+							);
+						}
+					}).open();
 				}),
 			);
 

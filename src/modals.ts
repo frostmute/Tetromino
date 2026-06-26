@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, FuzzySuggestModal, Modal, Setting, TFile } from "obsidian";
 import type { FileDiff, SyncResult } from "./types";
 import type { MigrationPlan } from "./migration";
 
@@ -184,5 +184,31 @@ export class MigrationPreviewModal extends Modal {
 			.addButton((btn) =>
 				btn.setButtonText("Cancel").onClick(() => this.close()),
 			);
+	}
+}
+
+export class BackupFileSuggestModal extends FuzzySuggestModal<TFile> {
+	private onSelect: (file: TFile) => Promise<void> | void;
+
+	constructor(app: App, onSelect: (file: TFile) => Promise<void> | void) {
+		super(app);
+		this.onSelect = onSelect;
+		this.setPlaceholder("Select a channel mapping backup file...");
+	}
+
+	getItems(): TFile[] {
+		return this.app.vault
+			.getFiles()
+			.filter((file) => file.path.endsWith(".json"))
+			.sort((a, b) => a.path.localeCompare(b.path));
+	}
+
+	getItemText(file: TFile): string {
+		return file.path;
+	}
+
+	onChooseItem(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
+		void _evt;
+		void this.onSelect(file);
 	}
 }

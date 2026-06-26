@@ -135,4 +135,32 @@ export class Setting {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export class FuzzySuggestModal<T = any> {
+	app: App;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	constructor(app: App, _onSelect?: any) {
+		this.app = app;
+		void _onSelect;
+	}
+	setPlaceholder(_placeholder: string): this {
+		void _placeholder;
+		return this;
+	}
+	getItems(): T[] {
+		return [];
+	}
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	getItemText(_item: any): string {
+		void _item;
+		return "";
+	}
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	onChooseItem(_item: any, _evt: unknown): void {
+		void _item;
+		void _evt;
+	}
+	open(): void {}
+}
+
 export function addIcon(): void {}

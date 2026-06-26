@@ -53,13 +53,14 @@ This phase guides developers through adding new features to Tetromino while main
   - All 7 new tests correctly fail with `TypeError: plugin.restoreChannelMappingsFromFile is not a function` (TDD confirmed).
   - All 128 existing tests continue to pass (no regressions).
 
-- [ ] Implement the feature incrementally with test-driven development:
+- [x] Implement the feature incrementally with test-driven development:
   - Implement API methods first (if needed), ensuring pagination and error handling match existing patterns
   - Then implement sync-engine logic, ensuring tests pass for each operation
   - Then add UI (settings, commands, prompts in main.ts) to expose the feature to users
   - Run `npm run lint:fix` after each file to maintain code style
   - Run `npm test` frequently to ensure no regressions
   - Keep commits focused and coherent (one logical change per commit)
+  - **Completed:** Added `restoreChannelMappingsFromFile(filePath)` to `src/main.ts` with a shared `restoreFromBackupData` helper, refactored `restoreLatestChannelMappingsBackup` to use it, and added a **"Restore from file..."** button in `src/settings-tab.ts` wired to a new `BackupFileSuggestModal` in `src/modals.ts`. All 135 tests pass (including 10 backup-specific tests), lint is clean, and build succeeds.
 
 - [ ] Maintain backwards compatibility and data safety:
   - If the feature changes the note structure or metadata format, write a migration in `src/migration.ts`

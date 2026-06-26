@@ -468,6 +468,31 @@ export default class ArenaSyncPlugin extends Plugin {
 		return filePath;
 	}
 
+	private async restoreFromBackupData(data: unknown): Promise<void> {
+		const backup = data as Record<string, unknown>;
+		if (!Array.isArray(backup.channelMappings)) {
+			throw new Error(
+				"Backup data is invalid: channelMappings must be an array.",
+			);
+		}
+		this.settings.channelMappings = backup.channelMappings.map((mapping) => ({
+			...(mapping as ChannelMapping),
+		}));
+		this.normalizeMappings();
+		await this.saveSettings();
+	}
+
+	async restoreChannelMappingsFromFile(filePath: string): Promise<string> {
+		const abstractFile = this.app.vault.getAbstractFileByPath(filePath);
+		if (!abstractFile || !(abstractFile instanceof TFile)) {
+			throw new Error("File not found");
+		}
+		const raw = await this.app.vault.read(abstractFile);
+		const data = JSON.parse(raw);
+		await this.restoreFromBackupData(data);
+		return filePath;
+	}
+
 	async restoreLatestChannelMappingsBackup(): Promise<string> {
 		const folderPrefix = normalizePath("Are.na/channel-mapping-backups");
 		const candidates = this.app.vault
@@ -483,17 +508,8 @@ export default class ArenaSyncPlugin extends Plugin {
 			throw new Error("No channel mapping backups found.");
 		}
 		const raw = await this.app.vault.read(latest);
-		const data = JSON.parse(raw) as {
-			channelMappings?: ChannelMapping[];
-		};
-		if (!Array.isArray(data.channelMappings)) {
-			throw new Error("Latest backup is invalid.");
-		}
-		this.settings.channelMappings = data.channelMappings.map((mapping) => ({
-			...mapping,
-		}));
-		this.normalizeMappings();
-		await this.saveSettings();
+		const data = JSON.parse(raw);
+		await this.restoreFromBackupData(data);
 		return latest.path;
 	}
 
