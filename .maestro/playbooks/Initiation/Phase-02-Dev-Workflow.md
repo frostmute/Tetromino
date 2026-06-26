@@ -117,13 +117,15 @@ With the development environment verified, this phase establishes best practices
   - **No integration tests**: All tests are unit-level with mocked dependencies. No end-to-end test simulates a full sync cycle.
   - **main.ts / settings-tab.ts / modals.ts (0%)**: UI-coupled code is untested, which is expected for an Obsidian plugin but means settings persistence and command registration logic is unverified.
 
-- [ ] Document the PR checklist for contributors: Create a mental reference for PR requirements:
+- [x] Document the PR checklist for contributors: Create a mental reference for PR requirements:
   - Changes are focused and small when possible
   - TypeScript type checks pass (`npm run build`)
   - All new code has tests (`npm test` passes with no regressions)
   - ESLint passes (`npm run lint`)
   - CHANGELOG.md has an entry under `[Unreleased]`
   - Docs are updated if behavior changed (README, settings help text, etc.)
+
+  **Completed:** Expanded the existing "Pull requests" section in `CONTRIBUTING.md` into a structured "Pull request checklist" with checkbox items organized into **Required** (focused scope, TypeScript compilation, linting, tests, changelog) and **When applicable** (docs sync, settings consistency, security review, migration impact) categories. Also added a **PR description** template section covering what/why, issue references, and behavior changes. The checklist replaces the previous five-bullet list with nine actionable items and a description guide.
 
 - [ ] Set up pre-commit validation script understanding: Review any existing git hooks or scripts (e.g., `scripts/` directory). Understand the release script at `scripts/release.sh` and version-bumping logic at `version-bump.mjs`. Document the release checklist for maintainers.
 

@@ -107,13 +107,49 @@ npm test
 npm run build
 ```
 
-## Pull requests
+## Pull request checklist
 
-- Keep PRs focused and small when possible.
-- Update docs for behavior changes.
-- Add tests for behavior changes where practical.
-- Add an entry under `[Unreleased]` in `CHANGELOG.md`.
-- Keep settings help text and README feature/setting lists in sync.
+Use this checklist as a mental reference before opening a PR. Reviewers will
+check the same items.
+
+### Required
+
+- [ ] **Focused scope** — the PR addresses a single logical change. Split
+  unrelated fixes into separate PRs.
+- [ ] **TypeScript compiles** — `npm run build` passes (runs `tsc -noEmit`,
+  esbuild bundle, and package step).
+- [ ] **Linter passes** — `npm run lint` reports no errors. Run `npm run lint:fix`
+  first to auto-fix formatting issues.
+- [ ] **Tests pass** — `npm test` passes with no regressions. New behavioral
+  code should include tests; CI runs the suite across Node 18, 20, and 22.
+- [ ] **Changelog updated** — add an entry under `[Unreleased]` in
+  `CHANGELOG.md` using the appropriate subsection (`Added`, `Changed`,
+  `Fixed`, `Removed`) per [Keep a Changelog](https://keepachangelog.com/).
+
+### When applicable
+
+- [ ] **Docs updated** — if the PR changes user-facing behavior, update
+  `README.md` (feature/setting descriptions), settings help text in
+  `settings-tab.ts`, and any other affected docs.
+- [ ] **Settings in sync** — keep the settings UI help text, `README.md`
+  feature list, and `CHANGELOG.md` consistent when adding or modifying
+  settings.
+- [ ] **Security considerations** — changes touching API tokens, file paths,
+  or user-generated content should be reviewed against the patterns in
+  `src/securityUtils.ts` (XSS sanitization, path traversal prevention,
+  token masking).
+- [ ] **Migration impact** — if the PR changes file naming, folder structure,
+  or stored settings, verify that `src/migration.ts` handles the transition
+  or add migration logic.
+
+### PR description
+
+When opening the PR, include:
+
+- **What** changed and **why**.
+- Related issues (e.g., `Closes #42`).
+- Any settings, API, or behavior changes.
+- Screenshots or console output if the change is visual or affects logging.
 
 ## Coding notes
 
