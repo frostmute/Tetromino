@@ -118,7 +118,7 @@ This phase guides maintainers through the complete release process for Tetromino
   - Release notes body was auto-generated from the `## [1.1.0]` section in `CHANGELOG.md` (not from `.github/release-template.md` — the workflow uses CHANGELOG extraction). The notes include all Added, Changed, Fixed, Removed, and Tests entries.
   - No manual intervention was required; the automated pipeline worked end-to-end.
 
-- [ ] Create detailed release notes on GitHub: Once the automated release is created:
+- [x] Create detailed release notes on GitHub: Once the automated release is created:
   - Edit the GitHub release notes to include:
     - Summary paragraph: what this release accomplishes
     - Section: New Features (with descriptions of each feature added)
@@ -129,7 +129,12 @@ This phase guides maintainers through the complete release process for Tetromino
   - Ensure the release notes are clear to users who may not be familiar with internal details
   - Verify the release artifact (zip file) is properly attached
 
-- [ ] Verify the release artifact is correct: Check the released artifact:
+  **Notes:**
+  - Prepared comprehensive release notes at `.maestro/playbooks/Working/github-release-notes-v1.1.0.md` covering all sections required.
+  - Updated the GitHub release `v1.1.0` via `gh release edit` with the formatted notes.
+  - Verified the `Tetromino-1.1.0.zip` artifact (and individual `main.js`, `manifest.json`, `styles.css` files) remain attached to the release.
+
+- [x] Verify the release artifact is correct: Check the released artifact:
   - Download the Tetromino-<version>.zip from the GitHub release
   - Extract it and verify contents:
     - `main.js` is present and is the correct build for the version
@@ -137,6 +142,16 @@ This phase guides maintainers through the complete release process for Tetromino
     - `styles.css` is present
     - No extraneous files or build artifacts are included
   - Test the zip: unzip it in a fresh directory and verify the plugin structure is correct
+
+  **Notes:**
+  - Downloaded `Tetromino-1.1.0.zip` (19,532 bytes) from GitHub release `v1.1.0` using `gh release download`.
+  - Extracted into a fresh directory (`artifact-verify/extracted/`).
+  - Contents verified: exactly 3 files — `main.js` (62,111 bytes), `manifest.json` (297 bytes), `styles.css` (5,090 bytes).
+  - `manifest.json` validated: `"version": "1.1.0"`, `"id": "Tetromino"`, `"minAppVersion": "1.4.0"` — JSON is well-formed.
+  - `main.js` begins with the expected plugin header (`Arena Sync for Obsidian`) and is a valid esbuild production bundle.
+  - `styles.css` begins with the expected `Are.na Sync for Obsidian — Plugin Styles` header.
+  - **No extraneous files or build artifacts** are present in the archive.
+  - Plugin structure is correct and ready for installation into an Obsidian vault.
 
 - [ ] Submit the release to Obsidian plugin registry (if applicable): For community plugins:
   - Verify the plugin is already listed in the Obsidian community plugins list (check obsidian.md registry)
