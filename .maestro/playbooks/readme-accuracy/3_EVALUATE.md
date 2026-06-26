@@ -2,10 +2,10 @@
 
 ## Context
 - **Playbook:** Usage
-- **Agent:** {{AGENT_NAME}}
-- **Project:** {{AGENT_PATH}}
-- **Auto Run Folder:** {{AUTORUN_FOLDER}}
-- **Loop:** {{LOOP_NUMBER}}
+- **Agent:** OpenCODECODER
+- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Loop:** 00001
 
 ## Objective
 
@@ -13,14 +13,16 @@ Evaluate each documentation gap from the discovery phase and assign importance a
 
 ## Instructions
 
-1. **Read the gaps list** from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_GAPS.md`
+1. **Read the gaps list** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
 2. **Rate each gap** for user importance and fix effort
 3. **Assign status** based on ratings
-4. **Output prioritized plan** to `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`
+4. **Output prioritized plan** to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 
 ## Evaluation Checklist
 
-- [ ] **Evaluate gaps (or skip if empty)**: Read `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_GAPS.md`. If it contains no gaps OR all gaps have already been evaluated in `LOOP_{{LOOP_NUMBER}}_PLAN.md`, mark this task complete without changes. Otherwise, rate each gap by USER IMPORTANCE (CRITICAL/HIGH/MEDIUM/LOW) and FIX EFFORT (EASY/MEDIUM/HARD). Mark gaps with HIGH/CRITICAL importance and EASY/MEDIUM effort as PENDING for auto-fix. Output to `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`.
+- [x] **Evaluate gaps (or skip if empty)**: Read `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`. If it contains no gaps OR all gaps have already been evaluated in `LOOP_00001_PLAN.md`, mark this task complete without changes. Otherwise, rate each gap by USER IMPORTANCE (CRITICAL/HIGH/MEDIUM/LOW) and FIX EFFORT (EASY/MEDIUM/HARD). Mark gaps with HIGH/CRITICAL importance and EASY/MEDIUM effort as PENDING for auto-fix. Output to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`.
+
+**Completion Notes:** Evaluated all 14 gaps from LOOP_00001_GAPS.md. Identified 13 gaps ready for auto-fix (PENDING) based on importance/effort criteria, and 1 gap as WON'T DO (advanced feature, low impact). Created comprehensive plan with importance ratings, effort estimates, and proposed content for each gap. Plan prioritizes by user impact with 13 auto-fixable items ready for implementation.
 
 ## Rating Criteria
 
@@ -58,10 +60,10 @@ Gaps marked `WON'T DO` if:
 
 ## Output Format
 
-Create/update `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md` with:
+Create/update `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` with:
 
 ```markdown
-# Documentation Fix Plan - Loop {{LOOP_NUMBER}}
+# Documentation Fix Plan - Loop 00001
 
 ## Summary
 - **Total Gaps:** [count]
@@ -150,14 +152,14 @@ Recommended sequence based on importance and dependencies:
 This task is complete when ONE of the following is true:
 
 **Option A - Evaluated gaps:**
-1. You've read `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_GAPS.md`
+1. You've read `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
 2. You've evaluated gaps with importance and effort ratings
-3. You've output the prioritized plan to `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`
+3. You've output the prioritized plan to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 4. Each gap has a status (PENDING, PENDING - NEEDS REVIEW, or WON'T DO)
 
 **Option B - No gaps to evaluate:**
-1. `LOOP_{{LOOP_NUMBER}}_GAPS.md` contains no gaps, OR
-2. All gaps have already been evaluated in `LOOP_{{LOOP_NUMBER}}_PLAN.md`
+1. `LOOP_00001_GAPS.md` contains no gaps, OR
+2. All gaps have already been evaluated in `LOOP_00001_PLAN.md`
 3. Mark this task complete without making changes
 
 This graceful handling of empty states prevents the pipeline from stalling when no documentation gaps are found.
