@@ -25,7 +25,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 - **For users:** [User Guide](docs/USER_GUIDE.md) | [Settings Reference](docs/SETTINGS_REFERENCE.md) | [FAQ](docs/FAQ.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
 - **For developers:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [API Design](docs/API_DESIGN.md) | [ADRs](docs/ADRs/)
-- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md)
+- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [FIRST_CONTRIBUTION](FIRST_CONTRIBUTION.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md) | [CONTRIBUTORS](CONTRIBUTORS.md)
 - **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
 - **Planning and reporting:** [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
 - **Community:** [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions)
@@ -195,7 +195,7 @@ npm run lint
 npm test
 ```
 
-**Contributor resources:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [CONTRIBUTING](CONTRIBUTING.md)
+**Contributor resources:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [CONTRIBUTING](CONTRIBUTING.md) | [First-Time Contributor Guide](FIRST_CONTRIBUTION.md)
 
 ## Companion Tools
 
@@ -241,6 +241,16 @@ For details, see [SECURITY.md](SECURITY.md).
 - Enable debug logging to see pagination progress in the console.
 
 **Full troubleshooting guide:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+## Contributors
+
+Tetromino is maintained by [Jonathan J Wagner](https://github.com/frostmute). We welcome contributions of all kinds — code, documentation, bug reports, and community support.
+
+- **Want to contribute?** See [FIRST_CONTRIBUTION.md](FIRST_CONTRIBUTION.md) for a step-by-step guide.
+- **Looking for a first issue?** Browse [`good first issue`](https://github.com/frostmute/Tetromino/labels/good%20first%20issue) labels.
+- **All contributors:** See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list.
+
+First-time contributors are thanked by name in release notes.
 
 ## License
 

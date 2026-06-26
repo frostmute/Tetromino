@@ -2,7 +2,13 @@
 
 Thanks for contributing to `Tetromino`.
 
+> **New to open source or this project?** Start with [FIRST_CONTRIBUTION.md](FIRST_CONTRIBUTION.md) — a step-by-step walkthrough from fork to merged PR.
+
 All contributors are expected to adhere to our [Code of Conduct](../CODE_OF_CONDUCT.md). Please read it before participating.
+
+## Good First Issues
+
+Looking for a place to start? Issues labeled [`good first issue`](https://github.com/frostmute/Tetromino/labels/good%20first%20issue) are curated for new contributors. They are well-scoped, documented, and low-risk. Comment on an issue to claim it, and a maintainer will assign it to you.
 
 ## Scope and product behavior
 

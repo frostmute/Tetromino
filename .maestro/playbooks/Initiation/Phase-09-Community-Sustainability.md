@@ -49,15 +49,18 @@ This phase establishes practices for engaging with the community, managing issue
   - Kept the roadmap realistic: committed features are high-confidence extensions of existing architecture
   - Noted that the roadmap should be updated every release
 
-- [ ] Build a contributor onboarding guide: Make it easy to contribute:
-  - Create `CONTRIBUTING.md` enhancements or a new `FIRST_CONTRIBUTION.md`:
-    - "Good first issue" label: mark issues suitable for new contributors
-    - Step-by-step: how to fork, clone, set up, make changes, test, submit PR
-    - Reference the Playbook (Phase 04 for features, Phase 05 for testing)
-    - Include a "Getting Help" section with links to discussions, chat, or maintainer contacts
-    - Point to the Developer Guide (Phase 08 docs)
-  - Respond promptly to first-time contributors and help them succeed
-  - Thank contributors by name in release notes and README
+- [x] Build a contributor onboarding guide: Make it easy to contribute:
+  - Created `FIRST_CONTRIBUTION.md` as a welcoming, step-by-step guide for first-time contributors:
+    - Covers fork/clone/setup, finding a `good first issue`, making changes, testing, and submitting a PR.
+    - References Phase 04 (feature development) and Phase 05 (testing) playbooks.
+    - Points to the Developer Guide (`docs/DEVELOPER_GUIDE.md`) for architecture and testing patterns.
+    - Includes a "Getting Help" section with links to GitHub Discussions and maintainer contacts.
+    - Sets expectations for maintainer response times and constructive feedback.
+  - Enhanced `CONTRIBUTING.md` with a prominent link to `FIRST_CONTRIBUTION.md` and a "Good First Issues" section explaining the label.
+  - Created `CONTRIBUTORS.md` to acknowledge maintainers and contributors, with instructions on how to be listed.
+  - Updated `README.md` Quick Navigation and Development sections to link to `FIRST_CONTRIBUTION.md` and `CONTRIBUTORS.md`.
+  - Added a "Contributors" section to `README.md` thanking contributors and directing readers to the first-time contributor guide.
+  - Commit: `MAESTRO: add first-time contributor guide and contributor acknowledgements`
 
 - [ ] Set up community communication channels: Foster engagement beyond GitHub:
   - If not already done, enable GitHub Discussions:
