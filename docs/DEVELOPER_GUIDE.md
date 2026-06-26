@@ -71,6 +71,8 @@ Responsibilities:
 - Response normalisation: adapts both v3 (`{ data, meta }`) and legacy v2 (`{ contents, length }`) shapes.
 - Binary asset downloads with independent retry logic.
 
+For endpoint details, retry formulas, rate-limit behaviour, and future-version migration guidance, see [[API_DESIGN]].
+
 ### Sync Engine (`src/sync-engine.ts`)
 
 `SyncEngine` is the heart of the plugin. It:

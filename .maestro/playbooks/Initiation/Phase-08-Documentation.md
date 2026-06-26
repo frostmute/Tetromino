@@ -36,7 +36,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
   - Cross-reference the Playbook phases (Phase 04 for features, Phase 05 for testing, etc.)
   - **Completed 2026-06-26.** Created `docs/DEVELOPER_GUIDE.md` with full architecture overview, module guide for all 11 source files, TypeScript strict-mode conventions, error-handling patterns, determinism requirements, step-by-step feature workflow with review checklist, test quick-start with mock examples, debugging commands for DevTools and local testing, and a playbook phase cross-reference table. Links to existing `docs/testing/testing-guide.md` to avoid duplication.
 
-- [ ] Document API design and integration patterns: Help contributors understand the Are.na integration:
+- [x] Document API design and integration patterns: Help contributors understand the Are.na integration:
   - Create `docs/API_DESIGN.md` with:
     - Are.na API overview: base URL, authentication, pagination limits
     - API endpoints used: /channels/{id}, /blocks, /attachments
@@ -44,6 +44,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Pagination: how Tetromino handles paginated results, page size limits
     - Rate limiting: Are.na rate limits and how to handle 429 responses
     - Future API versions: how to handle breaking changes in Are.na API v4+
+  - **Completed 2026-06-26.** Created `docs/API_DESIGN.md` with full base URL and auth details, endpoint-by-endpoint coverage (channel metadata, contents, blocks, user channels, token verification, asset downloads), retry/backoff matrix with exact formulas and timing tables, pagination stop conditions, rate-limit handling with `Retry-After` parsing, response normalisation for v3/v2/array shapes, caching strategy, and a migration guide for hypothetical Are.na API v4+. Cross-references to [[DEVELOPER_GUIDE]] and [[USER_GUIDE]] included in YAML front matter.
 
 - [ ] Create architecture decision records (ADRs) for major choices: Document key decisions:
   - Create `docs/ADRs/` folder and document decisions like:
