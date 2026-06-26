@@ -1,0 +1,67 @@
+name: 📢 Announcements
+description: Official announcements for releases, major news, and project updates (maintainers only)
+labels: ["announcement", "news"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This category is for **maintainer announcements only**. Community members should use [Questions & Help](https://github.com/frostmute/Tetromino/discussions/categories/q-and-a), [Feature Ideas](https://github.com/frostmute/Tetromino/discussions/categories/feature-ideas), or [Show & Tell](https://github.com/frostmute/Tetromino/discussions/categories/show-and-tell).
+
+  - type: dropdown
+    id: announcement_type
+    attributes:
+      label: Announcement type
+      description: "What kind of announcement is this?"
+      options:
+        - New release
+        - Major feature preview
+        - Breaking change / deprecation notice
+        - Community milestone
+        - Event or call for participation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version (if applicable)
+      description: "Plugin version this announcement relates to"
+      placeholder: "e.g. 1.2.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: "A brief, clear summary of the announcement."
+      placeholder: "Tetromino 1.2.0 is now available with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: "Full details, context, and background. Include links to relevant docs, PRs, or issues."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actions
+    attributes:
+      label: Action items for users
+      description: "Is there anything users need to do? (update, migrate settings, review docs, etc.)"
+      placeholder: "- Update to the latest version via Community Plugins\n- Review the new migration guide..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: thanks
+    attributes:
+      label: Contributors and thanks
+      description: "Acknowledge contributors, reporters, or community members who helped with this release or change."
+      placeholder: "Thanks to @username for..."
+    validations:
+      required: false

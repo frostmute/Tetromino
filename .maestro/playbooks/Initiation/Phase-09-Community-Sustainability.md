@@ -62,15 +62,18 @@ This phase establishes practices for engaging with the community, managing issue
   - Added a "Contributors" section to `README.md` thanking contributors and directing readers to the first-time contributor guide.
   - Commit: `MAESTRO: add first-time contributor guide and contributor acknowledgements`
 
-- [ ] Set up community communication channels: Foster engagement beyond GitHub:
-  - If not already done, enable GitHub Discussions:
-    - "Announcements" category for releases and major news
-    - "Questions & Help" for user questions and support
-    - "Ideas & Feature Requests" for feature brainstorming
-    - "Show & Tell" for users sharing creative import workflows
-  - Monitor discussions regularly (at least weekly) and respond to questions
-  - Summarize popular discussion topics and add to FAQ
-  - Pin useful discussions and guides for easy access
+- [x] Set up community communication channels: Foster engagement beyond GitHub:
+  - Created `.github/DISCUSSION_TEMPLATE/announcements.yml` to complement existing `q-and-a.yml`, `feature-ideas.yml`, and `show-and-tell.yml` templates
+  - Verified existing discussion templates cover: Questions & Help, Ideas & Feature Requests, and Show & Tell
+  - Created `docs/COMMUNITY_ENGAGEMENT.md` documenting:
+    - The four discussion categories and their purposes
+    - Maintainer response expectations (1-week target for unanswered questions)
+    - Process for summarizing popular discussion topics into the FAQ
+    - Pinning and curation policy for discussions
+    - Monthly community health check checklist
+    - Escalation path from discussions to formal issues
+  - Updated `docs/FAQ.md` with a "Still Have Questions?" section directing users to GitHub Discussions
+  - Note: Enabling GitHub Discussions itself is a repository setting that must be toggled via the GitHub UI (Settings → General → Discussions)
 
 - [ ] Create a maintainer succession plan: Ensure sustainability:
   - Document in a private file (e.g., MAINTAINERS.md or issue in private repo):

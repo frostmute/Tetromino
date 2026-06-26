@@ -161,6 +161,18 @@ For full security practices, see [SECURITY.md](../SECURITY.md).
 
 ---
 
+## Still Have Questions?
+
+If your question is not answered here:
+
+- **Ask in [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions/categories/q-and-a)** — The Questions & Help category is monitored by maintainers and the community.
+- **Check the [Troubleshooting Guide](TROUBLESHOOTING.md)** — For error messages, common failures, and how to collect logs.
+- **Review the [User Guide](USER_GUIDE.md)** — For step-by-step walkthroughs and feature deep-dives.
+
+Popular discussion topics are periodically summarized and added to this FAQ. If you find a question being asked repeatedly, feel free to open a PR adding it to this document.
+
+---
+
 ## Related Documentation
 
 - [[USER_GUIDE]] — Step-by-step walkthroughs and feature overview.
