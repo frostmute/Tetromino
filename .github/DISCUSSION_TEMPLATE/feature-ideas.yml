@@ -1,0 +1,45 @@
+name: 💡 Feature Ideas
+description: Share an idea for a new feature, improvement, or workflow enhancement
+labels: ["enhancement", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for improving Tetromino? We'd love to hear it. For bug reports, please use [Bug Report](https://github.com/frostmute/Tetromino/issues/new?template=bug_report.yml) instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: "What problem does this idea solve? Why would it be useful?"
+      placeholder: "I often find myself needing to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed idea
+      description: "Describe the feature or improvement. How would it work?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds
+      description: "Have you tried any existing workarounds? Are there other approaches?"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: "How much of the plugin would this touch?"
+      options:
+        - Small (UI tweak, setting, label)
+        - Medium (new option, command, behavior)
+        - Large (new sync mode, architecture change)
+    validations:
+      required: false

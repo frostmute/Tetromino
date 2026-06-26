@@ -1,0 +1,60 @@
+name: ❓ Questions & Help
+description: Ask a question about using Tetromino, configuration, troubleshooting, or anything else
+labels: ["question", "user-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about Tetromino? You're in the right place. Before posting, please check the [FAQ](https://github.com/frostmute/Tetromino/blob/main/docs/FAQ.md) and [Troubleshooting Guide](https://github.com/frostmute/Tetromino/blob/main/docs/TROUBLESHOOTING.md) — your question may already be answered there.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: "Find this in Settings → Community plugins → Tetromino"
+      placeholder: "e.g. 1.1.0"
+    validations:
+      required: false
+
+  - type: input
+    id: obsidian-version
+    attributes:
+      label: Obsidian version
+      description: "Find this in Settings → About"
+      placeholder: "e.g. 1.8.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic area
+      description: "What area does your question relate to?"
+      options:
+        - Installation / Setup
+        - Channel Mapping / Configuration
+        - Import / Sync Behavior
+        - Attachments / Media
+        - Templates / Formatting
+        - Troubleshooting / Errors
+        - Security / Privacy
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: "What do you need help with? Be as specific as possible."
+      placeholder: "I'm trying to... but I'm seeing..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: "Steps you've already tried, relevant settings, or screenshots."
+    validations:
+      required: false

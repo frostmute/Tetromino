@@ -28,6 +28,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
 - **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
 - **Planning and reporting:** [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+- **Community:** [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions)
 
 ## What This Plugin Is (and Is Not)
 

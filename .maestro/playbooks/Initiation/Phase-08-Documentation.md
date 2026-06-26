@@ -119,12 +119,10 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - How to test a fresh install if configuration is corrupted (three options: reset plugin data, test vault, restore from backup)
   - **Completed 2026-06-26.** Structured with YAML front matter, table of contents, quick diagnostic checklist, detailed error sections with symptoms/causes/fixes pattern, and cross-references to [[USER_GUIDE]], [[SETTINGS_REFERENCE]], [[FAQ]], [[DEVELOPER_GUIDE]], and [[API_DESIGN]].
 
-- [ ] Set up a knowledge base wiki or discussion board: Foster community knowledge:
-  - Create a GitHub Discussions category for "Questions & Help" where users can ask questions
-  - Pin the FAQ and troubleshooting guide in the discussions
-  - Create discussion templates for common topics (feature requests, questions about settings, etc.)
-  - Monitor discussions and add answers to the FAQ if new patterns emerge
-  - Link to discussions from the main README
+- [x] Set up a knowledge base wiki or discussion board: Foster community knowledge:
+  - **Discussion templates created:** `.github/DISCUSSION_TEMPLATE/q-and-a.yml` (Questions & Help), `feature-ideas.yml` (Feature Ideas), and `show-and-tell.yml` (Show and Tell). Each includes structured prompts and links to FAQ / Troubleshooting.
+  - **README updated:** Added "Community" link to GitHub Discussions in the Quick Navigation section.
+  - **Manual setup required:** A maintainer must enable GitHub Discussions in repository Settings → General → Discussions, then create a "Questions & Help" category and pin the FAQ and Troubleshooting guide posts. Discussion templates will automatically appear once discussions are enabled.
 
 - [ ] Verify all docs are accurate and linked correctly: Final documentation audit:
   - Read through every doc you created and verify content is accurate (commands work, paths exist, features described exist)
