@@ -8,10 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Sync summary modal with per-file diff viewer.
+- Master overview note generation (`Are.na/overview.md`).
+- Attachment migration system: preview modal, dry-run diffs, execution, and migration history log.
+- Per-channel attachment storage overrides.
+- Channel management tools in settings:
+  - `Import my channels` (bulk-create mappings from Are.na account)
+  - `Auto-enable imported channels` toggle (granular manual control)
+  - `Backup channel mappings`
+  - `Restore latest backup`
+  - `Restore from file...` (choose a specific historical backup to restore from)
+  - `Reset channel mappings`
+- Optional banner frontmatter field for Obsidian Banners plugin compatibility:
+  - enable/disable toggle
+  - custom field name
+  - banner image source priority (`thumb-first` / `display-first`)
+- Optional block enrichment features:
+  - import block description into frontmatter (`arena_description`)
+  - import block comments into note body
+  - import connected channels where block appears, with clickable external links
+  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
+- Channel index enhancements:
+  - folder-note compatible index filename mode (`index.md` or `<folder-name>.md`)
+  - `Info` section with description, started, modified, length, followers (when available)
+  - best-effort `This Channel Appears In` section with clickable external links
+- Build packaging script that outputs `dist/<plugin-id>-<version>.zip` without relying on system `zip`.
 - Sync-on-startup capability and periodic background sync intervals.
 - `markMissing` feature now handles deleted/missing blocks properly by clearing their sync records.
 
+### Changed
+- Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
+- Mapping folder is now optional in settings UI; explicit folders still override default behavior.
+- API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
+- API client now targets Are.na REST API v3 routes with a compatibility adapter for v3 `data/meta` pagination responses.
+- URL normalization now recognizes both legacy `/v2/...` and current `/v3/...` API URLs.
+
 ### Fixed
+- Fixed pagination edge case where some channels could stop after the first 100 blocks.
+- Fixed packaging failures in environments without a system `zip` binary.
 - `pMap` now stops spawning new tasks once a mapping function rejects, preventing wasted work and unhandled rejections after an error.
 - Fixed credential leak in `downloadBinaryFile` that sent API token to external CDN/S3 URLs.
 - Fixed XSS filter bypass via HTML entities inside protocol names (e.g., `java&#x09;script:`).
@@ -24,13 +58,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed trailing spaces in YAML array formatting for nested objects.
 - Fixed redundant async I/O in `createFolderStructure`.
 - Fixed GraphQL response handler crashing on null/empty responses.
-- Removed accidentally committed `scripts/copy-to-vault 2.mjs` targeting wrong plugin directory.
 
 ### Removed
 - Removed unused template directive files (`#extends`, `#block`, `#include`) and utility files (`downloadUtils.ts`, `arenaApiUtils.ts`, `yamlUtils.ts`, `fileUtils.ts`) that were superseded or unused.
+- Removed accidentally committed `scripts/copy-to-vault 2.mjs` targeting wrong plugin directory.
 
 ### Tests
 - Added unit tests for the `pMap` concurrency utility (order preservation, concurrency limit, empty arrays, limit larger than item count, and error propagation with halting).
+- Added backup restore tests covering `restoreChannelMappingsFromFile` and `restoreLatestChannelMappingsBackup` (valid restore, missing file, invalid JSON, missing/malformed `channelMappings`, normalization of legacy mappings).
 
 ## [1.0.0] — 2025-01-15
 
@@ -65,52 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API tokens masked in settings UI (password input field).
 - Input validation for channel mappings (slug required, folder optional with deterministic default).
 - Secure token verification with clear feedback.
-
-## [Unreleased]
-
-### Added
-
-- Sync summary modal with per-file diff viewer.
-- Master overview note generation (`Are.na/overview.md`).
-- Attachment migration system: preview modal, dry-run diffs, execution, and migration history log.
-- Per-channel attachment storage overrides.
-- Channel management tools in settings:
-  - `Import my channels` (bulk-create mappings from Are.na account)
-  - `Auto-enable imported channels` toggle (granular manual control)
-  - `Backup channel mappings`
-  - `Restore latest backup`
-  - `Reset channel mappings`
-- Optional banner frontmatter field for Obsidian Banners plugin compatibility:
-  - enable/disable toggle
-  - custom field name
-  - banner image source priority (`thumb-first` / `display-first`)
-- Optional block enrichment features:
-  - import block description into frontmatter (`arena_description`)
-  - import block comments into note body
-  - import connected channels where block appears, with clickable external links
-  - best-effort preview image import for `Channel` blocks (body image + banner candidate)
-- Channel index enhancements:
-  - folder-note compatible index filename mode (`index.md` or `<folder-name>.md`)
-  - `Info` section with description, started, modified, length, followers (when available)
-  - best-effort `This Channel Appears In` section with clickable external links
-- Build packaging script that outputs `dist/<plugin-id>-<version>.zip` without relying on system `zip`.
-
-### Changed
-
-- Default channel folder resolution now uses `Are.na/<channel-slug>` when a mapping folder is blank.
-- Mapping folder is now optional in settings UI; explicit folders still override default behavior.
-- API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
-- API client now targets Are.na REST API v3 routes with a compatibility adapter for v3 `data/meta` pagination responses.
-- URL normalization now recognizes both legacy `/v2/...` and current `/v3/...` API URLs.
-
-### Fixed
-
-- Fixed pagination edge case where some channels could stop after the first 100 blocks.
-- Fixed packaging failures in environments without a system `zip` binary.
-
----
-
-
 
 ---
 

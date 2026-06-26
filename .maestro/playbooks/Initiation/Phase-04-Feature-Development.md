@@ -62,12 +62,19 @@ This phase guides developers through adding new features to Tetromino while main
   - Keep commits focused and coherent (one logical change per commit)
   - **Completed:** Added `restoreChannelMappingsFromFile(filePath)` to `src/main.ts` with a shared `restoreFromBackupData` helper, refactored `restoreLatestChannelMappingsBackup` to use it, and added a **"Restore from file..."** button in `src/settings-tab.ts` wired to a new `BackupFileSuggestModal` in `src/modals.ts`. All 135 tests pass (including 10 backup-specific tests), lint is clean, and build succeeds.
 
-- [ ] Maintain backwards compatibility and data safety:
+- [x] Maintain backwards compatibility and data safety:
   - If the feature changes the note structure or metadata format, write a migration in `src/migration.ts`
   - Add a version bump in `manifest.json` if breaking changes occur
   - Test that old plugin data is gracefully migrated or skipped (no data loss)
   - Document any breaking changes clearly in CHANGELOG.md
   - Consider dry-run preview: does the feature work in dry-run mode before committing to vault changes?
+  - **Completed:** Verified full backwards compatibility — the "Restore from file" feature is purely additive and does not change any plugin data format, note structure, or metadata.
+  - **No migration needed:** `ArenaSyncSettings` and `ChannelMapping` types are unchanged; `src/migration.ts` was not modified.
+  - **No version bump for breaking changes:** No breaking changes occurred; `manifest.json` remains at `1.0.0`.
+  - **Old plugin data handled gracefully:** `main.ts`'s existing `normalizeMappings()` automatically fills missing fields (`attachmentStorageOverride`, `customAttachmentFolderOverride`, `lastAttachmentBase`) when settings are loaded or restored. The `main-backup.test.ts` test `"normalizes mappings after restore"` confirms legacy backup data without newer fields is restored safely.
+  - **All 135 tests pass** with no regressions, including the 10 backup-specific tests.
+  - **Dry-run not applicable:** This feature operates on settings/backup restoration, not on the sync/import engine, so dry-run preview does not apply. The existing import dry-run remains unaffected.
+  - **CHANGELOG.md updated:** Merged duplicate `[Unreleased]` sections and documented the new `Restore from file...` feature under Channel management tools, along with the new backup restore test coverage.
 
 - [ ] Build and validate the complete feature: Once implementation is done:
   - Run `npm run lint` and fix any style issues
