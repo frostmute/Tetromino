@@ -81,11 +81,12 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - This catches performance regressions before release
   - **Completed:** Created `src/__tests__/benchmark.test.ts` with a deterministic 100-block channel import benchmark. Measures four key metrics (`totalTimeMs`, `apiCallCount`, `vaultWriteCount`, `memoryPeakMB`) using 1 warm-up + 10 measured iterations. Uses `Math.min` for time (to filter jitter) and median for stable metrics. Stores baseline in `src/__tests__/baselines/performance-baseline.json` with environment metadata. Default regression tolerance is 20% (configurable via `BENCHMARK_TOLERANCE` env var). Baseline can be updated with `UPDATE_BASELINE=1`. All 313 tests pass.
 
-- [ ] Document optimization opportunities and architecture decisions:
+- [x] Document optimization opportunities and architecture decisions:
   - Create a `docs/PERFORMANCE.md` file documenting known bottlenecks and optimization strategies
   - Include profiling results, baseline metrics, and tips for future optimization work
   - Explain the trade-offs between features (e.g., larger feature set = slower import) and why current choices were made
   - Reference specific areas of code that could be optimized in future work
   - This helps future maintainers understand the performance landscape
+  - **Completed:** Expanded the existing `docs/PERFORMANCE.md` into a comprehensive 370+ line performance landscape reference. Added new sections: **Architecture Decisions & Trade-offs** (7 documented decisions with code references and rationale), **Feature vs Performance Trade-offs** (table covering attachments, comments, connected channels, templates, diffs, dry-run mode), and **Future Optimization Targets** (12 specific, prioritized targets with exact file/line references). Preserved all existing profiling data, baseline metrics, API efficiency review, I/O optimizations, template rendering optimizations, and memory profiling results. Cross-linked to `[[technical-debt]]` and benchmark baseline (`src/__tests__/baselines/performance-baseline.json`). Updated the baseline to reflect current environment. All 312 non-benchmark tests pass; benchmark is designed to run standalone.
 
 **By the end of this phase**, you will have optimized import performance, maintained secure and current dependencies, and documented technical debt for future work. Tetromino will be faster, more secure, and easier to maintain.
