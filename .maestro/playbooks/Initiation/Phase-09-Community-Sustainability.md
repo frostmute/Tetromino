@@ -37,16 +37,17 @@ This phase establishes practices for engaging with the community, managing issue
     - When to close vs when to keep open (keep investigation issues open, close duplicates)
     - How to work with contributors (review PRs promptly, provide actionable feedback)
 
-- [ ] Create a ROADMAP to communicate future direction: Guide community expectations:
-  - Create `ROADMAP.md` documenting:
-    - Current version and what's in it
-    - Planned features for next 2-3 releases (why they matter, rough timeline)
-    - Known limitations (e.g., one-way import only, no auto-sync)
-    - Gaps and ideas being considered (so community knows what's being thought about)
-    - How to propose features or vote on priorities
+- [x] Create a ROADMAP to communicate future direction: Guide community expectations:
+  - Created `ROADMAP.md` documenting:
+    - Current version (v1.1.0) and what's in it
+    - Planned features for next 2-3 releases (v1.2.0 Content Depth, v1.3.0 Scale & Reliability, Future Ideas) with rationale and rough quarterly timelines
+    - Known limitations (one-way import, no auto-deletion, background sync best-effort, large channel performance, global templates only, local migration)
+    - Gaps and ideas being considered (webhooks, Canvas support, community channel packs, plugin hooks)
+    - How to propose features or vote on priorities via GitHub Discussions
     - Link to GitHub Discussions for feature requests and ideas
-  - Keep the roadmap realistic: only commit to features you're confident you can deliver
-  - Update the roadmap every release to reflect completed work and new plans
+  - Added ROADMAP link to README.md Quick Navigation section
+  - Kept the roadmap realistic: committed features are high-confidence extensions of existing architecture
+  - Noted that the roadmap should be updated every release
 
 - [ ] Build a contributor onboarding guide: Make it easy to contribute:
   - Create `CONTRIBUTING.md` enhancements or a new `FIRST_CONTRIBUTION.md`:
