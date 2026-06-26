@@ -14,14 +14,16 @@ This phase establishes practices for engaging with the community, managing issue
     - Enforcement: what consequences (warnings, bans) apply to violations
   - Link the CODE_OF_CONDUCT from README.md and CONTRIBUTING.md
 
-- [ ] Establish issue management and triage process: Create templates and workflows:
-  - Review existing GitHub issue templates in `.github/ISSUE_TEMPLATE/`
-  - Create a bug report template (title, description, steps to reproduce, expected vs actual, environment)
-  - Create a feature request template (title, problem statement, proposed solution, use case)
-  - Create issue labels: `type: bug`, `type: feature`, `priority: critical/high/medium/low`, `status: investigating`, `status: accepted`, `help wanted`, `good first issue`
-  - Document the triage process:
+- [x] Establish issue management and triage process: Create templates and workflows:
+  - Reviewed existing GitHub issue templates in `.github/ISSUE_TEMPLATE/` (bug_report.yml and feature_request.yml already exist and are comprehensive)
+  - Verified bug report template includes title, description, steps to reproduce, expected vs actual, and environment fields
+  - Verified feature request template includes title, problem statement, proposed solution, and use case (scope)
+  - Updated template labels to `type: bug` / `type: feature` and `status: investigating` to align with required label scheme
+  - Created `.github/ISSUE_TEMPLATE/config.yml` to direct questions to Discussions and security issues to private advisories
+  - Documented required issue labels (`type: bug`, `type: feature`, `priority: critical/high/medium/low`, `status: investigating`, `status: accepted`, `help wanted`, `good first issue`) in `ISSUE_MANAGEMENT.md` and `.github/PROJECT_BOARD.md`
+  - Documented the triage process in `ISSUE_MANAGEMENT.md`:
     - New issues are labeled and assigned priority within 1 week
-    - Critical bugs get immediate attention
+    - Critical bugs get immediate attention (24-hour acknowledgment)
     - Feature requests are triaged for alignment with project scope
     - Mark duplicates and close with reference to original issue
     - Thank reporters for their contribution
