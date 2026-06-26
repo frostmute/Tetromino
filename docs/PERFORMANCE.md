@@ -130,17 +130,41 @@ To reduce redundant API calls for metadata that changes infrequently, a **5-minu
 
 ### Network Optimization Targets Remaining
 
-1. **Parallelize attachment downloads** — Currently limited by the `pMap` concurrency of 5 for blocks; attachments within a block are sequential.
+1. **Parallelize attachment downloads** — Already parallelized at the block level via `pMap` concurrency of 5; attachments within a single block are typically 0–1, so further parallelization yields diminishing returns.
 2. **Real-world API profiling** — Run the plugin in a live Obsidian vault with a real Are.na token and a 100+ block channel to measure true end-to-end time.
+
+## File I/O & Vault Operation Optimizations (Implemented)
+
+A review of `src/sync-engine.ts` identified several I/O inefficiencies that were addressed:
+
+### 1. Precomputed Path Caching
+
+`resolveChannelFolder(mapping)` and `resolveAttachmentBaseFolder(settings, mapping)` were previously recomputed **for every block** inside `pullBlock` and `ensureBlockAsset`. These values are constant for an entire channel sync, so they are now computed once in `pull()` and passed down as parameters.
+
+**Impact:** Eliminates redundant string manipulation and `normalizePath` calls across all blocks in a channel.
+
+### 2. Read-Skip Fast Path for Unchanged Files
+
+Previously, every existing note was read from the vault and hashed to detect changes, even when the remote block had not changed and the local file had not been edited. A fast path now skips the `vault.read()` call when all of the following are true:
+
+- A `SyncRecord` exists for this block in this channel.
+- The record's `localPath` matches the target `notePath` (file has not moved).
+- The record's `remoteHash` matches the newly computed `remoteHash` (remote content is unchanged).
+- The file's `stat.mtime` is ≤ `record.lastSyncedAt` (local file has not been modified since the last sync).
+
+**Impact:** On re-syncs of unchanged channels, this avoids reading every existing note into memory. For large vaults with many blocks, this can significantly reduce I/O latency.
+
+**Safety:** If any condition fails (e.g., local edit, move, or remote change), the fast path is bypassed and the file is read normally.
 
 ## Future Optimization Targets
 
 Based on this profiling, the highest-impact optimizations to investigate are:
 
-1. **Batch vault writes** — If the Obsidian API supports bulk transactions, writing multiple notes at once could reduce per-block overhead.
-2. **Parallelize attachment downloads** — Currently limited by the `pMap` concurrency of 5 for blocks; attachments within a block are sequential.
+1. ~~Batch vault writes~~ — The Obsidian API does not provide bulk transaction support; writes are inherently per-file.
+2. ~~Parallelize attachment downloads~~ — Already parallelized at the block level via `pMap` concurrency of 5.
 3. **Cache rendered templates** — If the same template is reused across many blocks, caching the parsed AST could shave off parse time.
 4. **Diff generation** — `unifiedDiff` is computed for every create/update. For large channels, this may be expensive; consider making diffs optional in non-dry-run mode.
+5. **Memory usage during large imports** — Profile peak memory with 1000+ block channels and ensure no leaks.
 
 ## Related Documents
 

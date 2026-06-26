@@ -31,12 +31,15 @@ jest.mock("obsidian", () => ({
 jest.mock("../api");
 
 class MockTFile extends TFile {
+	declare stat: { ctime: number; mtime: number; size: number };
+
 	constructor(path: string) {
 		super();
 		this.path = path;
 		this.name = path.split("/").pop() || path;
 		this.basename = this.name.replace(/\.md$/, "");
 		this.extension = path.endsWith(".md") ? "md" : path.split(".").pop() || "";
+		this.stat = { ctime: Date.now(), mtime: Date.now(), size: 0 };
 	}
 }
 
@@ -60,6 +63,7 @@ class MockVault {
 		const normalized = normalizePath(path);
 		const f = new MockTFile(normalized);
 		this.files.set(normalized, { file: f, content });
+		f.stat.size = content.length;
 		return f;
 	}
 
@@ -67,12 +71,19 @@ class MockVault {
 		const normalized = normalizePath(path);
 		const f = new MockTFile(normalized);
 		this.files.set(normalized, { file: f, content: "", binary: data });
+		f.stat.size = data.byteLength;
 		return f;
 	}
 
 	async modify(file: TFile, content: string): Promise<void> {
 		const entry = this.files.get(file.path);
-		if (entry) entry.content = content;
+		if (entry) {
+			entry.content = content;
+			if (entry.file instanceof MockTFile) {
+				entry.file.stat.mtime = Date.now();
+				entry.file.stat.size = content.length;
+			}
+		}
 	}
 
 	async rename(file: TFile, newPath: string): Promise<void> {
@@ -543,8 +554,78 @@ describe("SyncEngine extended coverage", () => {
 			const mapping = makeMapping("test-channel");
 			await runSync(mapping);
 
-			const note = mockVault.files.get("Are.na/test-channel/ChannelBlock.md")?.content ?? "";
-			expect(note).toContain("https://example.com/preview.jpg");
+		const note = mockVault.files.get("Are.na/test-channel/ChannelBlock.md")?.content ?? "";
+		expect(note).toContain("https://example.com/preview.jpg");
+		});
+	});
+
+	describe("I/O optimizations", () => {
+		it("skips vault.read for unchanged files when mtime indicates no local edit", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			const block = makeBlock(1, { title: "Stable" });
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
+
+			const mapping = makeMapping("test-channel");
+			await runSync(mapping);
+
+			// Second sync: should skip read via fast path
+			const readSpy = jest.spyOn(mockVault, "read");
+			const result = await runSync(mapping);
+
+			expect(result.skipped).toBe(1);
+			expect(readSpy).not.toHaveBeenCalledWith(
+				expect.objectContaining({ path: "Are.na/test-channel/Stable.md" }),
+			);
+			readSpy.mockRestore();
+		});
+
+		it("does not skip vault.read when file was edited locally after last sync", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			const block = makeBlock(1, { title: "Stable" });
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
+
+			const mapping = makeMapping("test-channel");
+			await runSync(mapping);
+
+			// Simulate local edit by modifying mtime forward
+			const entry = mockVault.files.get("Are.na/test-channel/Stable.md");
+			if (entry?.file instanceof MockTFile) {
+				entry.file.stat.mtime = Date.now() + 10000;
+			}
+
+			const readSpy = jest.spyOn(mockVault, "read");
+			const result = await runSync(mapping);
+
+			expect(readSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ path: "Are.na/test-channel/Stable.md" }),
+			);
+			expect(result.skipped).toBe(1); // still skipped because content matches
+			readSpy.mockRestore();
+		});
+
+		it("does not skip vault.read when remote content changed", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			const block = makeBlock(1, { title: "Stable" });
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
+
+			const mapping = makeMapping("test-channel");
+			await runSync(mapping);
+
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Stable", content: "Changed" }),
+			]);
+
+			const readSpy = jest.spyOn(mockVault, "read");
+			const result = await runSync(mapping);
+
+			expect(readSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ path: "Are.na/test-channel/Stable.md" }),
+			);
+			expect(result.updated).toBe(1);
+			readSpy.mockRestore();
 		});
 	});
 });

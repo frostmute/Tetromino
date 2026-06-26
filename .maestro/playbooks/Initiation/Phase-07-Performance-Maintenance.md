@@ -23,12 +23,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Measure improvement: after optimization, re-profile the import process and note the speedup
   - **Completed:** Are.na API v3 does not support batch block fetching beyond the 100/page maximum (already in use). Pagination confirmed efficient with early-stop heuristics (empty/partial/total/duplicate detection). Retry logic verified as reasonable: exponential backoff capped at 10s with jitter, `MAX_RETRIES=3`, plus an outer `fetchPageWithRetries` loop for page-level resilience. Added a 5-minute TTL in-memory cache to `ArenaApi` for `getChannel` and `getBlock`, eliminating redundant metadata/detail API calls within a session. Updated `docs/PERFORMANCE.md` with the API efficiency review. Added caching tests in `src/__tests__/api.test.ts` and fixed `src/__tests__/api_extended.test.ts` to use unique block IDs so caching doesn't interfere with block-type assertions. All 302 tests pass.
 
-- [ ] Optimize file I/O and vault operations: Review `src/sync-engine.ts` for I/O optimization:
+- [x] Optimize file I/O and vault operations: Review `src/sync-engine.ts` for I/O optimization:
   - Check if vault writes can be batched (e.g., write multiple notes in a transaction if Obsidian API supports it)
   - Verify file path construction is efficient (no repeated path calculations)
   - Review attachment handling: can downloads be parallelized (not sequential)?
   - Check if notes are being read back unnecessarily for conflict detection (cache reads)
   - Profile and measure improvement after optimizations
+  - **Completed:** Obsidian Vault API does not support bulk transactions, so per-file writes remain necessary. Eliminated redundant path calculations by precomputing `channelFolder` and `attachmentBaseFolder` once per channel in `pull()` and passing them to `pullBlock`/`ensureBlockAsset` instead of recomputing for every block. Confirmed attachment downloads are already parallelized at the block level via `pMap` concurrency of 5. Added a read-skip fast path in `pullBlock` that avoids `vault.read()` when the `SyncRecord` indicates the remote block is unchanged and the file's `stat.mtime` is ≤ `lastSyncedAt` (meaning no local edits occurred). This significantly reduces I/O on re-syncs of large unchanged channels. Added targeted tests in `src/__tests__/sync-engine-extended.test.ts` to verify the fast path is taken when safe and bypassed when the file is edited locally or the remote changes. Updated `MockVault`/`MockTFile` in the same file to track `stat.mtime` for realistic testing. Updated `docs/PERFORMANCE.md` with the new I/O optimization section. All 305 tests pass.
 
 - [ ] Optimize template rendering: Review `src/templateUtils.ts` for performance:
   - Check for unnecessary string concatenations (use array.join() for large strings)

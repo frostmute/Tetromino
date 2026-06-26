@@ -244,6 +244,10 @@ export class SyncEngine {
 
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
+		const attachmentBaseFolder = resolveAttachmentBaseFolder(
+			this.settings,
+			mapping,
+		);
 
 		let completed = 0;
 		const blocksToProcess = blocks.filter((block) => {
@@ -268,6 +272,8 @@ export class SyncEngine {
 					block,
 					mapping,
 					channel,
+					channelFolder,
+					attachmentBaseFolder,
 					result,
 					dryRun,
 				);
@@ -307,15 +313,16 @@ export class SyncEngine {
 		block: ArenaBlock,
 		mapping: ChannelMapping,
 		channel: ArenaChannel,
+		channelFolder: string,
+		attachmentBaseFolder: string,
 		result: SyncResult,
 		dryRun: boolean,
 	): Promise<string> {
 		const noteFileName = this.blockFileName(block);
-		const channelFolder = resolveChannelFolder(mapping);
 		const notePath = normalizePath(`${channelFolder}/${noteFileName}`);
 		const assetPath = await this.ensureBlockAsset(
 			block,
-			mapping,
+			attachmentBaseFolder,
 			dryRun,
 			result,
 		);
@@ -373,8 +380,23 @@ export class SyncEngine {
 			return notePath;
 		}
 
-		const localContent = await this.vault.read(existing);
-		const localHash = computeHash(localContent);
+		let localHash: string | undefined;
+		let localContent: string | undefined;
+		if (
+			record &&
+			record.localPath === notePath &&
+			record.remoteHash === remoteHash &&
+			typeof (existing.stat as { mtime?: number } | undefined)?.mtime ===
+				"number" &&
+			(existing.stat as { mtime: number }).mtime <=
+				new Date(record.lastSyncedAt).getTime()
+		) {
+			localHash = record.remoteHash;
+		} else {
+			localContent = await this.vault.read(existing);
+			localHash = computeHash(localContent);
+		}
+
 		if (localHash === remoteHash) {
 			result.skipped++;
 			result.actions.push(`skip ${notePath}`);
@@ -402,9 +424,9 @@ export class SyncEngine {
 		result.actions.push(`update ${notePath}`);
 		result.fileDiffs.push({
 			path: notePath,
-			before: localContent,
+			before: localContent ?? "",
 			after: markdown,
-			diff: unifiedDiff(localContent, markdown, notePath, notePath),
+			diff: unifiedDiff(localContent ?? "", markdown, notePath, notePath),
 			kind: "update",
 		});
 		if (!dryRun) {
@@ -422,7 +444,7 @@ export class SyncEngine {
 
 	private async ensureBlockAsset(
 		block: ArenaBlock,
-		mapping: ChannelMapping,
+		baseFolder: string,
 		dryRun: boolean,
 		result: SyncResult,
 	): Promise<string | undefined> {
@@ -451,7 +473,6 @@ export class SyncEngine {
 		if (!url || !fileName) return undefined;
 
 		console.time(`arena-sync:asset:${block.id}`);
-		const baseFolder = resolveAttachmentBaseFolder(this.settings, mapping);
 		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
 		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
 		result.downloaded++;
