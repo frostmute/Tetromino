@@ -2,26 +2,26 @@
 
 ## Context
 - **Playbook:** Usage
-- **Agent:** {{AGENT_NAME}}
-- **Project:** {{AGENT_PATH}}
-- **Auto Run Folder:** {{AUTORUN_FOLDER}}
-- **Loop:** {{LOOP_NUMBER}}
+- **Agent:** OpenCODECODER
+- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Loop:** 00001
 
 ## Objective
 
-Implement ONE documentation fix from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md` that has status `PENDING`. Update the project's README.md and log the change.
+Implement ONE documentation fix from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` that has status `PENDING`. Update the project's README.md and log the change.
 
 ## Instructions
 
-1. **Read the plan** from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`
+1. **Read the plan** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 2. **Find a `PENDING` item** with CRITICAL/HIGH importance and EASY/MEDIUM effort
-3. **Implement the fix** in `{{AGENT_PATH}}/README.md`
+3. **Implement the fix** in `/Users/thewytchhaus/Documents/GitHub/Tetromino/README.md`
 4. **Update status** to `IMPLEMENTED` in the plan file
-5. **Log the change** to `{{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DATE}}.md`
+5. **Log the change** to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
 
 ## Implementation Checklist
 
-- [ ] **Fix one documentation gap (or skip if none)**: Read {{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to {{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DATE}}.md. Only fix ONE gap per task.
+- [ ] **Fix one documentation gap (or skip if none)**: Read /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md. Only fix ONE gap per task.
 
 ## Fix Types
 
@@ -67,16 +67,16 @@ Implement ONE documentation fix from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PL
 
 ## Output Format
 
-After implementing, append to `{{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DATE}}.md`:
+After implementing, append to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`:
 
 ```markdown
 ---
 
 ## [YYYY-MM-DD HH:MM] - [Brief Description]
 
-**Agent:** {{AGENT_NAME}}
-**Project:** {{AGENT_PATH}}
-**Loop:** {{LOOP_NUMBER}}
+**Agent:** OpenCODECODER
+**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Loop:** 00001
 **Doc ID:** DOC-XXX
 **Gap ID:** GAP-XXX
 
@@ -95,7 +95,7 @@ After implementing, append to `{{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DAT
 ```
 
 ### Verification
-- [ ] Change matches the proposed fix from LOOP_{{LOOP_NUMBER}}_PLAN.md
+- [ ] Change matches the proposed fix from LOOP_00001_PLAN.md
 - [ ] Formatting matches existing README style
 - [ ] No broken links or references introduced
 - [ ] Content is accurate based on code review
@@ -103,12 +103,12 @@ After implementing, append to `{{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DAT
 
 ## Update Plan Status
 
-After implementing, update `LOOP_{{LOOP_NUMBER}}_PLAN.md`:
+After implementing, update `LOOP_00001_PLAN.md`:
 
 ```markdown
 ### DOC-001: [Feature Name]
 - **Status:** `IMPLEMENTED`  ← Changed from PENDING
-- **Implemented In:** Loop {{LOOP_NUMBER}}
+- **Implemented In:** Loop 00001
 - **Changes Made:**
   - [x] Added feature description
   - [x] Added usage example
@@ -127,12 +127,12 @@ After implementing, update `LOOP_{{LOOP_NUMBER}}_PLAN.md`:
 This task is complete when ONE of the following is true:
 
 **Option A - Implemented a fix:**
-1. You've implemented exactly ONE fix from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`
-2. You've appended the change details to `{{AUTORUN_FOLDER}}/USAGE_LOG_{{AGENT_NAME}}_{{DATE}}.md`
-3. You've updated the item status in `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md` to `IMPLEMENTED`
+1. You've implemented exactly ONE fix from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
+2. You've appended the change details to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
+3. You've updated the item status in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` to `IMPLEMENTED`
 
 **Option B - No PENDING fixes available:**
-1. `LOOP_{{LOOP_NUMBER}}_PLAN.md` doesn't exist, OR
+1. `LOOP_00001_PLAN.md` doesn't exist, OR
 2. It contains no items with status exactly `PENDING`
 3. Mark this task complete without making changes
 
@@ -145,11 +145,11 @@ If there are no items with status exactly `PENDING` in the plan file, append to 
 ```markdown
 ---
 
-## [YYYY-MM-DD HH:MM] - Loop {{LOOP_NUMBER}} Complete
+## [YYYY-MM-DD HH:MM] - Loop 00001 Complete
 
-**Agent:** {{AGENT_NAME}}
-**Project:** {{AGENT_PATH}}
-**Loop:** {{LOOP_NUMBER}}
+**Agent:** OpenCODECODER
+**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Loop:** 00001
 **Status:** No PENDING fixes available
 
 **Summary:**

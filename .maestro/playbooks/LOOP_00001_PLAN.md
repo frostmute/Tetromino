@@ -14,12 +14,13 @@
 ## PENDING - Ready for Auto-Fix
 
 ### DOC-001: Import My Channels Command
-- **Status:** `PENDING`
+- **Status:** `IMPLEMENTED`
 - **Gap ID:** GAP-005
 - **Type:** INCOMPLETE
 - **User Importance:** CRITICAL
 - **Fix Effort:** EASY
 - **README Section:** Commands section (after "Import current channel")
+- **Implemented In:** Loop 00001
 - **Fix Description:**
   Add documentation for the "Import my channels" bulk import command, which allows users to quickly create mappings from their Are.na account without manual setup.
 - **Proposed Content:**

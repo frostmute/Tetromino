@@ -82,6 +82,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - `Import all channels now`
 - `Preview import (dry-run)`
 - `Import current channel`
+- `Import my channels` - Bulk-create channel mappings from your Are.na account
 - `Preview current channel import (dry-run)`
 - `Open channel on Are.na`
 - `Preview attachment migration`
