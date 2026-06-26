@@ -23,9 +23,11 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 ## Quick Navigation
 
-- Project docs: [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
-- CI and releases: [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
-- Planning and reporting: [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+- **For users:** [User Guide](docs/USER_GUIDE.md) | [Settings Reference](docs/SETTINGS_REFERENCE.md) | [FAQ](docs/FAQ.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
+- **For developers:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [API Design](docs/API_DESIGN.md) | [ADRs](docs/ADRs/)
+- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md)
+- **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
+- **Planning and reporting:** [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
 
 ## What This Plugin Is (and Is Not)
 
@@ -43,6 +45,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Supports full pagination for large channels (not limited to the first 100 blocks).
 - Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
 - Shows status bar progress for channels and block pages.
+- **Learn more:** [User Guide — First Import](docs/USER_GUIDE.md#first-import) | [API Design — Retry Logic](docs/API_DESIGN.md#retry-and-backoff-strategy)
 
 ### Deterministic Writing
 
@@ -51,6 +54,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Writes channel index notes and a master overview note (`Are.na/overview.md`).
 - Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
 - Sync summary modal with per-file diff viewer after every import or dry-run.
+- **Learn more:** [ADR-003 — Deterministic Output](docs/ADRs/ADR-003-deterministic-output.md) | [User Guide — Dry-Run](docs/USER_GUIDE.md#dry-run-feature)
 
 ### Block Enrichment (Optional)
 
@@ -59,6 +63,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Block comments in a dedicated `Comments` section.
 - Connected channel list (`This block appears in`) with external links.
 - Best-effort preview image for Channel blocks.
+- **Learn more:** [Settings Reference — Enrichments](docs/SETTINGS_REFERENCE.md#content-rendering)
 
 ### Template Engine
 
@@ -66,6 +71,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Handlebars-like syntax: `{{title}}`, `{{#if image}}...{{/if}}`, `{{#each comments}}...{{/each}}`.
 - Template variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`.
 - Toggle between default output and custom template in settings.
+- **Learn more:** [Settings Reference — Templates](docs/SETTINGS_REFERENCE.md#template-engine)
 
 ### Attachments and Media
 
@@ -75,6 +81,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Storage modes: channel-local, global folder, custom folder.
 - Per-channel storage overrides.
 - Migration tools with preview, diff, execution, and history logging.
+- **Learn more:** [Settings Reference — Attachments](docs/SETTINGS_REFERENCE.md#attachment-handling) | [User Guide — Attachment Handling](docs/USER_GUIDE.md#attachment-handling)
 
 ### Channel Management
 
@@ -83,14 +90,15 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Backup, restore, and reset tools for channel mappings.
 - `Restore from file...` to pick a specific historical backup instead of only the latest.
 - Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
+- **Learn more:** [User Guide — Channel Management](docs/USER_GUIDE.md#channel-management)
 
 ## Commands
+
+Available from the Obsidian Command Palette (`Ctrl/Cmd + P`):
 
 - `Import all channels now`
 - `Preview import (dry-run)`
 - `Import current channel`
-- `Import my channels` - Bulk-create channel mappings from your Are.na account
-- `Backup channel mappings` - Save current channel mappings to a backup file
 - `Preview current channel import (dry-run)`
 - `Open channel on Are.na`
 - `Preview attachment migration`
@@ -107,10 +115,11 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Template engine toggle and custom template string.
 - Frontmatter, notifications, and debug logging toggles.
 - Channel mapping management and migration actions.
+- **Full reference:** [Settings Reference](docs/SETTINGS_REFERENCE.md)
 
 ## How Import Works
 
-1. Create mappings manually or use `Import my channels`.
+1. Create mappings manually or use `Import my channels` in settings.
 2. Run `Import all channels now` or a dry-run preview command.
 3. The plugin fetches channel metadata and all paginated blocks from Are.na.
 4. It normalizes each block into deterministic Markdown output.
@@ -119,12 +128,46 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 7. It shows a sync summary with diffs for changed files.
 8. It records import state and timestamps in plugin data.
 
+**Detailed walkthrough:** [User Guide — First Import](docs/USER_GUIDE.md#first-import)
+
+## Documentation
+
+### For Users
+
+New to Tetromino? Start here:
+
+- **[User Guide](docs/USER_GUIDE.md)** — Overview, installation, first import walkthrough, dry-run explanation, settings reference, troubleshooting, and FAQ.
+- **[Settings Reference](docs/SETTINGS_REFERENCE.md)** — Every setting explained with defaults, examples, and advanced template syntax.
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common errors, solutions, and how to collect logs for bug reports.
+- **[FAQ](docs/FAQ.md)** — Answers to the most common questions about sync behavior, security, and offline usage.
+
+### For Developers
+
+Want to contribute or understand the internals?
+
+- **[Developer Guide](docs/DEVELOPER_GUIDE.md)** — Architecture overview, module guide, code style, and how to add features or tests.
+- **[API Design](docs/API_DESIGN.md)** — Are.na API integration details, pagination, rate limiting, retry logic, and response normalization.
+- **[ADRs](docs/ADRs/)** — Architecture Decision Records documenting key design choices (one-way import, manual triggers, deterministic output, Markdown-only format, dry-run previews).
+
 ## Installation
 
-1. Put `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/Tetromino/`.
-2. Enable **Tetromino** in Obsidian Community Plugins.
-3. Open settings and add your API token.
-4. Add at least one channel mapping, or run `Import my channels`.
+### From Obsidian Community Plugins (Recommended)
+
+1. Open **Settings → Community Plugins** in Obsidian.
+2. Search for **"Tetromino"** in the Community Plugins browser.
+3. Click **Install**, then **Enable**.
+4. Open Tetromino settings and add your Are.na API token.
+5. Add at least one channel mapping, or run `Import my channels`.
+
+**Plugin directory:** <https://obsidian.md/plugins?id=Tetromino>
+
+### Manual Installation
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/frostmute/Tetromino/releases/latest).
+2. Place them into `<your-vault>/.obsidian/plugins/Tetromino/`.
+3. Enable **Tetromino** in Obsidian Community Plugins.
+4. Open settings and add your API token.
+5. Add at least one channel mapping, or run `Import my channels`.
 
 ## Development
 
@@ -150,6 +193,8 @@ Quality checks:
 npm run lint
 npm test
 ```
+
+**Contributor resources:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [CONTRIBUTING](CONTRIBUTING.md)
 
 ## Companion Tools
 
@@ -193,6 +238,8 @@ For details, see [SECURITY.md](SECURITY.md).
 - Verify the channel mapping is enabled in settings.
 - Check that the channel is public (or your token has access to private channels).
 - Enable debug logging to see pagination progress in the console.
+
+**Full troubleshooting guide:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## License
 

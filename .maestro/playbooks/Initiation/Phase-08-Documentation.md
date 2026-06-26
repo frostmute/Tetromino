@@ -65,13 +65,15 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Backup and restoration: how settings are stored in Obsidian plugin data, how to back up channel mappings to JSON, and how to perform a full `data.json` backup
     - Migration: explanation of `loadSettings` normalization, mapping field upgrades, and attachment base snapshots for automatic migration prompts
 
-- [ ] Update README.md with clear, up-to-date feature list: Keep the main entry point fresh:
-  - Review the README feature highlights and ensure they match current code
-  - Add links to detailed docs for each major feature
-  - Keep the Quick Navigation section updated with latest docs
-  - Add badges for latest version, CI status, license (already present, verify they're correct)
-  - Add a "For Users" vs "For Developers" section that directs people to appropriate docs
-  - Include a link to the community plugins registry
+- [x] Update README.md with clear, up-to-date feature list: Keep the main entry point fresh:
+  - Reviewed the README feature highlights and ensured they match current code (verified all features against `src/main.ts`, `src/types.ts`, and `src/settings-tab.ts`)
+  - Added links to detailed docs for each major feature (User Guide, Settings Reference, API Design, ADRs)
+  - Updated the Quick Navigation section with latest docs (USER_GUIDE, SETTINGS_REFERENCE, FAQ, TROUBLESHOOTING, DEVELOPER_GUIDE, API_DESIGN, ADRs)
+  - Verified badges for latest version, CI status, and license are correct (all point to `frostmute/Tetromino`, matching the git remote)
+  - Added a "For Users" vs "For Developers" section that directs people to appropriate docs
+  - Included a link to the Obsidian community plugins registry (`https://obsidian.md/plugins?id=Tetromino`)
+  - Fixed the Commands section to only list actual Command Palette commands (removed "Import my channels" and "Backup channel mappings" which are settings UI actions, not commands)
+  - Added installation instructions for both Community Plugins browser and manual installation
 
 - [ ] Create a FAQ document addressing common questions: Build a support resource:
   - Create `docs/FAQ.md` with questions like:
