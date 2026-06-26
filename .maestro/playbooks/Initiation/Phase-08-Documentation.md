@@ -87,14 +87,15 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Is my Are.na token secure?
   - **Completed 2026-06-26.** Created `docs/FAQ.md` with YAML front matter, structured Markdown, table of contents, and detailed answers for all eight questions. Cross-references to [[USER_GUIDE]], [[SETTINGS_REFERENCE]], [[TROUBLESHOOTING]], [[DEVELOPER_GUIDE]], [[ADR-001]], and [[ADR-002]] included. Also contains a supported content types table and a troubleshooting quick-reference matrix.
 
-- [ ] Document the release process for maintainers: Create a release guide:
-  - Create `docs/RELEASE_GUIDE.md` that references Phase 06 but adds:
-    - Detailed release checklist to follow step-by-step
-    - Common mistakes and how to avoid them
-    - How to test a release candidate in a test vault
-    - How to handle urgent hotfixes
-    - Post-release verification steps
-  - Reference the script and automation in `.github/workflows/release.yml`
+- [x] Document the release process for maintainers: Create a release guide:
+  - Created `docs/RELEASE_GUIDE.md` that references Phase 06 but adds:
+    - Detailed release checklist to follow step-by-step (8 phases from pre-release prep through documentation)
+    - Common mistakes and how to avoid them (9 common pitfalls with recovery steps)
+    - How to test a release candidate in a test vault (setup, install, test checklist, automated deploy script)
+    - How to handle urgent hotfixes (workflow, principles, emergency bypass)
+    - Post-release verification steps (immediate, short-term monitoring, long-term housekeeping)
+  - Referenced the script and automation in `.github/workflows/release.yml` with a full step-by-step breakdown of the automated pipeline, failure modes, and pre-release support.
+  - Cross-references to [[DEVELOPER_GUIDE]], [[USER_GUIDE]], [[FAQ]], [[API_DESIGN]], and [[testing-guide]] included in YAML front matter.
 
 - [ ] Create troubleshooting guide and error reference: Help users solve problems:
   - Create `docs/TROUBLESHOOTING.md` with:
