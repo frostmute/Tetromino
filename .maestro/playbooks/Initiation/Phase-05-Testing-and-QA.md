@@ -58,7 +58,7 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - `api.ts` coverage increased from 53.64% to 93.75% statements / 79.39% branches / 93.93% functions / 93.71% lines.
   - All 162 tests pass.
 
-- [ ] Review and extend sync-engine test coverage: In `src/__tests__/`, examine tests for `sync-engine.ts`:
+- [x] Review and extend sync-engine test coverage: In `src/__tests__/`, examine tests for `sync-engine.ts`:
   - Test import flow: Are.na blocks → vault notes (determinism: same input = same output)
   - Test dry-run preview: no vault modifications occur
   - Test conflict resolution: what happens when a note already exists and content changed?
@@ -66,6 +66,23 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Test template rendering: user-provided templates produce correct note structure
   - Test metadata preservation: note metadata (created, modified, tags) is preserved correctly
   - Run `npm test` and ensure all sync-engine tests pass
+
+  **Notes:**
+  - Created `src/__tests__/sync-engine-extended.test.ts` with 18 new tests and a realistic in-memory mock vault (`MockVault`) that supports `getAbstractFileByPath`, `create`, `modify`, `rename`, `createBinary`, `read`, and `createFolder`.
+  - Coverage increased from 22.74% to **81.75% statements / 60.42% branches / 89.74% functions / 83.66% lines** for `sync-engine.ts`.
+  - Tests cover:
+    - **Import flow & determinism**: verify notes and channel index are created; repeated sync with identical blocks yields identical output and is skipped.
+    - **Dry-run preview**: no vault files or folders are created/modified, but `result.actions` correctly reports planned operations.
+    - **Conflict resolution**: existing notes with divergent content are updated; unchanged notes are skipped.
+    - **Attachment handling**: Image and Attachment blocks trigger `api.downloadBinary`, create binary assets in the vault, and embed/link them correctly in notes. Dry-run reports downloads without calling the API.
+    - **Template rendering**: custom templates are applied when `templateEnabled` is true.
+    - **Metadata preservation**: generated frontmatter includes `arena_created_at`; `vault.modify` is not called when content is unchanged, implicitly preserving file timestamps.
+    - **Moves & renames**: changing a block title results in a vault rename, with `result.moves` tracking the change.
+    - **Missing blocks / deletion**: blocks removed from the remote channel are marked missing and sync records are cleaned up.
+    - **Channel index & master overview**: index notes contain sorted wikilinks; `syncAll` generates or updates `Are.na/overview.md`.
+    - **Excluded classes**: blocks with classes in `excludeClasses` are skipped.
+    - **Block context enrichment**: comment fetching and channel preview image fetching are exercised.
+  - All **180 tests pass** across 12 suites.
 
 - [ ] Test utilities and helpers: In `src/__tests__/`, add tests for utility modules:
   - `utils.ts`: slug generation, filename sanitization, date formatting, etc.
