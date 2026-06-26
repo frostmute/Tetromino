@@ -239,3 +239,167 @@ describe("ArenaApi security", () => {
 		});
 	});
 });
+
+describe("ArenaApi request caching", () => {
+	let requestUrlMock: jest.SpyInstance;
+	let dateNowMock: jest.SpyInstance;
+
+	beforeEach(() => {
+		requestUrlMock = jest.spyOn(obsidian, "requestUrl");
+		dateNowMock = jest.spyOn(Date, "now");
+	});
+
+	afterEach(() => {
+		requestUrlMock.mockRestore();
+		dateNowMock.mockRestore();
+	});
+
+	it("caches getChannel and returns cached value on subsequent calls", async () => {
+		requestUrlMock.mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			json: {
+				data: {
+					id: 42,
+					title: "Cached Channel",
+					slug: "cached-channel",
+					status: "public",
+					user: makeBlock(1).user,
+					created_at: "2026-01-01T00:00:00.000Z",
+					updated_at: "2026-01-01T00:00:00.000Z",
+					length: 10,
+				},
+			},
+			arrayBuffer: new ArrayBuffer(0),
+		});
+
+		const api = new ArenaApi("token");
+		const first = await api.getChannel("cached-channel");
+		expect(first.title).toBe("Cached Channel");
+		expect(requestUrlMock).toHaveBeenCalledTimes(1);
+
+		const second = await api.getChannel("cached-channel");
+		expect(second.title).toBe("Cached Channel");
+		expect(requestUrlMock).toHaveBeenCalledTimes(1); // no extra request
+	});
+
+	it("caches getBlock and returns cached value on subsequent calls", async () => {
+		const blockData = { ...makeBlock(123), title: "Cached Block" };
+		requestUrlMock.mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			json: { data: blockData },
+			arrayBuffer: new ArrayBuffer(0),
+		});
+
+		const api = new ArenaApi("token");
+		const first = await api.getBlock(123);
+		expect(first.title).toBe("Cached Block");
+		expect(requestUrlMock).toHaveBeenCalledTimes(1);
+
+		const second = await api.getBlock(123);
+		expect(second.title).toBe("Cached Block");
+		expect(requestUrlMock).toHaveBeenCalledTimes(1); // no extra request
+	});
+
+	it("expires cache after TTL and refetches", async () => {
+		let now = 1000000;
+		dateNowMock.mockImplementation(() => now);
+
+		requestUrlMock
+			.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: {
+					data: {
+						id: 1,
+						title: "Old Title",
+						slug: "expiring-channel",
+						status: "public",
+						user: makeBlock(1).user,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-01T00:00:00.000Z",
+						length: 5,
+					},
+				},
+				arrayBuffer: new ArrayBuffer(0),
+			})
+			.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: {
+					data: {
+						id: 1,
+						title: "New Title",
+						slug: "expiring-channel",
+						status: "public",
+						user: makeBlock(1).user,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-02T00:00:00.000Z",
+						length: 5,
+					},
+				},
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+		const api = new ArenaApi("token");
+		const first = await api.getChannel("expiring-channel");
+		expect(first.title).toBe("Old Title");
+		expect(requestUrlMock).toHaveBeenCalledTimes(1);
+
+		// Advance time past the 5-minute TTL
+		now += 6 * 60 * 1000;
+
+		const second = await api.getChannel("expiring-channel");
+		expect(second.title).toBe("New Title");
+		expect(requestUrlMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not share cache across ArenaApi instances", async () => {
+		requestUrlMock
+			.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: {
+					data: {
+						id: 1,
+						title: "Instance A",
+						slug: "shared-slug",
+						status: "public",
+						user: makeBlock(1).user,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-01T00:00:00.000Z",
+						length: 0,
+					},
+				},
+				arrayBuffer: new ArrayBuffer(0),
+			})
+			.mockResolvedValueOnce({
+				status: 200,
+				headers: {},
+				json: {
+					data: {
+						id: 1,
+						title: "Instance B",
+						slug: "shared-slug",
+						status: "public",
+						user: makeBlock(1).user,
+						created_at: "2026-01-01T00:00:00.000Z",
+						updated_at: "2026-01-01T00:00:00.000Z",
+						length: 0,
+					},
+				},
+				arrayBuffer: new ArrayBuffer(0),
+			});
+
+		const apiA = new ArenaApi("token-a");
+		const apiB = new ArenaApi("token-b");
+
+		const first = await apiA.getChannel("shared-slug");
+		const second = await apiB.getChannel("shared-slug");
+
+		expect(first.title).toBe("Instance A");
+		expect(second.title).toBe("Instance B");
+		expect(requestUrlMock).toHaveBeenCalledTimes(2);
+	});
+});

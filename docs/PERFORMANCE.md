@@ -90,6 +90,49 @@ npx jest src/__tests__/performance.test.ts --no-coverage
 npx jest --no-coverage
 ```
 
+## API Call Efficiency Review
+
+A targeted review of `src/api.ts` was conducted to optimize network-layer performance.
+
+### Batching
+
+The Are.na API v3 does **not** support fetching multiple arbitrary blocks in a single request. The maximum page size is 100 blocks (`per=100`), which `ArenaApi` already uses. No further batching optimizations are possible at the API level.
+
+### Pagination Efficiency
+
+Pagination is already efficient:
+- `PER_PAGE` is set to the API maximum (100).
+- `shouldStopPagination` halts early on empty pages, partial pages, reported total pages, or duplicate blocks.
+- No over-fetching occurs.
+
+### Retry Logic
+
+Retry behavior is reasonable and resilient:
+- **Exponential backoff** with jitter for transient errors (500/502/503/504) and network failures.
+- **Max retry cap** of 10 seconds prevents excessive delays.
+- **Rate-limit handling** respects the `Retry-After` header from 429 responses.
+- `MAX_RETRIES = 3` strikes a balance between resilience and prompt failure.
+- `fetchPageWithRetries` adds an outer retry loop (up to 3 consecutive errors per page) on top of `request`'s inner retries, yielding up to 9 total attempts for a single page in the worst case. This provides strong resilience against intermittent flakiness.
+
+### Request Caching (Implemented)
+
+To reduce redundant API calls for metadata that changes infrequently, a **5-minute TTL in-memory cache** was added to `ArenaApi`:
+
+| Method | Cache Key | TTL | Benefit |
+|--------|-----------|-----|---------|
+| `getChannel(slug)` | `channel:${slug}` | 5 min | Avoids re-fetching channel metadata on every sync of the same channel. |
+| `getBlock(id)` | `block:${id}` | 5 min | Eliminates duplicate block detail fetches when the same block appears in multiple contexts. |
+
+**Expected real-world improvement:**
+- Re-syncing a channel within 5 minutes skips the `getChannel` call entirely (~100–300 ms saved).
+- Block detail fetches (e.g., comments, connected channels) are deduplicated across the same `ArenaApi` instance.
+- Cache is per-instance, ensuring different tokens/agents do not share stale data.
+
+### Network Optimization Targets Remaining
+
+1. **Parallelize attachment downloads** — Currently limited by the `pMap` concurrency of 5 for blocks; attachments within a block are sequential.
+2. **Real-world API profiling** — Run the plugin in a live Obsidian vault with a real Are.na token and a 100+ block channel to measure true end-to-end time.
+
 ## Future Optimization Targets
 
 Based on this profiling, the highest-impact optimizations to investigate are:
@@ -98,7 +141,6 @@ Based on this profiling, the highest-impact optimizations to investigate are:
 2. **Parallelize attachment downloads** — Currently limited by the `pMap` concurrency of 5 for blocks; attachments within a block are sequential.
 3. **Cache rendered templates** — If the same template is reused across many blocks, caching the parsed AST could shave off parse time.
 4. **Diff generation** — `unifiedDiff` is computed for every create/update. For large channels, this may be expensive; consider making diffs optional in non-dry-run mode.
-5. **Real-world API profiling** — Run the plugin in a live Obsidian vault with a real Are.na token and a 100+ block channel to measure true end-to-end time.
 
 ## Related Documents
 

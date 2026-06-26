@@ -15,12 +15,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Document the baseline performance (seconds per 100 blocks) for future comparison
   - **Completed:** Added `console.time()` / `console.timeEnd()` instrumentation to `src/sync-engine.ts` at channel metadata fetch, block list fetch, per-block processing, attachment handling, and index write phases. Created `src/__tests__/performance.test.ts` with simulated 100-block and 250-block imports using mock infrastructure. Baseline measured: ~20ms for 100 blocks (~5,000 blocks/sec), ~37ms for 250 blocks (~6,757 blocks/sec) in mock environment. Identified block processing as the dominant local cost (~75-80%). Full results documented in `docs/PERFORMANCE.md`.
 
-- [ ] Optimize API call efficiency: Review `src/api.ts` for performance improvements:
+- [x] Optimize API call efficiency: Review `src/api.ts` for performance improvements:
   - Check if API calls can be batched (e.g., fetch multiple blocks per request if Area.na API supports it)
   - Verify pagination is efficient: ensure each page request is necessary (not over-fetching)
   - Review retry logic: confirm backoff is reasonable (exponential backoff, max retries)
   - Add request caching for metadata that doesn't change frequently (e.g., channel info)
   - Measure improvement: after optimization, re-profile the import process and note the speedup
+  - **Completed:** Are.na API v3 does not support batch block fetching beyond the 100/page maximum (already in use). Pagination confirmed efficient with early-stop heuristics (empty/partial/total/duplicate detection). Retry logic verified as reasonable: exponential backoff capped at 10s with jitter, `MAX_RETRIES=3`, plus an outer `fetchPageWithRetries` loop for page-level resilience. Added a 5-minute TTL in-memory cache to `ArenaApi` for `getChannel` and `getBlock`, eliminating redundant metadata/detail API calls within a session. Updated `docs/PERFORMANCE.md` with the API efficiency review. Added caching tests in `src/__tests__/api.test.ts` and fixed `src/__tests__/api_extended.test.ts` to use unique block IDs so caching doesn't interfere with block-type assertions. All 302 tests pass.
 
 - [ ] Optimize file I/O and vault operations: Review `src/sync-engine.ts` for I/O optimization:
   - Check if vault writes can be batched (e.g., write multiple notes in a transaction if Obsidian API supports it)

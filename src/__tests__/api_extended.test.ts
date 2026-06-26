@@ -637,18 +637,20 @@ describe("ArenaApi block types", () => {
 			},
 		];
 
-		for (const { cls, overrides } of types) {
+		for (let i = 0; i < types.length; i++) {
+			const { cls, overrides } = types[i];
 			requestUrlMock.mockResolvedValueOnce({
 				status: 200,
 				headers: {},
-				json: { data: makeBlock(1, { class: cls, ...overrides }) },
+				json: { data: makeBlock(i + 1, { class: cls, ...overrides }) },
 				arrayBuffer: new ArrayBuffer(0),
 			});
 		}
 
 		const api = new ArenaApi("token");
-		for (const { cls } of types) {
-			const block = await api.getBlock(1);
+		for (let i = 0; i < types.length; i++) {
+			const { cls } = types[i];
+			const block = await api.getBlock(i + 1);
 			expect(block.class).toBe(cls);
 		}
 	});

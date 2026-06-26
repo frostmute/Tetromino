@@ -37,13 +37,34 @@ function asNumber(val: unknown): number | null {
 	return typeof n === "number" && !isNaN(n) ? n : null;
 }
 
+interface CacheEntry<T> {
+	value: T;
+	expiry: number;
+}
+
 export class ArenaApi {
 	private token: string;
 	private debug: boolean;
+	private cache = new Map<string, CacheEntry<unknown>>();
+	private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 	constructor(token: string, debug = false) {
 		this.token = token;
 		this.debug = debug;
+	}
+
+	private getCached<T>(key: string): T | undefined {
+		const entry = this.cache.get(key);
+		if (!entry) return undefined;
+		if (Date.now() > entry.expiry) {
+			this.cache.delete(key);
+			return undefined;
+		}
+		return entry.value as T;
+	}
+
+	private setCached<T>(key: string, value: T): void {
+		this.cache.set(key, { value, expiry: Date.now() + this.CACHE_TTL_MS });
 	}
 
 
@@ -279,11 +300,19 @@ export class ArenaApi {
 	}
 
 	async getChannel(slug: string): Promise<ArenaChannel> {
+		const cacheKey = `channel:${slug}`;
+		const cached = this.getCached<ArenaChannel>(cacheKey);
+		if (cached) {
+			this.log(`Cache hit for channel ${slug}`);
+			return cached;
+		}
 		const payload = await this.request<unknown>(
 			"GET",
 			`/channels/${encodeURIComponent(slug)}`,
 		);
-		return this.normalizeChannel(payload);
+		const channel = this.normalizeChannel(payload);
+		this.setCached(cacheKey, channel);
+		return channel;
 	}
 
 	async getChannelContents(
@@ -446,8 +475,16 @@ export class ArenaApi {
 	}
 
 	async getBlock(id: number): Promise<ArenaBlock> {
+		const cacheKey = `block:${id}`;
+		const cached = this.getCached<ArenaBlock>(cacheKey);
+		if (cached) {
+			this.log(`Cache hit for block ${id}`);
+			return cached;
+		}
 		const payload = await this.request<unknown>("GET", `/blocks/${id}`);
-		return this.normalizeBlock(payload);
+		const block = this.normalizeBlock(payload);
+		this.setCached(cacheKey, block);
+		return block;
 	}
 
 	async downloadBinary(url: string): Promise<ArrayBuffer> {
