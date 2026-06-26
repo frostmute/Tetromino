@@ -214,10 +214,22 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Verified the full pipeline: `npm run validate` passes with 0 errors, 296 tests passing, and coverage above all thresholds.
   - Fixed a latent TypeScript error in `src/__tests__/fixtures/vault.ts` (`MockTFile.parent` type incompatibility with `TFile`) that was blocking the build.
 
-- [ ] Document test patterns and expectations for future contributors:
+- [x] Document test patterns and expectations for future contributors:
   - Create a testing guide referencing how to add new tests (where to place them, what to mock, what to verify)
   - Show examples: how to mock Are.na API responses, how to test sync-engine logic, how to test settings
   - Document the coverage expectations and why they matter (determinism, reliability)
   - Include examples of good assertions and what to avoid (e.g., avoid testing implementation details, focus on behavior)
+
+  **Notes:**
+  - Created `docs/testing/testing-guide.md` with comprehensive, example-driven guidance for contributors:
+    1. **Where to place tests** — mapping of test types to file paths (`src/__tests__/{module}.test.ts`, `integration.test.ts`, `determinism.test.ts`).
+    2. **Mocking Are.na API responses** — step-by-step examples using `jest.spyOn(obsidian, "requestUrl")`, fixture reuse from `src/__tests__/fixtures/scenarios.ts`, error simulation (`makeErrorResponse`), and retry testing with `jest.useFakeTimers()`.
+    3. **Testing sync-engine logic** — unit-test pattern with mocked `Vault` and `jest.Mocked<ArenaApi>`, plus integration-test pattern using the in-memory `MockVault` from `src/__tests__/fixtures/vault.ts`.
+    4. **Testing settings / plugin lifecycle** — pattern drawn from `main.test.ts` showing how to mock `saveData`/`loadData` directly on the plugin instance without touching `Plugin` internals.
+    5. **Coverage expectations** — per-module targets (`api.ts` >= 85%, `sync-engine.ts` >= 80%, `utils.ts` >= 90%, etc.) and rationale linking coverage to determinism, reliability, and regression prevention.
+    6. **Good vs. bad assertions** — side-by-side table contrasting behaviour-focused assertions with implementation-detail anti-patterns, plus guidelines on matchers, error testing, spy cleanup, and test granularity.
+    7. **Pre-commit checklist** — quick checklist referencing `npm run validate`, fixture reuse, spy restoration, and coverage targets.
+  - Document is cross-linked to existing testing docs via wiki-links: `[[testing-strategy]]`, `[[coverage-map]]`, `[[test-fixtures]]`, `[[untestable-code]]`.
+  - All **296 tests pass** across 15 suites; coverage remains above all thresholds.
 
 **By the end of this phase**, you will have comprehensive test coverage for all critical modules, confidence that regressions are caught early, and clear documentation for contributors on testing expectations and patterns.
