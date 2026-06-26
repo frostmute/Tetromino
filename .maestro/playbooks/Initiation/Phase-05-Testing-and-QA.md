@@ -4,13 +4,28 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
 
 ## Tasks
 
-- [ ] Understand the Jest test structure and configuration: Review `jest.config.cjs` to understand:
+- [x] Understand the Jest test structure and configuration: Review `jest.config.cjs` to understand:
   - Test environment (jsdom for simulating Obsidian/browser APIs)
   - Module path mapping (TypeScript paths resolved correctly)
   - Coverage thresholds and which modules are covered
   - Test file locations and naming patterns (`src/__tests__/*.test.ts`)
   - How mocks in `src/__mocks__/` override real modules during tests
   - Review existing test files to understand the testing patterns used in the project
+
+  **Notes:**
+  - **Jest config** (`jest.config.cjs`): Uses `ts-jest` preset with `jsdom` environment. Test pattern is `**/__tests__/**/*.test.ts`. Coverage collected from `src/**/*.ts` excluding tests. `obsidian` module mapped to `src/__mocks__/obsidian.ts`.
+  - **TypeScript config** (`tsconfig.json`): `baseUrl: "."`, path alias `@/*` → `src/*`, module resolution `bundler`. Tests are excluded from compilation (`**/*.test.ts`).
+  - **No coverage thresholds** are currently defined in `jest.config.cjs`.
+  - **Current coverage** (from `npm test`): Overall 40.19% statements / 37.4% branches / 27.97% functions / 40.66% lines. Well-covered: `diff.ts` (98%), `migration.ts` (94%), `templateUtils.ts` (97.5%), `types.ts` (100%), `securityUtils.ts` (90%), `utils.ts` (83.7%). Poorly covered: `settings-tab.ts` (1.23%), `modals.ts` (5.31%), `main.ts` (19.75%), `sync-engine.ts` (22.74%), `api.ts` (53.64%).
+  - **Mocks**: `src/__mocks__/obsidian.ts` is the single mock file, automatically loaded via `moduleNameMapper`. It stubs `requestUrl`, `Vault`, `App`, `TFile`, `Plugin`, `Modal`, `Setting`, `Notice`, `FuzzySuggestModal`, etc.
+  - **Testing patterns observed**:
+    1. `jest.spyOn(obsidian, "requestUrl").mockResolvedValueOnce(...)` for per-test API call mocking.
+    2. `jest.mock("obsidian", () => ({...}))` and `jest.mock("../api")` for module-level mocking.
+    3. Shared fixtures in `fixtures.ts` (`makeChannel()`, `makeBlock()`).
+    4. `beforeEach`/`afterEach` for setup/teardown; `jest.useFakeTimers()` for retry/backoff testing.
+    5. `jest.Mocked<T>` for TypeScript-typed mocks.
+    6. Spy-and-restore pattern: `const spy = jest.spyOn(...)` → `spy.mockRestore()`.
+  - **Test suites**: 10 suites, 135 tests, all passing.
 
 - [ ] Create a test coverage map of critical modules: Identify which modules must have high test coverage:
   - `src/api.ts`: Must test pagination, retry logic, error handling, and all API endpoints (Are.na channels, blocks, attachments)
