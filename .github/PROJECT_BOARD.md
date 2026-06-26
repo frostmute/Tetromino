@@ -71,23 +71,50 @@ Out of scope for current line:
 
 ## Labels
 
-Create these labels in the repository to match board categories:
+Create these labels in the repository to match the required triage and categorization scheme:
 
-```
-bug             #d73a4a   Something isn't working
-enhancement     #a2eeef   New feature or request
-documentation   #0075ca   Improvements or additions to documentation
-good first issue #7057ff  Good for newcomers
-help wanted     #008672   Extra attention is needed
-triage          #e4e669   Needs prioritization
-import-engine   #1d76db   Core import logic
-api             #5319e7   Are.na API client
-ui              #f9d0c4   Settings and UI changes
-ci-cd           #bfd4f2   CI/CD and tooling
-testing         #c5def5   Test suite
-duplicate       #cfd3d7   This issue or pull request already exists
-wontfix         #ffffff   This will not be worked on
-```
+### Type labels
+
+| Label | Color | Purpose |
+|---|---|---|
+| `type: bug` | `#d73a4a` | Something isn't working |
+| `type: feature` | `#a2eeef` | New feature or request |
+
+### Priority labels
+
+| Label | Color | Purpose |
+|---|---|---|
+| `priority: critical` | `#b60205` | Blocks usage, data loss, or security risk |
+| `priority: high` | `#d93f0b` | Major impact, should be addressed soon |
+| `priority: medium` | `#fbca04` | Moderate impact, standard priority |
+| `priority: low` | `#0e8a16` | Minor impact, nice-to-have |
+
+### Status labels
+
+| Label | Color | Purpose |
+|---|---|---|
+| `status: investigating` | `#e4e669` | Under triage or initial investigation |
+| `status: accepted` | `#5319e7` | Confirmed and accepted for implementation |
+
+### Engagement labels
+
+| Label | Color | Purpose |
+|---|---|---|
+| `good first issue` | `#7057ff` | Good for newcomers |
+| `help wanted` | `#008672` | Extra attention is needed |
+| `duplicate` | `#cfd3d7` | This issue or pull request already exists |
+| `wontfix` | `#ffffff` | This will not be worked on |
+
+### Area labels (optional)
+
+| Label | Color | Purpose |
+|---|---|---|
+| `area: import-engine` | `#1d76db` | Core import logic |
+| `area: api` | `#5319e7` | Are.na API client |
+| `area: ui` | `#f9d0c4` | Settings and UI changes |
+| `area: docs` | `#0075ca` | Improvements or additions to documentation |
+| `area: ci-cd` | `#bfd4f2` | CI/CD and tooling |
+| `area: testing` | `#c5def5` | Test suite |
 
 ---
 
