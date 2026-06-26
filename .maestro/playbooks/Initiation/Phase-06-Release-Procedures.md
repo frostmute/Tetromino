@@ -159,6 +159,13 @@ This phase guides maintainers through the complete release process for Tetromino
   - If already listed, the registry automatically picks up new releases from GitHub (no additional action needed)
   - Wait for the release to appear in the Obsidian community plugins list (can take a few hours)
 
+  **Notes:**
+  - Verified the plugin is **not** currently listed in `obsidianmd/obsidian-releases` `community-plugins.json`.
+  - Prepared branch `add-tetromino-plugin` on fork `frostmute/obsidian-releases` with the registry entry appended.
+  - **Blocked:** Automatic PR creation failed due to GitHub OAuth SSO restrictions for the `obsidianmd` organization (`GraphQL: frostmute does not have the correct permissions to execute CreatePullRequest`; REST API returns `404`). The `gh` token likely needs SSO authorization for the `obsidianmd` org.
+  - **Manual action required:** Open the PR manually via https://github.com/obsidianmd/obsidian-releases/compare/master...frostmute:add-tetromino-plugin?expand=1
+  - Note: the correct target repo for community-plugin submissions is `obsidianmd/obsidian-releases`; the playbook reference to `obsidian-sample-plugin` appears to be a typo.
+
 - [ ] Announce the release and document post-release tasks: After a successful release:
   - Create a GitHub Discussions post (if enabled) announcing the new release and highlighting key changes
   - Update the project README if there are new features to highlight
