@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "createdAt": "2026-06-26T16:10:48.088Z",
+  "environment": {
+    "nodeVersion": "v22.23.0",
+    "platform": "darwin"
+  },
+  "metrics": {
+    "totalTimeMs": {
+      "value": 69.6528699999999,
+      "unit": "ms"
+    },
+    "apiCallCount": {
+      "value": 42,
+      "unit": "calls"
+    },
+    "vaultWriteCount": {
+      "value": 141,
+      "unit": "writes"
+    },
+    "memoryPeakMB": {
+      "value": 1.9027099609375,
+      "unit": "MB"
+    }
+  }
+}

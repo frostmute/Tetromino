@@ -73,12 +73,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Document memory baseline for future optimization efforts
   - **Completed:** Created `src/__tests__/memory.test.ts` with three test cases: 1,000-block profile, 2,000-block stress test, and 5-iteration leak detection (500 blocks each). Measured heap via `process.memoryUsage()` with explicit `global.gc()` where available. Baseline: ~11.5 KB per block in the mock environment (72.6 MB → 83.5 MB for 1,000 blocks; 112.4 MB → 134.4 MB for 2,000 blocks). Leak detection showed oscillating retained growth with **no upward trend**, confirming no memory leak. Identified that the dominant memory cost is the `result` accumulator (`fileDiffs`, `actions`) and mock vault entries; real-world usage will be lower because files live on disk. Applied a micro-optimization in `src/sync-engine.ts` to skip `blocks.filter()` when `excludeClasses` is empty, eliminating a temporary array copy. Full results added to `docs/PERFORMANCE.md` under a new "Memory Profiling Results" section. All 312 tests pass.
 
-- [ ] Set up performance benchmarking for regression detection: Create automated performance tests:
+- [x] Set up performance benchmarking for regression detection: Create automated performance tests:
   - Add a performance test in `src/__tests__/` that imports a consistent dataset (e.g., 100-block test channel)
   - Measure key metrics: total time, API call count, vault write count, memory peak
   - Store baseline metrics in a file so future tests can compare
   - In CI, alert if performance regresses by more than X% (e.g., >10% slower)
   - This catches performance regressions before release
+  - **Completed:** Created `src/__tests__/benchmark.test.ts` with a deterministic 100-block channel import benchmark. Measures four key metrics (`totalTimeMs`, `apiCallCount`, `vaultWriteCount`, `memoryPeakMB`) using 1 warm-up + 10 measured iterations. Uses `Math.min` for time (to filter jitter) and median for stable metrics. Stores baseline in `src/__tests__/baselines/performance-baseline.json` with environment metadata. Default regression tolerance is 20% (configurable via `BENCHMARK_TOLERANCE` env var). Baseline can be updated with `UPDATE_BASELINE=1`. All 313 tests pass.
 
 - [ ] Document optimization opportunities and architecture decisions:
   - Create a `docs/PERFORMANCE.md` file documenting known bottlenecks and optimization strategies
