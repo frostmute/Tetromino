@@ -14,7 +14,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
   - **Completed 2026-06-26.** Full audit report saved to `docs/research/documentation-audit.md`.
   - **Fixes applied:** corrected background-sync contradiction in README, added missing Template Engine feature highlight, updated outdated "Only 100 blocks" troubleshooting tip, fixed CONTRIBUTING playbook filename reference, fixed `scripts/release.sh` hardcoded GitHub URL, and corrected misleading encryption claim in SECURITY.md. All changes committed and pushed.
 
-- [ ] Create a comprehensive user guide: Build documentation that helps users get started:
+- [x] Create a comprehensive user guide: Build documentation that helps users get started:
   - Create `docs/USER_GUIDE.md` with:
     - Overview: what Tetromino does and doesn't do (one-way import only)
     - Installation: how to install the plugin (Obsidian community plugins search)
@@ -23,6 +23,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Settings reference: explain each setting with examples (channel mapping, template format, attachment handling)
     - Troubleshooting: common issues and solutions (auth token, Are.na API limits, vault permissions)
     - FAQ: answers to likely questions (two-way sync? auto-import? deletion behavior?)
+  - **Completed 2026-06-26.** Created `docs/USER_GUIDE.md` with full overview, installation steps, first-import walkthrough, dry-run explanation, detailed settings reference tables, troubleshooting section, and FAQ. Cross-references to related docs (SETTINGS_REFERENCE, TROUBLESHOOTING, FAQ) included in YAML front matter.
 
 - [ ] Create developer documentation for contributors: Build onboarding docs for maintainers:
   - Create `docs/DEVELOPER_GUIDE.md` with:
