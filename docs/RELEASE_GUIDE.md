@@ -217,6 +217,7 @@ unzip -l "Tetromino-${VERSION}.zip"
 - **Update `README.md`** if new features warrant a highlight (e.g., add to the "Release History" section).
 - **Monitor GitHub Issues** for 48–72 hours for regression reports.
 - **Announce** the release on relevant channels (GitHub Discussions if enabled, social media, Are.na channel).
+- **Thank contributors** by name in the GitHub Release notes. First-time contributors get a special call-out. See [`COMMUNITY_CELEBRATION.md`](COMMUNITY_CELEBRATION.md) for templates and tone guidelines.
 - **Check the Obsidian registry** (see next section) if this is a new listing.
 
 ---

@@ -2,6 +2,14 @@
 
 {{RELEASE_NOTES}}
 
+## Contributors
+
+Thank you to everyone who contributed to this release:
+
+- @username — description of contribution
+
+First-time contributors this release: @new-contributor 🎉
+
 ---
 
 ## Installation

@@ -12,6 +12,7 @@ related:
   - '[[FAQ]]'
   - '[[ROADMAP]]'
   - '[[COMMUNITY_HEALTH]]'
+  - '[[COMMUNITY_CELEBRATION]]'
 ---
 
 # Community Engagement and Communication Channels

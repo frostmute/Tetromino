@@ -28,6 +28,8 @@ Contributors are recognized in:
 - Release notes on GitHub.
 - The project's README (for significant or sustained contributions).
 
+For maintainers: see [`docs/COMMUNITY_CELEBRATION.md`](docs/COMMUNITY_CELEBRATION.md) for templates and guidelines on thanking contributors, celebrating milestones, and sharing user stories.
+
 ## First-Time Contributors
 
 We actively welcome and support first-time contributors. If this is your first open-source contribution, check out [FIRST_CONTRIBUTION.md](FIRST_CONTRIBUTION.md) for a gentle step-by-step guide.

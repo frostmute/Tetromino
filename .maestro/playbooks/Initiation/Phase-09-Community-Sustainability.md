@@ -103,12 +103,11 @@ This phase establishes practices for engaging with the community, managing issue
     - Commit to transparent communication — added Disclosure Policy section covering what we disclose, coordinated disclosure timeline, credit policy, and no-retaliation pledge
   - Added private contact methods: GitHub Private Vulnerability Reporting and email via MAINTAINERS.md
 
-- [ ] Celebrate milestones and contributors publicly: Build community pride:
-  - When hitting milestones (100 stars, 1000 downloads, major release), announce it in Discussions
-  - Thank contributors by name in release notes (especially first-time contributors)
-  - Create a CONTRIBUTORS.md or AUTHORS section recognizing all contributors
-  - Share user stories if available (show how people use Tetromino, what they import from Are.na)
-  - Celebrate growth: "Tetromino is used in 500 vaults" or "v1.0.2 had 3 community contributions"
+- [x] Celebrate milestones and contributors publicly: Build community pride:
+  - Created `docs/COMMUNITY_CELEBRATION.md` documenting milestone types (stars, downloads, releases, community PRs, registry listing, adoption), announcement templates and tone guidelines, contributor recognition practices across release notes / CHANGELOG / CONTRIBUTORS.md / README, user story collection and sharing templates, growth metric celebrations, and an annual celebration cadence.
+  - Updated `.github/release-template.md` with a "Contributors" section including first-time contributor call-outs.
+  - Updated `docs/RELEASE_GUIDE.md` post-release tasks to reference thanking contributors and linking to the celebration guide.
+  - Linked the new document from `README.md` Quick Navigation, `CONTRIBUTORS.md`, and `docs/COMMUNITY_ENGAGEMENT.md` related docs.
 
 - [ ] Create an annual community survey: Gather feedback and ideas:
   - Each year (e.g., anniversary release), create a survey asking:
