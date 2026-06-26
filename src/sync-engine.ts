@@ -150,7 +150,9 @@ export class SyncEngine {
 			duration: 0,
 		};
 		const start = Date.now();
+		console.time(`arena-sync:channel-metadata:${mapping.channelSlug}`);
 		const channel = await this.api.getChannel(mapping.channelSlug);
+		console.timeEnd(`arena-sync:channel-metadata:${mapping.channelSlug}`);
 
 		if (!dryRun) {
 			mapping.channelId = channel.id;
@@ -174,6 +176,7 @@ export class SyncEngine {
 		dryRun: boolean,
 	): Promise<void> {
 		const channelFolder = resolveChannelFolder(mapping);
+		console.time(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
 		const blocks = await this.api.getAllChannelBlocksWithProgress(
 			mapping.channelSlug,
 			(currentPage: number, totalPages: number) => {
@@ -185,6 +188,7 @@ export class SyncEngine {
 				});
 			},
 		);
+		console.timeEnd(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
 
 		if (!dryRun) {
 			await this.ensureFolder(channelFolder);
@@ -258,6 +262,7 @@ export class SyncEngine {
 		});
 
 		await pMap(blocksToProcess, 5, async (block) => {
+			console.time(`arena-sync:block:${block.id}`);
 			try {
 				const path = await this.pullBlock(
 					block,
@@ -277,6 +282,7 @@ export class SyncEngine {
 				});
 			} finally {
 				completed++;
+				console.timeEnd(`arena-sync:block:${block.id}`);
 				this.onProgress?.({
 					channelSlug: mapping.channelSlug,
 					phase: "blocks",
@@ -444,6 +450,7 @@ export class SyncEngine {
 
 		if (!url || !fileName) return undefined;
 
+		console.time(`arena-sync:asset:${block.id}`);
 		const baseFolder = resolveAttachmentBaseFolder(this.settings, mapping);
 		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
 		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
@@ -452,16 +459,21 @@ export class SyncEngine {
 			`${dryRun ? "download" : "ensure"} asset ${assetPath}`,
 		);
 
-		if (dryRun) return assetPath;
+		if (dryRun) {
+			console.timeEnd(`arena-sync:asset:${block.id}`);
+			return assetPath;
+		}
 
 		await this.ensureFolder(baseFolder);
 		const existing = this.vault.getAbstractFileByPath(assetPath);
 		if (existing instanceof TFile) {
+			console.timeEnd(`arena-sync:asset:${block.id}`);
 			return assetPath;
 		}
 
 		const data = await this.api.downloadBinary(url);
 		await this.vault.createBinary(assetPath, data);
+		console.timeEnd(`arena-sync:asset:${block.id}`);
 		return assetPath;
 	}
 
@@ -472,6 +484,7 @@ export class SyncEngine {
 		dryRun: boolean,
 		result: SyncResult,
 	): Promise<void> {
+		console.time(`arena-sync:index:${mapping.channelSlug}`);
 		const indexPath = this.channelIndexPath(mapping);
 		const sorted = [...notePaths].sort();
 		const channelDescription =
@@ -539,14 +552,19 @@ export class SyncEngine {
 			kind: existing ? "update" : "create",
 		});
 
-		if (dryRun) return;
+		if (dryRun) {
+			console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
+			return;
+		}
 		if (!existing) {
 			await this.vault.create(indexPath, content);
+			console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
 			return;
 		}
 		if (existing instanceof TFile) {
 			await this.vault.modify(existing, content);
 		}
+		console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
 	}
 
 	private async updateMasterOverview(
