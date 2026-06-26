@@ -56,14 +56,14 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Include problem statement, decision, rationale, and consequences for each
   - **Completed 2026-06-26.** Created `docs/ADRs/` folder with five ADR documents. Each ADR includes YAML front matter, status, context, decision, detailed rationale, consequences (positive and negative), implementation notes with code references, and cross-references to related ADRs and guides.
 
-- [ ] Document settings and configuration: Create reference docs for plugin settings:
-  - Create `docs/SETTINGS_REFERENCE.md` with:
-    - All available settings from settings-tab.ts (channel mappings, templates, attachment behavior)
-    - Default values and allowed values for each setting
-    - Examples of setting up a real channel mapping
-    - Advanced features: custom templates, template variables (block type, title, source URL, etc.)
-    - Backup and restoration: how settings are stored, how to backup configuration
-    - Migration: if settings format changes between versions, how to upgrade
+- [x] Document settings and configuration: Create reference docs for plugin settings:
+  - Created `docs/SETTINGS_REFERENCE.md` with:
+    - All available settings from settings-tab.ts and types.ts (channel mappings, templates, attachment behavior, notifications, logging)
+    - Default values and allowed values for each setting in table format
+    - Example of setting up a real channel mapping (`design-inspiration` → `Are.na/design-inspiration`)
+    - Advanced features: custom templates with full variable reference, conditional/loop syntax, and a complete example
+    - Backup and restoration: how settings are stored in Obsidian plugin data, how to back up channel mappings to JSON, and how to perform a full `data.json` backup
+    - Migration: explanation of `loadSettings` normalization, mapping field upgrades, and attachment base snapshots for automatic migration prompts
 
 - [ ] Update README.md with clear, up-to-date feature list: Keep the main entry point fresh:
   - Review the README feature highlights and ensure they match current code
