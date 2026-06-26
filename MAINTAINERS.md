@@ -92,7 +92,7 @@ Any sponsorship model should:
 This file should be reviewed and updated:
 - Whenever a maintainer is added or steps down.
 - Whenever significant institutional knowledge changes (e.g., new hosting, registry changes).
-- At least once per year as part of a routine project health check.
+- At least once per year as part of a routine project health check; see [Community Health Metrics](docs/COMMUNITY_HEALTH.md) for monthly metrics and targets.
 
 ---
 

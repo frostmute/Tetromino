@@ -11,6 +11,7 @@ related:
   - '[[CONTRIBUTING]]'
   - '[[FAQ]]'
   - '[[ROADMAP]]'
+  - '[[COMMUNITY_HEALTH]]'
 ---
 
 # Community Engagement and Communication Channels

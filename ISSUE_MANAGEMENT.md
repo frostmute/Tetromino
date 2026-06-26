@@ -9,6 +9,7 @@ tags:
 related:
   - '[[PROJECT_BOARD]]'
   - '[[CONTRIBUTING]]'
+  - '[[COMMUNITY_HEALTH]]'
 ---
 
 # Issue Management and Triage Process

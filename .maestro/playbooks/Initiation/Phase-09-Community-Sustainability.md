@@ -87,15 +87,12 @@ This phase establishes practices for engaging with the community, managing issue
   - Linked `MAINTAINERS.md` from `README.md` Quick Navigation and `CONTRIBUTORS.md` Maintainers section
   - Commit: `MAESTRO: add maintainer succession plan and sustainability documentation`
 
-- [ ] Monitor community health metrics: Track engagement and participation:
-  - Watch these metrics monthly:
-    - Issue response time: how long before first response to new issues?
-    - PR response time: how long before review of submitted PRs?
-    - Community contributions: how many PRs from non-maintainers?
-    - User questions in Discussions: are questions being answered?
-    - Stale issues: how many open issues with no activity for 6+ months?
-  - Set targets (e.g., "respond to bugs within 24 hours", "maintain 50% community-contributed PRs")
-  - Report metrics in a monthly status update to the community
+- [x] Monitor community health metrics: Track engagement and participation:
+  - Created `docs/COMMUNITY_HEALTH.md` documenting the five key metrics to watch monthly (issue response time, PR response time, community contributions, discussion answer rate, stale issues).
+  - Defined measurable targets for each metric (e.g., median issue response ≤ 7 days, community PRs ≥ 50%, discussion answer rate ≥ 80%, stale issues ≤ 10%).
+  - Established a monthly reporting process using a GitHub Discussions Announcement thread with a standardized template.
+  - Added tools and GitHub search shortcuts to make metric collection efficient.
+  - Linked the new document from `README.md`, `ISSUE_MANAGEMENT.md`, `COMMUNITY_ENGAGEMENT.md`, and `MAINTAINERS.md`.
 
 - [ ] Create a security policy for responsible disclosure: Protect users:
   - Review existing `SECURITY.md` for vulnerability reporting process
