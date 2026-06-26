@@ -105,12 +105,38 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
     - `diff.ts`: 98.03% → unchanged (line 8 is unreachable through public API because `String.prototype.split` always returns at least one element).
   - All **221 tests pass** across 12 suites.
 
-- [ ] Set up test data and fixtures: Create realistic test scenarios:
+- [x] Set up test data and fixtures: Create realistic test scenarios:
   - Mock Are.na API responses for various channel configurations (small, large paginated, mixed block types)
   - Mock Obsidian vault structures with existing notes (for conflict testing)
   - Create fixtures that test edge cases: empty channels, channels with deleted blocks, blocks with special characters
   - Reference existing mocks in `src/__mocks__/` as templates for new fixtures
   - Document the test data so future maintainers know what scenarios are covered
+
+  **Notes:**
+  - Created `src/__tests__/fixtures/scenarios.ts` with comprehensive Are.na API fixtures:
+    - **Channel fixtures**: `emptyChannel`, `smallChannel`, `largeChannel`, `privateChannel`, `closedChannel`, `channelWithSpecialChars`, `channelListItems`
+    - **Block factories**: `makeTextBlock`, `makeImageBlock`, `makeLinkBlock`, `makeEmbedBlock`, `makeMediaBlock`, `makeAttachmentBlock`, `makeChannelBlock`
+    - **Edge-case fixtures**: `nullTitleBlock`, `emptyContentBlock`, `specialCharsBlock`, `veryLongTitleBlock`, `unicodeBlock`, `deletedBlock`, `nullDescriptionBlock`, `noImageDataBlock`
+    - **Scenario builders**: `makeSmallChannelBlocks()` (3 blocks), `makeMixedChannelBlocks()` (10 blocks, all types), `makePaginatedChannelBlocks(total)` (bulk generator), `makeConflictScenarioBlocks()` (conflict testing)
+    - **API response helpers**: `makeChannelResponse`, `makePaginatedBlocksResponse`, `makeLegacyPaginatedBlocksResponse`, `makeEmptyPaginatedResponse`, `makeErrorResponse`
+  - Created `src/__tests__/fixtures/vault.ts` with a reusable `MockVault` class:
+    - Full in-memory Obsidian vault implementation supporting `create`, `modify`, `rename`, `delete`, `createBinary`, `read`, `getAbstractFileByPath`, `createFolder`
+    - Helper methods: `seed()`, `has()`, `content()`, `paths()`, `clear()`
+    - `makeMockApp()` factory for instantiating `SyncEngine`
+    - Pre-built scenarios: `emptyVault()`, `vaultWithExistingNotes()`, `vaultWithConflictingEdits()`
+  - Created `src/__tests__/fixtures/index.ts` for clean re-exports.
+  - Created `src/__tests__/integration.test.ts` with 9 integration tests covering:
+    - Small channel import (3 blocks)
+    - Mixed block types (all 7 classes + edge cases)
+    - Empty channel
+    - Large paginated channel (250 blocks)
+    - Conflict resolution with two-phase sync
+    - Special characters in titles
+    - Dry-run with realistic data
+    - Channel with deleted blocks
+    - Unicode and international characters
+  - Created `docs/testing/test-fixtures.md` documenting all fixtures, scenarios, and usage patterns for future contributors.
+  - All **230 tests pass** across 13 suites.
 
 - [ ] Test for determinism and stability: Tetromino's core promise is deterministic output:
   - Write a test that imports the same Are.na channel multiple times and verifies the output is identical
