@@ -1,6 +1,6 @@
 {
   "name": "Tetromino",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "One-way import from Are.na channels into your Obsidian vault.",
   "main": "main.js",
   "scripts": {
