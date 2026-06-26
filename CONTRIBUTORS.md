@@ -8,6 +8,8 @@ Thank you to everyone who has helped make Tetromino better. This project thrives
 |------|------|--------|
 | Jonathan J Wagner | Lead maintainer, architecture, core engine | [@frostmute](https://github.com/frostmute) |
 
+For information on how maintainers are added, how they step down, and how the project ensures long-term sustainability, see [MAINTAINERS.md](MAINTAINERS.md).
+
 ## Contributors
 
 We thank all contributors, past and present, for their work on Tetromino. If you've contributed and aren't listed here, please open a PR to add yourself.

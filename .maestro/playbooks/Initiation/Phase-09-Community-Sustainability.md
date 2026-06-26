@@ -75,14 +75,17 @@ This phase establishes practices for engaging with the community, managing issue
   - Updated `docs/FAQ.md` with a "Still Have Questions?" section directing users to GitHub Discussions
   - Note: Enabling GitHub Discussions itself is a repository setting that must be toggled via the GitHub UI (Settings → General → Discussions)
 
-- [ ] Create a maintainer succession plan: Ensure sustainability:
-  - Document in a private file (e.g., MAINTAINERS.md or issue in private repo):
+- [x] Create a maintainer succession plan: Ensure sustainability:
+  - Created `MAINTAINERS.md` documenting:
     - Current maintainers and their contact info
-    - Key decisions only maintainers know (hosting, naming, future direction)
-    - How to add new maintainers (what level of trust, what responsibilities)
-    - Process if a maintainer steps down (transition, permissions, credits)
-    - This ensures knowledge doesn't leave when someone does
-  - If this plugin might outlive current maintainers, consider sponsorship models
+    - Key institutional knowledge (hosting, naming, future direction, secrets/permissions)
+    - Criteria and process for adding new maintainers (nomination, discussion, invitation, onboarding, trial period)
+    - Responsibilities of maintainers (reviews, triage, releases, communication)
+    - Process for stepping down voluntarily (announcement, transition, handoff, recognition)
+    - Process for unplanned departure (forking, repository transfer)
+    - Sponsorship models considered (GitHub Sponsors, Open Collective, community-driven)
+  - Linked `MAINTAINERS.md` from `README.md` Quick Navigation and `CONTRIBUTORS.md` Maintainers section
+  - Commit: `MAESTRO: add maintainer succession plan and sustainability documentation`
 
 - [ ] Monitor community health metrics: Track engagement and participation:
   - Watch these metrics monthly:
