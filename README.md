@@ -32,8 +32,8 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - It is a deterministic importer from Are.na to Obsidian.
 - It is vault-first, manual, and transparent.
 - It is not a two-way sync engine.
-- It does not run background sync jobs.
 - It does not auto-delete local notes when remote blocks disappear.
+- Background sync is optional and disabled by default (you can enable sync-on-startup and periodic intervals in settings).
 
 ## Feature Highlights
 
@@ -48,8 +48,9 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 
 - Writes stable Markdown notes for blocks.
 - Rewrites existing notes when remote block content changes.
-- Writes channel index notes and a master overview note.
+- Writes channel index notes and a master overview note (`Are.na/overview.md`).
 - Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
+- Sync summary modal with per-file diff viewer after every import or dry-run.
 
 ### Block Enrichment (Optional)
 
@@ -58,6 +59,13 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Block comments in a dedicated `Comments` section.
 - Connected channel list (`This block appears in`) with external links.
 - Best-effort preview image for Channel blocks.
+
+### Template Engine
+
+- Optional custom template system for full control over generated Markdown.
+- Handlebars-like syntax: `{{title}}`, `{{#if image}}...{{/if}}`, `{{#each comments}}...{{/each}}`.
+- Template variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`.
+- Toggle between default output and custom template in settings.
 
 ### Attachments and Media
 
@@ -180,9 +188,11 @@ For details, see [SECURITY.md](SECURITY.md).
 - Confirm attachment folders are valid and writable.
 - Verify disk space.
 
-### Only 100 blocks imported
+### Fewer blocks than expected
 
-- Use the latest build; pagination imports all pages.
+- Verify the channel mapping is enabled in settings.
+- Check that the channel is public (or your token has access to private channels).
+- Enable debug logging to see pagination progress in the console.
 
 ## License
 

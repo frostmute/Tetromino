@@ -107,5 +107,5 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  ✓ Released v${NEW_VERSION}${NC}"
 echo -e "${GREEN}    The release workflow will build and publish the GitHub${NC}"
 echo -e "${GREEN}    Release automatically. Watch progress at:${NC}"
-echo -e "${GREEN}    https://github.com/arena-sync/arena-sync-obsidian/actions${NC}"
+echo -e "${GREEN}    https://github.com/frostmute/Tetromino/actions${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

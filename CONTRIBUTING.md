@@ -833,7 +833,7 @@ For code changes:
 
 /.maestro/playbooks/           # Auto Run playbooks for agent orchestration
 ├── Initiation/
-│   ├── Phase-01-Environment-Setup.md
+│   ├── Phase-01-Setup-and-Verify.md
 │   ├── Phase-02-Dev-Workflow.md
 │   └── ...
 ```

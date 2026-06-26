@@ -17,7 +17,7 @@ We will acknowledge your report within 48 hours and work with you to understand 
 ## Security Considerations
 
 ### API Token Handling
-- **Storage**: API tokens are stored in Obsidian's plugin data directory, which is encrypted by Obsidian's security layer on desktop.
+- **Storage**: API tokens are stored in Obsidian's plugin data file (`data.json`) inside your vault. This file is part of your vault and is not encrypted by Obsidian by default—protect your vault as you would any sensitive local data.
 - **Transmission**: Tokens are sent to Are.na's API over HTTPS only. Never transmitted over unencrypted connections.
 - **Display**: Tokens are masked in the settings UI using password-type input fields.
 - **Best Practice**: Treat your API token like a password. Never share it or commit it to version control.
