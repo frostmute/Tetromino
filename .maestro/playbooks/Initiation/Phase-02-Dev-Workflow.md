@@ -4,7 +4,26 @@ With the development environment verified, this phase establishes best practices
 
 ## Tasks
 
-- [ ] Review existing GitHub workflows and CI configuration: Examine `.github/workflows/ci.yml` and `.github/workflows/release.yml` to understand the automated testing, linting, and release pipelines. Note which commands are run in CI (lint, test, build) and which gates must pass before merge.
+- [x] Review existing GitHub workflows and CI configuration: Examine `.github/workflows/ci.yml` and `.github/workflows/release.yml` to understand the automated testing, linting, and release pipelines. Note which commands are run in CI (lint, test, build) and which gates must pass before merge.
+
+  **CI Workflow (`.github/workflows/ci.yml`)** — triggers on push to `main` and all PRs targeting `main`:
+  1. **Lint job** — runs `npm run lint` (ESLint with `@typescript-eslint`, config in `.eslintrc.cjs`). Uses Node 20. Test files under `src/__tests__/` have relaxed `no-explicit-any` rules.
+  2. **Test job** — runs `npm test` (Jest with `--coverage`) across a matrix of Node 18, 20, and 22. Coverage report is uploaded as an artifact from the Node 20 run (retained 14 days). Jest uses `ts-jest` preset with `jsdom` environment and mocks `obsidian` via `src/__mocks__/obsidian.ts`.
+  3. **Build job** — depends on both Lint and Test passing (merge gate). Runs `npm run build` which chains: `tsc -noEmit -skipLibCheck` (type-check) → `esbuild` production bundle → `scripts/package.mjs`. Then verifies `main.js`, `manifest.json`, and `styles.css` exist. Packages them into a zip (`Tetromino-<version>.zip`) and uploads both the raw artifacts and zip (retained 30 days).
+
+  **Merge gates:** All three jobs (lint, test, build) must pass. The build job explicitly gates on lint + test via `needs: [lint, test]`.
+
+  **Release Workflow (`.github/workflows/release.yml`)** — triggers on `v*` tag push:
+  1. Runs tests and builds with Node 20 (full checkout with `fetch-depth: 0`).
+  2. **Version verification**: extracts the version from the git tag and verifies it matches `manifest.json` version — fails if mismatched.
+  3. Packages the plugin zip and generates release notes by extracting the matching version section from `CHANGELOG.md`.
+  4. Creates a GitHub Release via `softprops/action-gh-release@v2` with `main.js`, `manifest.json`, `styles.css`, and the zip. Pre-release is auto-detected from semver pre-release identifiers (e.g., `v1.1.0-beta.1`).
+
+  **Key observations:**
+  - TypeScript is checked via `tsc -noEmit` (not a standalone CI step — it's embedded in the `build` npm script).
+  - No branch protection rules are configured by the workflows themselves, but the job dependency graph enforces lint → test → build ordering.
+  - The esbuild config skips vault-copy in CI (checks `process.env.CI`).
+  - Permissions are minimal: CI uses `contents: read`, release uses `contents: write`.
 
 - [ ] Create a feature branch workflow guide: Document the standard process for developing a feature:
   - Create a feature branch from `main` using naming convention `feature/<description>` or `bugfix/<description>`
