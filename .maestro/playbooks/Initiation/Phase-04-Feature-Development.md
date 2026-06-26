@@ -91,12 +91,17 @@ This phase guides developers through adding new features to Tetromino while main
   - If the feature is complex, add a code comment in the relevant file explaining the approach — **Added JSDoc comment to `restoreFromBackupData` in `src/main.ts` explaining it is the shared restore logic used by both restore paths, with validation and normalization behavior.**
   - Add a comment in the PR description explaining what changed and why — **Will be included in the PR creation step (next task).**
 
-- [ ] Create a pull request with full context: When submitting the feature:
+- [x] Create a pull request with full context: When submitting the feature:
   - PR title: concise summary (e.g., "Add block-type filtering to import")
   - PR description: explain the problem, solution, and any trade-offs
   - Reference any related issues (e.g., "Closes #42")
   - Note any testing you did manually
   - Expect and address code review feedback constructively
   - Ensure all CI checks pass (lint, test, build) before merge
+  - **Completed:** Created PR [#43](https://github.com/frostmute/Tetromino/pull/43) — "feat: restore channel mappings from a specific backup file".
+  - **PR description** covers the problem, solution, file-by-file changes, testing evidence, and backwards-compatibility notes.
+  - **No open issue to reference** — the original v1.1 #6 project-board item was not tracked as a GitHub issue.
+  - **CI checks verified locally:** `npm run lint` (clean), `npm test` (135/135 pass), `npm run build` (success, artifact packaged).
+  - **Manual testing noted:** Plugin auto-deployed to Nexus Vault test vault; file picker, validation, and restore confirmed end-to-end.
 
 **By the end of this phase**, you will have added a fully functional feature to Tetromino with test coverage, documentation, and confidence that it integrates cleanly with the existing codebase. The plugin's philosophy of one-way, deterministic import is preserved.

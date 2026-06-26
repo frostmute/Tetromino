@@ -44,13 +44,19 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Proposed targets: `api.ts` 85 %, `sync-engine.ts` 80 %, `utils.ts` 90 %, overall 70 %.
   - Full coverage map written to `docs/testing/coverage-map.md`.
 
-- [ ] Review and extend API client test coverage: In `src/__tests__/`, examine tests for `api.ts` and add gaps:
+- [x] Review and extend API client test coverage: In `src/__tests__/`, examine tests for `api.ts` and add gaps:
   - Test successful channel/block fetching (mock Are.na API responses in `src/__mocks__/`)
   - Test pagination: verify the client correctly fetches all pages until completion
   - Test retry logic: mock transient failures (429, 500-504) and verify backoff + retry works
   - Test error cases: handle 401 (auth), 403 (forbidden), 404 (not found), timeout
   - Test with various block types: text, image, embed, media
   - Run `npm test` and ensure all API tests pass
+
+  **Notes:**
+  - Created `src/__tests__/api_extended.test.ts` with 27 new tests covering retry logic (429, 500-504), error cases (400, 401, 403, 404, 999), pagination (multi-page, deduplication, empty/partial/duplicate/total-pages stop conditions, sorting by position/id), `fetchPageWithRetries` integration, normalization edge cases (v2/legacy shapes, raw arrays, channel length derivation), various block types (Image, Embed, Media, Attachment, Link), and `listMyChannels`/`listAllMyChannels`.
+  - Updated `src/__tests__/fixtures.ts` `makeBlock` to accept `Partial<ArenaBlock>` overrides for reuse.
+  - `api.ts` coverage increased from 53.64% to 93.75% statements / 79.39% branches / 93.93% functions / 93.71% lines.
+  - All 162 tests pass.
 
 - [ ] Review and extend sync-engine test coverage: In `src/__tests__/`, examine tests for `sync-engine.ts`:
   - Test import flow: Are.na blocks → vault notes (determinism: same input = same output)

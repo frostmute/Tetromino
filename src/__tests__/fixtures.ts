@@ -22,7 +22,7 @@ export function makeChannel(id: number, slug: string, title: string): ArenaChann
 	};
 }
 
-export function makeBlock(id: number): ArenaBlock {
+export function makeBlock(id: number, overrides: Partial<ArenaBlock> = {}): ArenaBlock {
 	return {
 		id,
 		title: `Block ${id}`,
@@ -48,5 +48,6 @@ export function makeBlock(id: number): ArenaBlock {
 			avatar: "",
 			channel_count: 1,
 		},
+		...overrides,
 	};
 }
