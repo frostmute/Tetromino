@@ -116,13 +116,13 @@ Track progress across loops:
 Items that still need attention after this loop:
 
 ### Needs Maintainer Review
-- [ ] DOC-XXX: [feature] - [why needs review]
+- [ x] DOC-XXX: [feature] - [why needs review]
 
 ### Intentionally Undocumented
-- [ ] DOC-XXX: [feature] - [reason]
+- [ x] DOC-XXX: [feature] - [reason]
 
 ### Low Priority (future)
-- [ ] DOC-XXX: [feature] - [can address later]
+- [ x] DOC-XXX: [feature] - [can address later]
 
 ## Notes
 

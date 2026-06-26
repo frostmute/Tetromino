@@ -120,14 +120,15 @@ This phase establishes practices for engaging with the community, managing issue
   - Added mention of the annual survey to `ROADMAP.md` in the "How to Propose Features" section
   - Commit: `MAESTRO: add annual community survey documentation and process`
 
-- [ ] Document community values and philosophy: Clarify what Tetromino stands for:
-  - Create `PHILOSOPHY.md` or add to README:
+- [x] Document community values and philosophy: Clarify what Tetromino stands for:
+  - Created `PHILOSOPHY.md` with five core principles:
     - Tetromino is intentionally one-way (respects vault autonomy)
     - Tetromino is deterministic (predictable, auditable output)
     - Tetromino is user-controlled (no background jobs, no surprises)
     - Tetromino is open source (transparent, community-driven)
     - Tetromino respects users' time (fast, reliable, minimal configuration)
-  - Use this philosophy to guide decisions: does a feature fit?
-  - Help community understand the "why" behind design choices
+  - Added a decision-making litmus test and practical guidance for contributors evaluating features
+  - Linked `PHILOSOPHY.md` from `README.md` Quick Navigation, `CONTRIBUTING.md` scope section, and `ROADMAP.md` guiding principle
+  - Commit: `MAESTRO: add PHILOSOPHY.md documenting core community values and design principles`
 
 **By the end of this phase**, Tetromino will have a healthy, engaged community with clear expectations, transparent communication, and sustainable practices for long-term success. Contributors will feel welcomed, users will feel heard, and the project will be positioned for growth.
