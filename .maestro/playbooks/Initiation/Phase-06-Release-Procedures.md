@@ -99,7 +99,7 @@ This phase guides maintainers through the complete release process for Tetromino
   - Created annotated tag `v1.1.0` with message `Release v1.1.0`.
   - Pushed `main` (`753aa86`) and tag `v1.1.0` to `origin`. GitHub Actions release workflow should trigger automatically on the tag.
 
-- [ ] Trigger the automated release workflow: After pushing the tag:
+- [x] Trigger the automated release workflow: After pushing the tag:
   - The GitHub Actions workflow (`.github/workflows/release.yml`) automatically triggers on the version tag
   - The workflow runs lint, test, and build to verify the release quality
   - If all checks pass, the workflow creates a GitHub release with:
@@ -107,6 +107,16 @@ This phase guides maintainers through the complete release process for Tetromino
     - Built artifact (Tetromino-<version>.zip) attached to the release
     - Release notes including the CHANGELOG entries for this version
   - Monitor the GitHub Actions run to ensure it completes successfully
+
+  **Notes:**
+  - Verified the `v1.1.0` tag exists locally and on origin.
+  - GitHub Actions workflow `Release` (run ID `28236406429`) triggered automatically on push of tag `v1.1.0`.
+  - Workflow completed successfully in ~48s with status `success`.
+  - All workflow steps executed: checkout, Node 20 setup, `npm ci`, `npm test`, `npm run build`, manifest version verification, plugin ZIP packaging, release notes generation from `CHANGELOG.md`, and GitHub release creation via `softprops/action-gh-release@v2`.
+  - GitHub release `v1.1.0` was created by `github-actions[bot]` at `2026-06-26T11:56:00Z` and is live at: https://github.com/frostmute/Tetromino/releases/tag/v1.1.0
+  - Release assets attached: `main.js`, `manifest.json`, `styles.css`, and `Tetromino-1.1.0.zip`.
+  - Release notes body was auto-generated from the `## [1.1.0]` section in `CHANGELOG.md` (not from `.github/release-template.md` — the workflow uses CHANGELOG extraction). The notes include all Added, Changed, Fixed, Removed, and Tests entries.
+  - No manual intervention was required; the automated pipeline worked end-to-end.
 
 - [ ] Create detailed release notes on GitHub: Once the automated release is created:
   - Edit the GitHub release notes to include:
