@@ -26,13 +26,20 @@ This phase guides developers through adding new features to Tetromino while main
   - **Complexity:** SMALL effort (setting/UI change, ~1–4 hours). Touches `settings-tab.ts` and `main.ts` only. No migration or API changes needed.
   - **Branch created:** `feature/choose-backup-file`
 
-- [ ] Design the data flow and dependencies: Plan where the feature touches code:
+- [x] Design the data flow and dependencies: Plan where the feature touches code:
   - Does it need new Are.na API calls? Add methods to `api.ts` with full pagination and error handling
   - Does it change import logic? Modify `sync-engine.ts` to handle new behavior (e.g., filtering, transformation)
   - Does it expose user choices? Add a new setting in `settings-tab.ts` that persists to plugin data
   - Does it need new utilities? Add helper functions to `utils.ts` or create a new utility file
   - Does it break existing plugin data format? Add a migration in `src/migration.ts` to handle version upgrades
   - Sketch out the flow so you know which files to touch and in what order
+  - **Design complete for "Choose backup file" feature:**
+    - **No new Are.na API calls** — the feature is entirely local; it reads existing `.json` backup files from the vault.
+    - **No sync-engine changes** — this does not affect import logic or block processing.
+    - **User choice exposed via UI** — a new **"Restore from file..."** button in `settings-tab.ts` (Channel management section) triggers an Obsidian file picker; no new persistent setting is needed because the file path is chosen at runtime.
+    - **No new utilities required** — validation logic (`channelMappings` array check) reuses the pattern from `restoreLatestChannelMappingsBackup()`. A small shared helper `restoreFromBackupData(data)` will be extracted in `main.ts` to avoid duplication between the existing latest-restore and the new file-restore paths.
+    - **No migration needed** — plugin data format (`ArenaSyncSettings`) is unchanged.
+    - **Files to touch (in order):** `src/main.ts` (add `restoreChannelMappingsFromFile(filePath: string)` and shared helper), then `src/settings-tab.ts` (add button wired to the new method). The data flow sketch and acceptance criteria are documented in `.maestro/playbooks/Working/feature-choose-backup-file.md`.
 
 - [ ] Write tests for the feature before implementation (TDD approach): Create test cases in `src/__tests__/`:
   - Write test mocks for any new Are.na API responses you'll need
