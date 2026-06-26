@@ -138,12 +138,28 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Created `docs/testing/test-fixtures.md` documenting all fixtures, scenarios, and usage patterns for future contributors.
   - All **230 tests pass** across 13 suites.
 
-- [ ] Test for determinism and stability: Tetromino's core promise is deterministic output:
+- [x] Test for determinism and stability: Tetromino's core promise is deterministic output:
   - Write a test that imports the same Are.na channel multiple times and verifies the output is identical
   - Test with various Are.na API responses (blocks in different orders, pagination boundaries)
   - Verify that generated Markdown files are byte-for-byte identical on repeated imports
   - Check that timestamps and generated dates don't cause non-deterministic output
   - Run the test multiple times to ensure it's not flaky
+
+  **Notes:**
+  - Created `src/__tests__/determinism.test.ts` with 10 comprehensive determinism tests:
+    1. **Repeated fresh imports**: 3 consecutive runs with identical mock API data → all vault files byte-for-byte identical.
+    2. **Block order independence**: Same blocks returned in original, reversed, and shuffled order → identical vault state (individual note files are independent; channel index is explicitly sorted).
+    3. **Pagination boundary independence**: Same blocks in natural vs reversed order → identical vault output.
+    4. **Mixed block types determinism**: All 7 block classes plus edge cases with download handling → identical output and matching binary asset paths across runs.
+    5. **Template rendering determinism**: Custom template enabled → identical rendered Markdown on repeated imports.
+    6. **No local timestamp leakage**: Fixed API dates verified in output; current-year dates are absent unless they match the mock data, confirming `new Date()` in sync records does not leak into vault files.
+    7. **syncAll overview determinism**: Multiple channels synced via `syncAll` → identical `Are.na/overview.md` across runs.
+    8. **Large channel determinism**: 250-block channel → identical output on repeated imports.
+    9. **Dry-run determinism**: Empty vault preserved and action counts match across repeated dry-run executions.
+    10. **Re-sync no-op**: Re-syncing unchanged data skips all blocks (`skipped: 2`) and leaves vault files untouched.
+  - Tests use a `getVaultSnapshot()` helper that captures all file paths and contents into sorted `Map`s for exact comparison.
+  - Flakiness verification: ran the determinism suite 5 consecutive times — all 50 executions passed with zero failures.
+  - All **240 tests pass** across 14 suites.
 
 - [ ] Add regression tests for known issues: For each bug fixed in Phase 03:
   - Create a Jest test that reproduces the bug (test should fail before the fix, pass after)
