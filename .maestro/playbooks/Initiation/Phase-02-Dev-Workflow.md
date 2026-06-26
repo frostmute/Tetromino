@@ -25,7 +25,7 @@ With the development environment verified, this phase establishes best practices
   - The esbuild config skips vault-copy in CI (checks `process.env.CI`).
   - Permissions are minimal: CI uses `contents: read`, release uses `contents: write`.
 
-- [ ] Create a feature branch workflow guide: Document the standard process for developing a feature:
+- [x] Create a feature branch workflow guide: Document the standard process for developing a feature:
   - Create a feature branch from `main` using naming convention `feature/<description>` or `bugfix/<description>`
   - Keep branches focused on a single logical change
   - Run `npm run lint:fix` to auto-fix formatting issues before commit
@@ -33,11 +33,89 @@ With the development environment verified, this phase establishes best practices
   - Push the branch and open a PR with description of what changed and why
   - Address code review comments and ensure all CI checks pass before merge
 
-- [ ] Review test coverage and identify critical test patterns: Examine `src/__tests__/` directory to understand existing test structure for:
+  **Completed:** Added a "Feature branch workflow" section to `CONTRIBUTING.md` covering branch naming conventions (`feature/`, `bugfix/`, `chore/`), local validation steps (`lint:fix`, `lint`, `test`, `build`), conventional commit message format, PR workflow, and merge process. The guide is placed between "Setup" and "Quality checks" for logical reading order.
+
+- [x] Review test coverage and identify critical test patterns: Examine `src/__tests__/` directory to understand existing test structure for:
   - API client tests (mocking Are.na API responses, pagination, retry logic)
   - Sync engine tests (import logic, conflict resolution, deterministic output)
   - Utilities tests (template rendering, diff calculations)
   - Understand the Jest configuration in `jest.config.cjs` and mocks in `src/__mocks__/`
+
+  **Completed:** All 125 tests pass across 9 test suites. Overall coverage: **36.65% statements, 36.14% branches, 25.08% functions, 37.04% lines**. Coverage is intentionally concentrated on the testable logic layers, while UI/entry-point modules (`main.ts`, `settings-tab.ts`, `modals.ts`) are untested due to deep Obsidian API coupling.
+
+  **Jest Configuration (`jest.config.cjs`):**
+  - Preset: `ts-jest` with `jsdom` environment (required for Obsidian API simulation)
+  - Test pattern: `**/__tests__/**/*.test.ts` under `<rootDir>`
+  - Coverage collection: all `src/**/*.ts` excluding `__tests__/`
+  - Module mapper: `obsidian` → `src/__mocks__/obsidian.ts` (provides `normalizePath`, `requestUrl`, `TFile`, `App`, `Vault` stubs)
+
+  **Obsidian Mock (`src/__mocks__/obsidian.ts`):**
+  - Minimal stub exporting `normalizePath` (path normalization), `requestUrl` (throws by default — tests must spy/mock), `TFile`, `App`, `Vault` classes
+  - Some test files (sync-engine tests) use inline `jest.mock("obsidian")` to provide richer mocks with additional TFile properties (`stat`, `vault`, `parent`)
+
+  **Test Fixtures (`src/__tests__/fixtures.ts`):**
+  - `makeChannel(id, slug, title)` and `makeBlock(id)` factory functions for `ArenaChannel` and `ArenaBlock` types
+  - Used by sync-engine tests; API tests define their own local `makeBlock` helper (slight duplication)
+
+  **Coverage by Module:**
+
+  | File | Stmts | Branch | Funcs | Lines | Status |
+  |------|-------|--------|-------|-------|--------|
+  | `types.ts` | 100% | 100% | 100% | 100% | Fully covered |
+  | `diff.ts` | 98% | 88% | 100% | 100% | Near-complete; only line 8 uncovered |
+  | `templateUtils.ts` | 97.5% | 88.4% | 100% | 97.5% | Near-complete |
+  | `migration.ts` | 94.1% | 71.9% | 100% | 97.8% | Well-covered |
+  | `securityUtils.ts` | 90% | 57.1% | 100% | 89.2% | Good; lines 92-96 uncovered |
+  | `utils.ts` | 83.7% | 57.3% | 100% | 84.7% | Good; some edge cases in URL/path handling uncovered |
+  | `api.ts` | 53.6% | 40.6% | 66.7% | 53.4% | Partial; pagination helpers, rate-limit logic, and search/user methods untested |
+  | `sync-engine.ts` | 22.7% | 9.9% | 35.9% | 23.1% | Low; `pull`, `pullBlock`, index/overview generation, deletion logic all untested |
+  | `main.ts` | 0% | 0% | 0% | 0% | Not tested (plugin entry point, deep Obsidian coupling) |
+  | `settings-tab.ts` | 0% | 0% | 0% | 0% | Not tested (UI layer) |
+  | `modals.ts` | 0% | 0% | 0% | 0% | Not tested (UI layer) |
+
+  **Critical Test Patterns Identified:**
+
+  1. **API Client Tests** (`api.test.ts`, `api_download.test.ts` — 23 tests):
+     - **Mocking pattern**: `jest.spyOn(obsidian, "requestUrl")` to intercept HTTP calls without network access
+     - **v3 API adapter tests**: Validates `data/meta` payload unwrapping for paginated channel contents and single resources
+     - **Security tests**: Verifies `downloadBinary` omits `Authorization` header (prevents token leakage to external CDNs), validates SSRF protection (absolute URLs get prefixed with BASE_URL)
+     - **Token verification**: Tests `verifyToken()` for valid (200), invalid (401), and network-failure scenarios with fake timers for retry backoff
+     - **Download retry logic**: Tests successful first attempt, retry after network error, retry after 429 rate limit with `retry-after` header, max retry exhaustion (500), and immediate failure on non-retriable 404
+
+  2. **Sync Engine Tests** (`sync-engine.test.ts`, `sync-engine-slug.test.ts` — 15 tests):
+     - **Mocking pattern**: Full `jest.mock("obsidian")` + `jest.mock("../api")`, manual `jest.Mocked<ArenaApi>` construction, spy on private methods (`pull`, `pullBlock`, `updateChannelIndex`, `ensureFolder`, `markMissing`, `updateMasterOverview`)
+     - **syncAll orchestration**: Validates disabled channel skipping, error collection from thrown exceptions (including non-Error string exceptions), result aggregation across multiple channels, and recoverable error passthrough from syncChannel results
+     - **syncChannel**: Verifies channel fetch → pull flow, dry-run mode (no state mutation), and recoverable error capture when individual `pullBlock` calls fail
+     - **Slug extraction**: Tests `extractChannelSlugFromBlock` with valid URLs, URI-decoded slugs, malformed URLs (fallback regex), invalid encoding, and non-channel URL rejection
+
+  3. **Utilities Tests** (`utils.test.ts` — 39 tests):
+     - **blockToMarkdown**: Tests text/link/image/attachment/channel block rendering, frontmatter toggle, null title fallback, banner field options (thumb-first vs display-first), description frontmatter, connected channels, comments, and template-enabled mode
+     - **Template integration**: Tests template rendering with `#if` guards, image variable with download path, and YAML frontmatter + body sanitization (XSS via `<script>` tags)
+     - **markdownToBlockContent**: Round-trip validation — strips frontmatter, extracts title from `# heading`, preserves body
+     - **computeHash**: Determinism test (same input → same output), uniqueness test, format validation (16-char hex)
+     - **sanitiseFilename**: Forbidden character replacement, whitespace collapsing, directory traversal prevention (`.`, `..`, `...`)
+     - **blockFileName**: Tests `title`, `id`, and `title-id` naming schemes
+     - **normalizeArenaUrl**: v2/v3 API URL → web URL conversion, external URL passthrough
+     - **resolveChannelFolder / resolveAttachmentBaseFolder**: Tests default paths, explicit overrides, global/channel/custom attachment storage modes, per-mapping overrides
+     - **pMap**: Concurrency-limited parallel mapping — order preservation, concurrency cap enforcement, empty array, oversized limit, error propagation with execution halt
+
+  4. **Template Utils Tests** (`templateUtils.test.ts` — 14 tests):
+     - `parseTemplate` + `renderTemplate` — plain text, variable interpolation, undefined variables (→ empty string), falsy `0`, dot-notation nested access, `#if`/`#else` with truthy/falsy/arrays, `#each` iteration (objects and primitives), error handling (unclosed blocks, unexpected closing tags as literal text)
+
+  5. **Diff Tests** (`diff.test.ts` — 7 tests):
+     - `unifiedDiff` — identical, additions, deletions, mixed changes, custom labels, empty strings, large-input fallback (>200K cells)
+
+  6. **Migration Tests** (`migration.test.ts` — 7 tests):
+     - `computeCurrentAttachmentBase`, `buildMigrationPlan` (skip disabled, skip same-base, detect moves/updates, ignore non-channel files), `executeMigration` (folder creation, rename, modify, error handling, TFile instance checks)
+
+  7. **Security Utils Tests** (`securityUtils.test.ts` — 14 tests):
+     - `sanitizeMarkdownContent` — safe passthrough, null/undefined/number coercion, `<script>`/`<style>`/`<iframe>` stripping, dataview/dataviewjs code block neutralization, templater syntax neutralization, inline event handler removal, `javascript:` protocol neutralization (plain, decimal entities, hex entities, named `&colon;`), wiki-link/markdown-link preservation
+
+  **Key Gaps and Improvement Opportunities:**
+  - **sync-engine.ts (22.7% stmts)**: The core `pull()` method, `pullBlock()`, `updateChannelIndex()`, `updateMasterOverview()`, and deletion/cleanup logic are untested. These are the most critical paths for data integrity.
+  - **api.ts (53.6% stmts)**: Pagination iteration (`getAllChannelBlocksWithProgress`), search, and user-related methods lack tests. Rate-limit retry logic in the base `request()` method is partially tested via `downloadBinary` but not directly.
+  - **No integration tests**: All tests are unit-level with mocked dependencies. No end-to-end test simulates a full sync cycle.
+  - **main.ts / settings-tab.ts / modals.ts (0%)**: UI-coupled code is untested, which is expected for an Obsidian plugin but means settings persistence and command registration logic is unverified.
 
 - [ ] Document the PR checklist for contributors: Create a mental reference for PR requirements:
   - Changes are focused and small when possible
