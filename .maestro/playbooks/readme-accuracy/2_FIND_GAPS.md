@@ -20,7 +20,7 @@ Compare the feature inventory against the README to identify specific documentat
 
 ## Gap Discovery Checklist
 
-- [ ] **Find documentation gaps (or skip if no discrepancies)**: Read LOOP_00001_FEATURE_INVENTORY.md and compare features in code vs README. If the feature inventory shows NO discrepancies (code and README are fully aligned), mark this task complete without creating LOOP_00001_GAPS.md. Otherwise, identify: (1) features in code but missing from README, (2) features in README but removed from code, (3) features documented inaccurately. Output findings to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`.}**EOF**
+- [x] **Find documentation gaps (or skip if no discrepancies)**: Read LOOP_00001_FEATURE_INVENTORY.md and compare features in code vs README. If the feature inventory shows NO discrepancies (code and README are fully aligned), mark this task complete without creating LOOP_00001_GAPS.md. Otherwise, identify: (1) features in code but missing from README, (2) features in README but removed from code, (3) features documented inaccurately. Output findings to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`.
 
 **COMPLETED**: Identified and documented 14 gaps:
 - 8 MISSING features (not documented in README)

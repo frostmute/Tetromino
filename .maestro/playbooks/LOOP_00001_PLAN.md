@@ -29,7 +29,7 @@
   ```
 
 ### DOC-002: Backup Channel Mappings Command
-- **Status:** `PENDING`
+- **Status:** `IMPLEMENTED`
 - **Gap ID:** GAP-006
 - **Type:** MISSING
 - **User Importance:** HIGH

@@ -21,9 +21,10 @@ Implement ONE documentation fix from `/Users/thewytchhaus/Documents/GitHub/Tetro
 
 ## Implementation Checklist
 
-- [ ] **Fix one documentation gap (or skip if none)**: Read /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md. Only fix ONE gap per task.
-  - **Implemented:** DOC-001 (Import my channels command) - CRITICAL/EASY
-  - **Change:** Added `Import my channels` to Commands section in README
+- [x] **Fix one documentation gap (or skip if none)**: Read /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md. Only fix ONE gap per task.
+  - **Implemented (Loop 1):** DOC-001 (Import my channels command) - CRITICAL/EASY
+  - **Implemented (Loop 1):** DOC-002 (Backup channel mappings command) - HIGH/EASY
+  - **Change:** Added commands to Commands section in README
   - **Status:** ✓ COMPLETED
 
 ## Fix Types
