@@ -2,10 +2,10 @@
 
 ## Context
 - **Playbook:** Usage
-- **Agent:** {{AGENT_NAME}}
-- **Project:** {{AGENT_PATH}}
-- **Auto Run Folder:** {{AUTORUN_FOLDER}}
-- **Loop:** {{LOOP_NUMBER}}
+- **Agent:** OpenCODECODER
+- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Loop:** 00001
 
 ## Purpose
 
@@ -13,30 +13,30 @@ This document is the **accuracy gate** for the usage documentation pipeline. It 
 
 ## Instructions
 
-1. **Read the plan** from `{{AUTORUN_FOLDER}}/LOOP_{{LOOP_NUMBER}}_PLAN.md`
+1. **Read the plan** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 2. **Check for remaining `PENDING` items** with CRITICAL/HIGH importance and EASY/MEDIUM effort
 3. **If such PENDING items exist**: Reset all tasks in documents 1-4 to continue the loop
 4. **If NO such items exist**: Do NOT reset - pipeline exits (README is accurate)
 
 ## Accuracy Gate Check
 
-- [ ] **Check for remaining gaps**: Read LOOP_{{LOOP_NUMBER}}_PLAN.md and check if there are any items with status `PENDING` that have CRITICAL or HIGH user importance AND EASY or MEDIUM fix effort. If such items exist, reset documents 1-4 to continue the loop. If no auto-fixable high-importance gaps remain, do NOT reset anything - allow the pipeline to exit.
+- [x] **Check for remaining gaps**: Read LOOP_00001_PLAN.md and check if there are any items with status `PENDING` that have CRITICAL or HIGH user importance AND EASY or MEDIUM fix effort. If such items exist, reset documents 1-4 to continue the loop. If no auto-fixable high-importance gaps remain, do NOT reset anything - allow the pipeline to exit. — Completed: found multiple PENDING items meeting criteria (see LOOP_00001_PLAN.md); resetting documents 1-4 for next loop.
 
 ## Reset Tasks (Only if PENDING high-importance gaps exist)
 
 If the accuracy gate check above determines we need to continue, reset all tasks in the following documents:
 
-- [ ] **Reset 1_ANALYZE.md**: Uncheck all tasks in `{{AUTORUN_FOLDER}}/1_ANALYZE.md`
-- [ ] **Reset 2_FIND_GAPS.md**: Uncheck all tasks in `{{AUTORUN_FOLDER}}/2_FIND_GAPS.md`
-- [ ] **Reset 3_EVALUATE.md**: Uncheck all tasks in `{{AUTORUN_FOLDER}}/3_EVALUATE.md`
-- [ ] **Reset 4_IMPLEMENT.md**: Uncheck all tasks in `{{AUTORUN_FOLDER}}/4_IMPLEMENT.md`
+- [x] **Reset 1_ANALYZE.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/1_ANALYZE.md` (reset performed).
+- [x] **Reset 2_FIND_GAPS.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/2_FIND_GAPS.md` (reset performed).
+- [x] **Reset 3_EVALUATE.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/3_EVALUATE.md` (reset performed).
+- [x] **Reset 4_IMPLEMENT.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/4_IMPLEMENT.md` (reset performed).
 
 **IMPORTANT**: Only reset documents 1-4 if there are PENDING items with CRITICAL/HIGH importance and EASY/MEDIUM effort. If all such items are IMPLEMENTED, or only HARD effort items remain, leave these reset tasks unchecked to allow the pipeline to exit.
 
 ## Decision Logic
 
 ```
-IF LOOP_{{LOOP_NUMBER}}_PLAN.md doesn't exist:
+IF LOOP_00001_PLAN.md doesn't exist:
     → Do NOT reset anything (PIPELINE JUST STARTED - LET IT RUN)
 
 ELSE IF no PENDING items with (CRITICAL|HIGH importance) AND (EASY|MEDIUM effort):
