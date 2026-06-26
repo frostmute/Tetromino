@@ -296,7 +296,7 @@ arena_id: {{id}}
 {{content}}
 ```
 
-Available variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`.
+Available variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`, `created_at`, `updated_at`.
 
 Enable it in settings under **Content rendering** → **Template engine**.
 

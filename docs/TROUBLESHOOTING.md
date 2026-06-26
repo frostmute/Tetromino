@@ -149,7 +149,7 @@ Tetromino's retry logic: up to 3 retries with exponential backoff (2s, 4s, 8s + 
 
 **Fix:**
 1. Wait a few minutes and retry.
-2. Check <https://status.are.na> (or Are.na's social media) for known outages.
+2. Check Are.na's social media (Twitter/X or Bluesky) or try visiting <https://www.are.na> directly to see if the site is down.
 3. Tetromino retries these automatically (up to 3 attempts with exponential backoff). If all retries fail, the error is surfaced to you.
 
 ---

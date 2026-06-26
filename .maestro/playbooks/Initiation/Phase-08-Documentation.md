@@ -124,11 +124,11 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
   - **README updated:** Added "Community" link to GitHub Discussions in the Quick Navigation section.
   - **Manual setup required:** A maintainer must enable GitHub Discussions in repository Settings → General → Discussions, then create a "Questions & Help" category and pin the FAQ and Troubleshooting guide posts. Discussion templates will automatically appear once discussions are enabled.
 
-- [ ] Verify all docs are accurate and linked correctly: Final documentation audit:
-  - Read through every doc you created and verify content is accurate (commands work, paths exist, features described exist)
-  - Check all internal links (references between docs, links to specific code files)
-  - Check all external links (Are.na API docs, Obsidian plugin registry, GitHub workflows)
-  - Run a spell-check on all docs
-  - Verify code examples actually work (copy-paste a template example and verify it parses correctly)
+- [x] Verify all docs are accurate and linked correctly: Final documentation audit completed 2026-06-26.
+  - **Content accuracy:** Verified all 14 docs (USER_GUIDE, DEVELOPER_GUIDE, API_DESIGN, SETTINGS_REFERENCE, FAQ, TROUBLESHOOTING, RELEASE_GUIDE, 5 ADRs, README, SECURITY, CONTRIBUTING, CHANGELOG) against the actual codebase. Source file line counts, command names, settings defaults, and API retry formulas all match.
+  - **Internal links:** All markdown file references and wiki-link cross-references verified against existing files. All referenced docs, scripts, and workflow files exist.
+  - **External links:** Checked all 30+ unique external URLs. One broken link found and fixed: `https://status.are.na` (unreachable) replaced with advice to check Are.na's social media or visit `https://www.are.na` directly in `docs/TROUBLESHOOTING.md`.
+  - **Spell-check:** No common misspellings detected across the documentation corpus.
+  - **Code examples:** Verified the template engine example from `docs/USER_GUIDE.md` parses and renders correctly using the actual `templateUtils.ts` parser. Also fixed a minor omission: added missing template variables `created_at` and `updated_at` to the `docs/USER_GUIDE.md` variable list.
 
 **By the end of this phase**, Tetromino will have comprehensive, accurate documentation that makes the plugin accessible to users, easy for contributors to understand, and sustainable for long-term maintenance.
