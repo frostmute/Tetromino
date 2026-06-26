@@ -2,7 +2,7 @@
 <p align="center">Deterministic, one-way import from Are.na into your Obsidian vault.</p>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/frostmute/Tetromino/main/assets/hero-banner.svg" alt="Tetromino Banner" width="600" />
+  <img src="https://github.com/frostmute/Tetromino/blob/main/assets/tetromino-github-hero.png" alt="Tetromino Banner" width="600" />
 </div>
 
 <div align="center">
