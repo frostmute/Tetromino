@@ -4,13 +4,14 @@ This phase guides developers through adding new features to Tetromino while main
 
 ## Tasks
 
-- [ ] Review existing architecture and design patterns: Before adding a feature, understand Tetromino's architecture:
+- [x] Review existing architecture and design patterns: Before adding a feature, understand Tetromino's architecture:
   - Entry point: `src/main.ts` registers the plugin, exposes commands, and hooks into Obsidian events
   - API layer: `src/api.ts` handles all Are.na API communication with pagination, retry logic, and error handling
   - Sync engine: `src/sync-engine.ts` contains all import logic, conflict resolution, and reconciliation
   - UI layer: `src/settings-tab.ts` defines user-facing settings and controls
   - Utilities: `src/utils.ts`, `src/templateUtils.ts`, `src/diff.ts`, `src/migration.ts` contain shared logic
   - Observe that API → Sync Engine → Main is the natural flow; changes to sync logic stay in sync-engine.ts
+  - *Reviewed all core files; architecture is well-layered with clear separation of concerns.*
 
 - [ ] Define the feature scope and acceptance criteria: For a new feature:
   - Write a clear problem statement: what problem does this solve? (e.g., "Users want to import specific block types only")
