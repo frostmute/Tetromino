@@ -398,7 +398,7 @@ export async function pMap<T, R>(
 	let hasFailed = false;
 	let firstError: unknown;
 
-	const workers = new Array(Math.min(items.length, limit)).fill(0).map(async () => {
+	const workers = Array.from({ length: Math.min(items.length, limit) }, async () => {
 		while (!hasFailed) {
 			const index = i++;
 			if (index >= items.length) return;

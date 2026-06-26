@@ -23,6 +23,13 @@ import { pMap } from "./utils";
 
 type ProgressHandler = (progress: ImportProgress) => void;
 
+const CONCURRENCY = {
+	CHANNEL_SYNC: 3,
+	PREVIEW_FETCH: 5,
+	DETAIL_FETCH: 5,
+	BLOCK_PROCESS: 5,
+} as const;
+
 export class SyncEngine {
 	private api: ArenaApi;
 	private readonly settings: ArenaSyncSettings;
@@ -75,7 +82,7 @@ export class SyncEngine {
 			(m) => m.enabled,
 		);
 
-		const results = await pMap(enabledMappings, 3, async (mapping) => {
+		const results = await pMap(enabledMappings, CONCURRENCY.CHANNEL_SYNC, async (mapping) => {
 			try {
 				return await this.syncChannel(mapping, options);
 			} catch (err) {
@@ -194,53 +201,8 @@ export class SyncEngine {
 			await this.ensureFolder(channelFolder);
 		}
 
-		if (this.settings.includeChannelBlockPreviewImage) {
-			const channelSlugsToFetch = new Set<string>();
-			for (const block of blocks) {
-				if (block.class === "Channel" && !this.shouldExclude(block)) {
-					const slug = this.extractChannelSlugFromBlock(block);
-					if (slug && !this.channelPreviewCache.has(slug)) {
-						channelSlugsToFetch.add(slug);
-					}
-				}
-			}
-
-			if (channelSlugsToFetch.size > 0) {
-				await pMap(Array.from(channelSlugsToFetch), 5, (slug) =>
-					this.getChannelPreviewImage(slug),
-				);
-			}
-		}
-
-		const needsComments = this.settings.includeBlockComments;
-		const needsChannels = this.settings.includeBlockConnectedChannels;
-
-		if (needsComments || needsChannels) {
-			const blockIdsToFetch = new Set<number>();
-			for (const block of blocks) {
-				if (this.shouldExclude(block)) continue;
-
-				const blockNeedsComments =
-					needsComments &&
-					("comment_count" in block &&
-					typeof block.comment_count === "number"
-						? block.comment_count > 0
-						: true);
-
-				if (
-					(blockNeedsComments || needsChannels) &&
-					!this.blockDetailsCache.has(block.id)
-				) {
-					blockIdsToFetch.add(block.id);
-				}
-			}
-
-			if (blockIdsToFetch.size > 0) {
-				await pMap(Array.from(blockIdsToFetch), 5, (id) =>
-					this.getBlockDetail(id),
-				);
-			}
-		}
+		await this.prefetchChannelPreviews(blocks);
+		await this.prefetchBlockDetails(blocks);
 
 		const importedPaths: string[] = [];
 		const importedBlockIds: number[] = [];
@@ -265,7 +227,7 @@ export class SyncEngine {
 			return true;
 		});
 
-		await pMap(blocksToProcess, 5, async (block) => {
+		await pMap(blocksToProcess, CONCURRENCY.BLOCK_PROCESS, async (block) => {
 			console.time(`arena-sync:block:${block.id}`);
 			try {
 				const path = await this.pullBlock(
@@ -498,6 +460,77 @@ export class SyncEngine {
 		return assetPath;
 	}
 
+	/**
+	 * Pre-fetch preview images for Channel blocks so they are cached before
+	 * rendering begins.
+	 */
+	private async prefetchChannelPreviews(blocks: ArenaBlock[]): Promise<void> {
+		if (!this.settings.includeChannelBlockPreviewImage) return;
+
+		const channelSlugsToFetch = new Set<string>();
+		for (const block of blocks) {
+			if (block.class === "Channel" && !this.shouldExclude(block)) {
+				const slug = this.extractChannelSlugFromBlock(block);
+				if (slug && !this.channelPreviewCache.has(slug)) {
+					channelSlugsToFetch.add(slug);
+				}
+			}
+		}
+
+		if (channelSlugsToFetch.size > 0) {
+			await pMap(
+				Array.from(channelSlugsToFetch),
+				CONCURRENCY.PREVIEW_FETCH,
+				(slug) => this.getChannelPreviewImage(slug),
+			);
+		}
+	}
+
+	/**
+	 * Pre-fetch block details (comments and connected channels) for any blocks
+	 * that need them and are not already cached.
+	 */
+	private async prefetchBlockDetails(blocks: ArenaBlock[]): Promise<void> {
+		const needsComments = this.settings.includeBlockComments;
+		const needsChannels = this.settings.includeBlockConnectedChannels;
+
+		if (!needsComments && !needsChannels) return;
+
+		const blockIdsToFetch = new Set<number>();
+		for (const block of blocks) {
+			if (this.shouldExclude(block)) continue;
+
+			if (
+				(this.blockNeedsComments(block) || needsChannels) &&
+				!this.blockDetailsCache.has(block.id)
+			) {
+				blockIdsToFetch.add(block.id);
+			}
+		}
+
+		if (blockIdsToFetch.size > 0) {
+			await pMap(
+				Array.from(blockIdsToFetch),
+				CONCURRENCY.DETAIL_FETCH,
+				(id) => this.getBlockDetail(id),
+			);
+		}
+	}
+
+	/**
+	 * Determine whether a block likely needs comment fetching based on settings
+	 * and the block's comment count (if known).
+	 */
+	private blockNeedsComments(block: ArenaBlock): boolean {
+		if (!this.settings.includeBlockComments) return false;
+		return (
+			"comment_count" in block &&
+			typeof block.comment_count === "number"
+				? block.comment_count > 0
+				: true
+		);
+	}
+
 	private async updateChannelIndex(
 		mapping: ChannelMapping,
 		channel: ArenaChannel,
@@ -682,11 +715,7 @@ export class SyncEngine {
 			}>;
 		} = {};
 
-		const needsComments =
-			this.settings.includeBlockComments &&
-			("comment_count" in block && typeof block.comment_count === "number"
-				? block.comment_count > 0
-				: true);
+		const needsComments = this.blockNeedsComments(block);
 		const needsChannels = this.settings.includeBlockConnectedChannels;
 
 		if (needsComments || needsChannels) {
@@ -781,11 +810,15 @@ export class SyncEngine {
 		return comments;
 	}
 
-	private extractConnectedChannels(
-		detail: unknown,
-		sourceChannelSlug: string,
+	/**
+	 * Generic helper that extracts channel references from any object shape
+	 * containing the standard Are.na pool keys.
+	 */
+	private extractChannelPool(
+		source: unknown,
+		excludeSlug: string,
 	): Array<{ title: string; slug?: string }> {
-		const obj = detail as Record<string, unknown>;
+		const obj = source as Record<string, unknown>;
 		const pools = [
 			obj.connected_by_channels,
 			obj.connected_channels,
@@ -798,51 +831,12 @@ export class SyncEngine {
 			if (!Array.isArray(pool)) continue;
 			for (const item of pool) {
 				if (!item || typeof item !== "object") continue;
-				const ch = item as Record<string, unknown>;
-				const slug =
-					typeof ch.slug === "string" && ch.slug.trim()
-						? ch.slug.trim()
-						: undefined;
-				const title =
-					typeof ch.title === "string" && ch.title.trim()
-						? ch.title.trim()
-						: slug || "Untitled";
-				if (slug && slug === sourceChannelSlug) continue;
-				const row = { title, slug };
-				if (slug) {
-					bySlug.set(slug, row);
-				} else {
-					byTitle.set(title.toLowerCase(), row);
-				}
-			}
-		}
-		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
-			a.title.localeCompare(b.title),
-		);
-	}
-
-	private extractChannelAppearsIn(
-		channel: ArenaChannel,
-	): Array<{ title: string; slug?: string }> {
-		const chObj = channel as unknown as Record<string, unknown>;
-		const pools = [
-			chObj.connected_by_channels,
-			chObj.connected_channels,
-			chObj.channels,
-			chObj.appears_in_channels,
-		];
-		const bySlug = new Map<string, { title: string; slug?: string }>();
-		const byTitle = new Map<string, { title: string; slug?: string }>();
-		for (const pool of pools) {
-			if (!Array.isArray(pool)) continue;
-			for (const item of pool) {
-				if (!item || typeof item !== "object") continue;
 				const row = item as Record<string, unknown>;
 				const slug =
 					typeof row.slug === "string" && row.slug.trim()
 						? row.slug.trim()
 						: undefined;
-				if (slug && slug === channel.slug) continue;
+				if (slug && slug === excludeSlug) continue;
 				const title =
 					typeof row.title === "string" && row.title.trim()
 						? row.title.trim()
@@ -857,6 +851,19 @@ export class SyncEngine {
 		return [...bySlug.values(), ...byTitle.values()].sort((a, b) =>
 			a.title.localeCompare(b.title),
 		);
+	}
+
+	private extractConnectedChannels(
+		detail: unknown,
+		sourceChannelSlug: string,
+	): Array<{ title: string; slug?: string }> {
+		return this.extractChannelPool(detail, sourceChannelSlug);
+	}
+
+	private extractChannelAppearsIn(
+		channel: ArenaChannel,
+	): Array<{ title: string; slug?: string }> {
+		return this.extractChannelPool(channel, channel.slug);
 	}
 
 	private extractChannelSlugFromBlock(block: ArenaBlock): string | null {

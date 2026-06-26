@@ -57,12 +57,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Prioritize items by impact and effort; consider tackling high-impact, low-effort items in future releases
   - **Completed:** Conducted a full codebase audit of 22 technical-debt items across duplication, complexity, error handling, test coverage, and maintainability. Identified 6 **Quick Win** candidates (high-impact, low-effort). Found three instances of duplicated `ensureFolder`, overlapping `extractConnectedChannels`/`extractChannelAppearsIn` logic, dual-path content rendering in `blockToMarkdown`, and scattered magic concurrency numbers. Mapped exact line ranges and coverage gaps from the latest Jest coverage report (73.55 % statements, 46 % functions). Created comprehensive `docs/technical-debt.md` with a summary table, detailed per-item analysis, risk ratings, recommended fixes, and a sprint-order roadmap. The document is cross-linked to `[[coverage-map]]` and `[[PERFORMANCE]]` for graph exploration.
 
-- [ ] Refactor complex functions for maintainability: If sync-engine.ts or other modules have complex logic:
+- [x] Refactor complex functions for maintainability: If sync-engine.ts or other modules have complex logic:
   - Break large functions into smaller, well-named helper functions
   - Extract nested loops and conditionals into named functions (improves readability)
   - Add comments explaining non-obvious logic (but prefer clear code over comments)
   - Run tests frequently during refactoring to ensure behavior doesn't change
   - After refactoring, confirm import behavior is identical before and after (test with multiple channels)
+  - **Completed:** Decomposed the 140-line `pull()` method in `src/sync-engine.ts` by extracting `prefetchChannelPreviews(blocks)` and `prefetchBlockDetails(blocks)` as self-contained private helpers with JSDoc comments. Extracted `blockNeedsComments(block)` predicate to eliminate duplicated `comment_count` heuristic logic that previously existed in both `pull()` and `buildBlockContext()`. Deduplicated `extractConnectedChannels()` and `extractChannelAppearsIn()` (which shared ~80 % logic) into a single generic `extractChannelPool(source, excludeSlug)` helper with thin wrapper methods preserving the existing API. Named all magic concurrency numbers (`3`, `5`) as a `CONCURRENCY` constant object at module level in `src/sync-engine.ts`. Fixed `pMap` array creation in `src/utils.ts` from `new Array(...).fill(0).map()` to the more idiomatic `Array.from({ length: ... })`. All 309 tests pass; lint is clean on modified files.
 
 - [ ] Profile memory usage during large imports: Monitor memory consumption:
   - Load a test with a very large channel (1000+ blocks) and watch memory usage
