@@ -161,11 +161,19 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Flakiness verification: ran the determinism suite 5 consecutive times — all 50 executions passed with zero failures.
   - All **240 tests pass** across 14 suites.
 
-- [ ] Add regression tests for known issues: For each bug fixed in Phase 03:
+- [x] Add regression tests for known issues: For each bug fixed in Phase 03:
   - Create a Jest test that reproduces the bug (test should fail before the fix, pass after)
   - Add the test to the appropriate test file in `src/__tests__/`
   - Run `npm test` to ensure the regression test passes
   - This prevents the same bug from being reintroduced in future changes
+
+  **Notes:**
+  - Phase 03 had no open GitHub issues, but regression tests were added for documented bugs from the project's commit history (CHANGELOG `[Unreleased]` → `Fixed`):
+    1. **Credential leak in `downloadBinary`** (`src/__tests__/api_download.test.ts`): Added test verifying that `requestUrl` is called with `headers: {}` and no `Authorization` key when downloading assets from external URLs. This prevents the API token from being leaked to CDNs/S3.
+    2. **Frontmatter corruption by `sanitizeMarkdownContent`** (`src/__tests__/utils.test.ts`): Added test verifying that template frontmatter values containing literal `<style>` tags are preserved, while the body is still sanitized. This catches regressions where the sanitizer was applied to the entire output instead of just the body.
+    3. **Template mode dropping comments/connected channels** (`src/__tests__/utils.test.ts`): Added test verifying that `{{#each comments}}` and `{{#each connected_channels}}` render enrichment data in template mode. This prevents silent dropping of enrichment context.
+    4. **`markMissing` not cleaning up stale sync records** (`src/__tests__/sync-engine-extended.test.ts`): Added test verifying that when blocks disappear from a channel, their sync records are removed from both `syncRecordMap` and `settings.syncRecords`. This prevents stale record leaks.
+  - All **244 tests pass** across 14 suites.
 
 - [ ] Run comprehensive test suite and check coverage: Execute full testing workflow:
   - Run `npm test` to execute all Jest tests

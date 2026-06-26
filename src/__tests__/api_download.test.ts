@@ -88,4 +88,18 @@ describe("ArenaApi.downloadBinary retry logic", () => {
 		);
 		expect(requestUrlMock).toHaveBeenCalledTimes(1);
 	});
+
+	it("does not send Authorization header to external URLs (credential leak regression)", async () => {
+		requestUrlMock.mockResolvedValueOnce({
+			status: 200,
+			headers: {},
+			arrayBuffer: new ArrayBuffer(8),
+			json: {},
+		});
+
+		await api.downloadBinary("https://cdn.external.com/image.png");
+		const call = requestUrlMock.mock.calls[0][0] as { headers: Record<string, string> };
+		expect(call.headers).toEqual({});
+		expect(call.headers).not.toHaveProperty("Authorization");
+	});
 });

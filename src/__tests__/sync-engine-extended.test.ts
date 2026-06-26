@@ -403,6 +403,33 @@ describe("SyncEngine extended coverage", () => {
 			expect(result.missingPaths).toContain("Are.na/test-channel/Remove.md");
 			expect(result.actions).toContain("missing Are.na/test-channel/Remove.md");
 		});
+
+		it("removes stale sync records when blocks go missing (regression)", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Keep" }),
+				makeBlock(2, { title: "Remove" }),
+			]);
+
+			const mapping = makeMapping("test-channel");
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+			await engine.syncChannel(mapping);
+
+			// Verify sync records exist for both blocks before second sync
+			expect(defaultSettings.syncRecords.length).toBe(2);
+
+			// Now only block 1 remains on remote
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Keep" }),
+			]);
+			const result = await engine.syncChannel(mapping);
+
+			expect(result.deleted).toBe(1);
+			expect(defaultSettings.syncRecords.length).toBe(1);
+			expect(defaultSettings.syncRecords[0].blockId).toBe(1);
+			expect(defaultSettings.syncRecords.some((r) => r.blockId === 2)).toBe(false);
+		});
 	});
 
 	describe("channel index and overview", () => {

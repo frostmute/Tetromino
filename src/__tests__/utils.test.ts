@@ -821,6 +821,37 @@ describe("blockToMarkdown template uncovered branches", () => {
 		const md = blockToMarkdown(block, s);
 		expect(md).toContain("cover: https://cdn.are.na/photo_thumb.jpg");
 	});
+
+	it("template: preserves frontmatter values that look dangerous (regression)", () => {
+		const tmpl = "---\ntitle: {{title}}\nstyle_value: <style>body{color:red}</style>\n---\n\n{{content}}";
+		const s = { ...base, templateString: tmpl };
+		const block = makeBlock({ title: "Test", content: "<script>evil()</script>" });
+		const md = blockToMarkdown(block, s);
+		// Frontmatter should preserve literal tags; body should be sanitized
+		expect(md).toContain("style_value: <style>body{color:red}</style>");
+		expect(md).not.toContain("<script>");
+		expect(md).not.toContain("evil()");
+	});
+
+	it("template: renders comments and connected channels (regression for dropped enrichment)", () => {
+		const tmpl = "{{#each comments}}{{author}}: {{body}}\n{{/each}}{{#each connected_channels}}{{title}} {{/each}}";
+		const s = { ...base, templateString: tmpl };
+		const block = makeBlock({ title: "Test" });
+		const md = blockToMarkdown(block, s, {
+			comments: [
+				{ author: "alice", body: "Nice!" },
+				{ author: "bob", body: "Great!" },
+			],
+			connectedChannels: [
+				{ title: "Channel A", slug: "channel-a" },
+				{ title: "Channel B", slug: "channel-b" },
+			],
+		});
+		expect(md).toContain("alice: Nice!");
+		expect(md).toContain("bob: Great!");
+		expect(md).toContain("Channel A");
+		expect(md).toContain("Channel B");
+	});
 });
 
 /* ------------------------------------------------------------------ */
