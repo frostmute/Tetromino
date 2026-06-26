@@ -75,7 +75,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
   - Fixed the Commands section to only list actual Command Palette commands (removed "Import my channels" and "Backup channel mappings" which are settings UI actions, not commands)
   - Added installation instructions for both Community Plugins browser and manual installation
 
-- [ ] Create a FAQ document addressing common questions: Build a support resource:
+- [x] Create a FAQ document addressing common questions: Build a support resource:
   - Create `docs/FAQ.md` with questions like:
     - Why is import manual and not automatic?
     - Can Tetromino sync changes back to Are.na?
@@ -85,6 +85,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - How do I troubleshoot import failures?
     - Can I use Tetromino offline?
     - Is my Are.na token secure?
+  - **Completed 2026-06-26.** Created `docs/FAQ.md` with YAML front matter, structured Markdown, table of contents, and detailed answers for all eight questions. Cross-references to [[USER_GUIDE]], [[SETTINGS_REFERENCE]], [[TROUBLESHOOTING]], [[DEVELOPER_GUIDE]], [[ADR-001]], and [[ADR-002]] included. Also contains a supported content types table and a troubleshooting quick-reference matrix.
 
 - [ ] Document the release process for maintainers: Create a release guide:
   - Create `docs/RELEASE_GUIDE.md` that references Phase 06 but adds:
