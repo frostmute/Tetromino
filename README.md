@@ -190,9 +190,9 @@ For details, see [SECURITY.md](SECURITY.md).
 
 MIT
 
-## Features Updated (v1.0.0 parity)
+## Release History
 
-- **Handlebars-lite templating**: Allows full programmatic control over how blocks map to markdown notes, using AST-based parsing instead of rigid line-by-line building.
-- **Security sanitization**: Prevents executable Obsidian logic (like Templater or Dataview injections) from escaping the content block into the vault.
-- **Download utilities**: Binary download helpers with magic-byte validation and safe redirect handling (available for future integration with vault-native downloads).
-- **GraphQL API utilities**: Rate-limited GraphQL client for Are.na's v3 endpoint (available for future integration).
+See [CHANGELOG.md](CHANGELOG.md) for a complete version history.
+
+- **v1.1.0** (2025-06-26) — Sync summary modal, overview note generation, attachment migration, channel management tools, banner frontmatter, block enrichment, channel index enhancements, background sync, and numerous security and performance fixes.
+- **v1.0.0** (2025-01-15) — Initial stable release with deterministic Are.na → Obsidian import, pagination, retries, stable Markdown output, and attachment support.
