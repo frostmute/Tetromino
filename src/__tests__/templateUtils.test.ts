@@ -89,4 +89,70 @@ describe("parseTemplate / renderTemplate", () => {
 			expect(renderTemplate(ast, {})).toBe("{{/if}}");
 		});
 	});
+
+	describe("edge cases and special characters", () => {
+		it("handles unclosed {{ tag (no }}) by treating rest as text", () => {
+			const ast = parseTemplate("{{name");
+			expect(renderTemplate(ast, { name: "Arena" })).toBe("{{name");
+		});
+
+		it("renders special characters in variables", () => {
+			const ast = parseTemplate("{{text}}");
+			expect(renderTemplate(ast, { text: "<script>alert('xss')</script>" })).toBe(
+				"<script>alert('xss')</script>"
+			);
+		});
+
+		it("renders empty string values", () => {
+			const ast = parseTemplate("{{empty}}");
+			expect(renderTemplate(ast, { empty: "" })).toBe("");
+		});
+
+		it("skips null and undefined variables", () => {
+			const ast = parseTemplate("{{nullVal}}-{{undef}}-{{zero}}");
+			expect(renderTemplate(ast, { nullVal: null, undef: undefined, zero: 0 })).toBe("--0");
+		});
+
+		it("handles boolean true in #if", () => {
+			const ast = parseTemplate("{{#if active}}yes{{else}}no{{/if}}");
+			expect(renderTemplate(ast, { active: true })).toBe("yes");
+		});
+
+		it("handles boolean false in #if", () => {
+			const ast = parseTemplate("{{#if active}}yes{{else}}no{{/if}}");
+			expect(renderTemplate(ast, { active: false })).toBe("no");
+		});
+
+		it("handles nested #if", () => {
+			const ast = parseTemplate(
+				"{{#if outer}}{{#if inner}}both{{else}}outer-only{{/if}}{{else}}none{{/if}}"
+			);
+			expect(renderTemplate(ast, { outer: true, inner: true })).toBe("both");
+			expect(renderTemplate(ast, { outer: true, inner: false })).toBe("outer-only");
+			expect(renderTemplate(ast, { outer: false, inner: true })).toBe("none");
+		});
+
+		it("handles #each with object nested properties", () => {
+			const ast = parseTemplate("{{#each users}}{{profile.name}}:{{/each}}");
+			expect(renderTemplate(ast, { users: [{ profile: { name: "A" } }, { profile: { name: "B" } }] })).toBe(
+				"A:B:"
+			);
+		});
+
+		it("handles multiple variables in one template", () => {
+			const ast = parseTemplate("{{greeting}} {{name}}!");
+			expect(renderTemplate(ast, { greeting: "Hello", name: "World" })).toBe("Hello World!");
+		});
+
+		it("handles deeply nested property access", () => {
+			const ast = parseTemplate("{{a.b.c.d}}");
+			expect(renderTemplate(ast, { a: { b: { c: { d: "deep" } } } })).toBe("deep");
+			expect(renderTemplate(ast, { a: { b: {} } })).toBe("");
+		});
+
+		it("handles whitespace inside tags", () => {
+			const ast = parseTemplate("{{  name  }}");
+			expect(renderTemplate(ast, { name: "Arena" })).toBe("Arena");
+		});
+	});
 });

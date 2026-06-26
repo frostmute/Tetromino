@@ -84,11 +84,26 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
     - **Block context enrichment**: comment fetching and channel preview image fetching are exercised.
   - All **180 tests pass** across 12 suites.
 
-- [ ] Test utilities and helpers: In `src/__tests__/`, add tests for utility modules:
+- [x] Test utilities and helpers: In `src/__tests__/`, add tests for utility modules:
   - `utils.ts`: slug generation, filename sanitization, date formatting, etc.
   - `templateUtils.ts`: template variable substitution and edge cases (empty values, special chars)
   - `diff.ts`: diff calculation and conflict detection
   - Run `npm test` to verify all utility tests pass
+
+  **Notes:**
+  - Extended `src/__tests__/utils.test.ts` with 22 new tests covering:
+    - Legacy path: Media blocks, Link without source title/description, connected channels without slug, comments without createdAt, Image with no data, Image download fallback, Attachment download with embed/link styles.
+    - Template path: Link, Media, Attachment (download embed/link + fallback URL), Image embed, bodyImageUrl on non-Image blocks, banner field with custom name.
+    - Edge cases: normalizeArenaUrl (empty, invalid, non-api URLs), markdownToBlockContent (trailing `---`, no h1), resolveChannelFolder (missing slug).
+  - Extended `src/__tests__/templateUtils.test.ts` with 12 new tests covering:
+    - Unclosed `{{` tag, special characters, empty strings, null/undefined/null values, boolean true/false in `#if`, nested `#if`, `#each` with nested object properties, multiple variables, deeply nested dot access, whitespace inside tags.
+  - Extended `src/__tests__/diff.test.ts` with 5 new tests covering:
+    - One empty vs non-empty string, completely different strings, CRLF line endings, single-line replacement, additions at start, deletions at end.
+  - Coverage improvements:
+    - `utils.ts`: 85.64% → **99.04% statements / 78.66% branches**
+    - `templateUtils.ts`: 97.53% → **100% statements / 91.3% branches**
+    - `diff.ts`: 98.03% → unchanged (line 8 is unreachable through public API because `String.prototype.split` always returns at least one element).
+  - All **221 tests pass** across 12 suites.
 
 - [ ] Set up test data and fixtures: Create realistic test scenarios:
   - Mock Are.na API responses for various channel configurations (small, large paginated, mixed block types)

@@ -550,3 +550,321 @@ describe("pMap", () => {
 		expect(executed).not.toContain(4);
 	});
 });
+
+/* ------------------------------------------------------------------ */
+/*  normalizeArenaUrl edge cases                                      */
+/* ------------------------------------------------------------------ */
+
+describe("normalizeArenaUrl edge cases", () => {
+	it("returns empty string unchanged", () => {
+		expect(normalizeArenaUrl("")).toBe("");
+	});
+
+	it("returns invalid URL unchanged", () => {
+		expect(normalizeArenaUrl("not-a-url")).toBe("not-a-url");
+	});
+
+	it("leaves non-api are.na URLs unchanged", () => {
+		expect(normalizeArenaUrl("https://www.are.na/channel/test")).toBe(
+			"https://www.are.na/channel/test"
+		);
+	});
+
+	it("converts api user URLs", () => {
+		expect(normalizeArenaUrl("https://api.are.na/v2/users/testuser")).toBe(
+			"https://www.are.na/user/testuser"
+		);
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  blockToMarkdown legacy path – uncovered branches                  */
+/* ------------------------------------------------------------------ */
+
+describe("blockToMarkdown legacy uncovered branches", () => {
+	const settings: ArenaSyncSettings = { ...DEFAULT_SETTINGS };
+
+	it("renders Media block with source URL", () => {
+		const block = makeBlock({
+			class: "Media",
+			content: null,
+			source: { url: "https://youtube.com/watch?v=123", title: "Video" },
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("<https://youtube.com/watch?v=123>");
+	});
+
+	it("renders Link block without source title", () => {
+		const block = makeBlock({
+			class: "Link",
+			content: null,
+			source: { url: "https://example.com", title: "" },
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[https://example.com](https://example.com)");
+	});
+
+	it("renders Link block without description", () => {
+		const block = makeBlock({
+			class: "Link",
+			content: null,
+			source: { url: "https://example.com", title: "Example" },
+			description: null,
+		});
+		const md = blockToMarkdown(block, settings);
+		expect(md).toContain("[Example](https://example.com)");
+		expect(md).not.toContain("---\n\nA description");
+	});
+
+	it("renders connected channel without slug", () => {
+		const block = makeBlock({ class: "Channel", content: null });
+		const md = blockToMarkdown(block, settings, {
+			connectedChannels: [{ title: "No Slug Channel", slug: undefined }],
+		});
+		expect(md).toContain("- No Slug Channel");
+		expect(md).not.toContain("[No Slug Channel]");
+	});
+
+	it("renders comment without createdAt", () => {
+		const block = makeBlock();
+		const md = blockToMarkdown(block, settings, {
+			comments: [{ author: "anon", body: "Nice block" }],
+		});
+		expect(md).toContain("- **anon**: Nice block");
+		expect(md).not.toContain("(");
+	});
+
+	it("renders Image block with no image data", () => {
+		const block = makeBlock({ class: "Image", content: null, image: null });
+		const md = blockToMarkdown(block, settings);
+		expect(md).not.toContain("![");
+	});
+
+	it("renders Image block download with missing assetPath", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...settings, imageHandling: "download" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("![[photo.jpg]]");
+	});
+
+	it("renders Attachment block download with embed style", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const s = {
+			...settings,
+			attachmentHandling: "download" as const,
+			downloadedAttachmentLinkStyle: "embed" as const,
+		};
+		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/notes.pdf" });
+		expect(md).toContain("![[Are.na/Attachments/notes.pdf]]");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  blockToMarkdown template path – uncovered branches                */
+/* ------------------------------------------------------------------ */
+
+describe("blockToMarkdown template uncovered branches", () => {
+	const base: ArenaSyncSettings = {
+		...DEFAULT_SETTINGS,
+		templateEnabled: true,
+	};
+
+	it("template: Link block renders markdown link", () => {
+		const block = makeBlock({
+			class: "Link",
+			content: null,
+			source: { url: "https://example.com", title: "Example" },
+		});
+		const s = { ...base, templateString: "{{content}}" };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("[Example](https://example.com)");
+	});
+
+	it("template: Media block renders raw URL", () => {
+		const block = makeBlock({
+			class: "Media",
+			content: null,
+			source: { url: "https://vimeo.com/123", title: "Video" },
+		});
+		const s = { ...base, templateString: "{{content}}" };
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("<https://vimeo.com/123>");
+	});
+
+	it("template: Attachment block with download embed style", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const s = {
+			...base,
+			templateString: "{{content}}",
+			attachmentHandling: "download" as const,
+			downloadedAttachmentLinkStyle: "embed" as const,
+		};
+		const md = blockToMarkdown(block, s, { assetPath: "Attachments/notes.pdf" });
+		expect(md).toBe("![[Attachments/notes.pdf]]");
+	});
+
+	it("template: Attachment block with download link style", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const s = {
+			...base,
+			templateString: "{{content}}",
+			attachmentHandling: "download" as const,
+			downloadedAttachmentLinkStyle: "link" as const,
+		};
+		const md = blockToMarkdown(block, s, { assetPath: "Attachments/notes.pdf" });
+		expect(md).toBe("[[Attachments/notes.pdf|notes.pdf]]");
+	});
+
+	it("template: Attachment block without download falls back to URL", () => {
+		const block = makeBlock({
+			class: "Attachment",
+			content: null,
+			attachment: {
+				file_name: "notes.pdf",
+				file_size: 1024,
+				url: "https://cdn.are.na/notes.pdf",
+				content_type: "application/pdf",
+				extension: "pdf",
+			},
+		});
+		const s = {
+			...base,
+			templateString: "{{content}}",
+			attachmentHandling: "link" as const,
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toBe("[notes.pdf](https://cdn.are.na/notes.pdf)");
+	});
+
+	it("template: Image block with embed uses display URL", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...base, templateString: "{{image}}", imageHandling: "embed" as const };
+		const md = blockToMarkdown(block, s);
+		expect(md).toBe("https://cdn.are.na/photo_display.jpg");
+	});
+
+	it("template: bodyImageUrl on non-Image block sets image var", () => {
+		const block = makeBlock({ class: "Text", content: "Hello" });
+		const s = { ...base, templateString: "{{image}}" };
+		const md = blockToMarkdown(block, s, { bodyImageUrl: "https://cdn.are.na/preview.jpg" });
+		expect(md).toBe("https://cdn.are.na/preview.jpg");
+	});
+
+	it("template: banner field enabled with custom name", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = {
+			...base,
+			templateString: "---\ncover: {{cover}}\n---",
+			bannerFieldEnabled: true,
+			bannerFieldName: "cover",
+		};
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("cover: https://cdn.are.na/photo_thumb.jpg");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  markdownToBlockContent edge cases                                 */
+/* ------------------------------------------------------------------ */
+
+describe("markdownToBlockContent edge cases", () => {
+	it("handles content ending with horizontal rule", () => {
+		const md = "# Title\n\nBody\n\n---";
+		const { title, content } = markdownToBlockContent(md);
+		expect(title).toBe("Title");
+		expect(content).toBe("Body");
+	});
+
+	it("handles markdown without frontmatter but with h1", () => {
+		const md = "# Hello\n\nWorld\n---";
+		const { title, content } = markdownToBlockContent(md);
+		expect(title).toBe("Hello");
+		expect(content).toBe("World");
+	});
+
+	it("handles markdown without h1", () => {
+		const md = "Just some content";
+		const { title, content } = markdownToBlockContent(md);
+		expect(title).toBe("");
+		expect(content).toBe("Just some content");
+	});
+});
+
+/* ------------------------------------------------------------------ */
+/*  resolveChannelFolder edge cases                                   */
+/* ------------------------------------------------------------------ */
+
+describe("resolveChannelFolder edge cases", () => {
+	it("falls back to Are.na when slug is missing", () => {
+		expect(
+			resolveChannelFolder({
+				channelSlug: "",
+				channelId: 0,
+				channelTitle: "",
+				localFolder: "",
+				lastSyncedAt: null,
+				enabled: true,
+			}),
+		).toBe("Are.na");
+	});
+});
