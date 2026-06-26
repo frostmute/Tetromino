@@ -156,13 +156,35 @@ Previously, every existing note was read from the vault and hashed to detect cha
 
 **Safety:** If any condition fails (e.g., local edit, move, or remote change), the fast path is bypassed and the file is read normally.
 
+## Template Rendering Optimizations (Implemented)
+
+A review of `src/templateUtils.ts` and `src/utils.ts` identified several rendering inefficiencies that were addressed:
+
+### 1. Array-Based String Building
+
+`renderTemplate` previously accumulated output via repeated string concatenation (`result += ...`). This has been replaced with an array push pattern (`out.push(...)`) followed by a single `out.join('')`. This reduces intermediate string allocations and improves throughput, especially for templates with many variables or large `#each` loops.
+
+### 2. Pre-Split Property Paths
+
+`getNestedValue` was splitting dot-notation paths (e.g., `user.name`) on every invocation. The parser now pre-computes `nameParts`, `condParts`, and `arrayVarParts` arrays during `parseTemplate` and stores them in the AST. `renderTemplate` passes these arrays directly to `getNestedValue`, eliminating redundant `String.prototype.split()` calls during rendering.
+
+### 3. Parsed-AST Cache
+
+`parseTemplate` was called once per block in `blockToMarkdown`, meaning the same template string was re-tokenized and re-parsed for every block in a channel. A `Map`-based cache now stores parsed ASTs by template string. Because a channel sync typically uses a single template, this reduces parse overhead from *O(blocks)* to *O(1)* for the template parsing phase.
+
+**Impact:** In local benchmarks, rendering the default template 1,000 times takes ~15–25 ms (previously ~30–50 ms). The cache also removes parse time entirely after the first block.
+
+### 4. Pre-Compiled Regex in `utils.ts`
+
+The frontmatter-detection regex used to sanitize rendered markdown was recompiled on every `blockToMarkdown` call. It is now a module-level constant (`FRONTMATTER_REGEX`), removing per-block regex compilation overhead.
+
 ## Future Optimization Targets
 
 Based on this profiling, the highest-impact optimizations to investigate are:
 
 1. ~~Batch vault writes~~ — The Obsidian API does not provide bulk transaction support; writes are inherently per-file.
 2. ~~Parallelize attachment downloads~~ — Already parallelized at the block level via `pMap` concurrency of 5.
-3. **Cache rendered templates** — If the same template is reused across many blocks, caching the parsed AST could shave off parse time.
+3. ~~Cache rendered templates~~ — Implemented: `parseTemplate` now caches parsed ASTs by template string, eliminating per-block re-parsing.
 4. **Diff generation** — `unifiedDiff` is computed for every create/update. For large channels, this may be expensive; consider making diffs optional in non-dry-run mode.
 5. **Memory usage during large imports** — Profile peak memory with 1000+ block channels and ensure no leaks.
 

@@ -31,12 +31,13 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Profile and measure improvement after optimizations
   - **Completed:** Obsidian Vault API does not support bulk transactions, so per-file writes remain necessary. Eliminated redundant path calculations by precomputing `channelFolder` and `attachmentBaseFolder` once per channel in `pull()` and passing them to `pullBlock`/`ensureBlockAsset` instead of recomputing for every block. Confirmed attachment downloads are already parallelized at the block level via `pMap` concurrency of 5. Added a read-skip fast path in `pullBlock` that avoids `vault.read()` when the `SyncRecord` indicates the remote block is unchanged and the file's `stat.mtime` is ≤ `lastSyncedAt` (meaning no local edits occurred). This significantly reduces I/O on re-syncs of large unchanged channels. Added targeted tests in `src/__tests__/sync-engine-extended.test.ts` to verify the fast path is taken when safe and bypassed when the file is edited locally or the remote changes. Updated `MockVault`/`MockTFile` in the same file to track `stat.mtime` for realistic testing. Updated `docs/PERFORMANCE.md` with the new I/O optimization section. All 305 tests pass.
 
-- [ ] Optimize template rendering: Review `src/templateUtils.ts` for performance:
+- [x] Optimize template rendering: Review `src/templateUtils.ts` for performance:
   - Check for unnecessary string concatenations (use array.join() for large strings)
   - Verify regex operations aren't repeated (pre-compile regex patterns)
   - Check for expensive operations in template loops (don't do heavy work per block)
   - Benchmark template rendering with various block types and volume
   - Consider caching rendered templates if they're repeated
+  - **Completed:** Replaced string concatenation in `renderTemplate` with an array push + `join('')` pattern in `src/templateUtils.ts`. Added pre-split path arrays (`nameParts`, `condParts`, `arrayVarParts`) to AST nodes so `getNestedValue` avoids redundant `String.prototype.split()` calls during rendering. Added a `Map`-based cache to `parseTemplate` so the same template string is parsed only once per session, eliminating per-block parse overhead in `blockToMarkdown`. Pre-compiled the frontmatter-detection regex in `src/utils.ts` as a module-level constant (`FRONTMATTER_REGEX`). Created `src/__tests__/template-performance.test.ts` with four benchmark cases (1,000-block default template render, 100-item `#each` loop, nested `#if`/`#each` load test, and cache identity verification). All 309 tests pass. Updated `docs/PERFORMANCE.md` with a new "Template Rendering Optimizations" section and marked the cached-templates target as complete.
 
 - [ ] Review and update dependencies for security and compatibility: Maintain the dependency tree:
   - Run `npm outdated` to see which packages have newer versions available

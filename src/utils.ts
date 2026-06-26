@@ -9,6 +9,8 @@ import type {
 	ChannelMapping,
 } from "./types";
 
+const FRONTMATTER_REGEX = /^(---\n[\s\S]*?\n---\n?)(\s*[\s\S]*)$/;
+
 export interface MarkdownContext {
 	channelSlug?: string;
 	channelTitle?: string;
@@ -167,7 +169,7 @@ export function blockToMarkdown(
 		const rendered = renderTemplate(ast, vars);
 
 		// Sanitize only the body, preserving YAML frontmatter
-		const fmMatch = rendered.match(/^(---\n[\s\S]*?\n---\n?)(\s*[\s\S]*)$/);
+		const fmMatch = FRONTMATTER_REGEX.exec(rendered);
 		if (fmMatch) {
 			return fmMatch[1] + sanitizeMarkdownContent(fmMatch[2]);
 		}
