@@ -27,12 +27,22 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
     6. Spy-and-restore pattern: `const spy = jest.spyOn(...)` → `spy.mockRestore()`.
   - **Test suites**: 10 suites, 135 tests, all passing.
 
-- [ ] Create a test coverage map of critical modules: Identify which modules must have high test coverage:
+- [x] Create a test coverage map of critical modules: Identify which modules must have high test coverage:
   - `src/api.ts`: Must test pagination, retry logic, error handling, and all API endpoints (Are.na channels, blocks, attachments)
   - `src/sync-engine.ts`: Must test import logic, conflict resolution, dry-run preview, and reconciliation
   - `src/utils.ts`: Utility functions (template rendering, slug generation, etc.)
   - `src/settings-tab.ts`: Settings UI validation and data persistence
   - Run `npm test` with coverage report and identify any uncovered lines in critical paths
+
+  **Notes:**
+  - Coverage report captured and analysed. Current overall: 40.19 % statements / 37.4 % branches / 27.97 % functions / 40.66 % lines.
+  - **Critical gaps identified:**
+    - `api.ts` (53.64 %): pagination/progress logic (`getAllChannelBlocksWithProgress`, `fetchPageWithRetries`, `shouldStopPagination`), rate-limit and transient-error branches, binary-download error paths, and legacy pagination shapes.
+    - `sync-engine.ts` (22.74 %): `pullBlock` (create/update/skip/move/dry-run), sync-record bookkeeping (`upsertRecord`, `markMissing`), asset handling (`ensureBlockAsset`), enrichment (`buildBlockContext`, `extractComments`, `extractConnectedChannels`), and index/overview generation.
+    - `utils.ts` (83.73 %): template branches for `Link`, `Media`, `Attachment`, and image-handling options.
+    - `settings-tab.ts` (1.23 %): UI-bound code; excluded from coverage target.
+  - Proposed targets: `api.ts` 85 %, `sync-engine.ts` 80 %, `utils.ts` 90 %, overall 70 %.
+  - Full coverage map written to `docs/testing/coverage-map.md`.
 
 - [ ] Review and extend API client test coverage: In `src/__tests__/`, examine tests for `api.ts` and add gaps:
   - Test successful channel/block fetching (mock Are.na API responses in `src/__mocks__/`)
