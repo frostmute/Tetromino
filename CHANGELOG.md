@@ -42,12 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API transient error handling now retries on HTTP `500/502/503/504` (in addition to `429`).
 - API client now targets Are.na REST API v3 routes with a compatibility adapter for v3 `data/meta` pagination responses.
 - URL normalization now recognizes both legacy `/v2/...` and current `/v3/...` API URLs.
+- Optimized sync speed with concurrent channel syncing and bounded-concurrency block fetching.
+- Optimized batch API requests with controlled concurrency via `pMap`.
+- Resolved N+1 API queries for channel preview images and block detail fetching.
+- Optimized `SyncRecords` lookup to O(1) for improved sync performance on large channels.
+- Replaced direct `console` calls with internal logging methods for consistent diagnostics.
 
 ### Fixed
 - Fixed pagination edge case where some channels could stop after the first 100 blocks.
 - Fixed packaging failures in environments without a system `zip` binary.
 - `pMap` now stops spawning new tasks once a mapping function rejects, preventing wasted work and unhandled rejections after an error.
 - Fixed credential leak in `downloadBinaryFile` that sent API token to external CDN/S3 URLs.
+- Fixed API token leak in error logging.
 - Fixed XSS filter bypass via HTML entities inside protocol names (e.g., `java&#x09;script:`).
 - Fixed template mode producing malformed Obsidian markdown for downloaded images (double-bracketed paths).
 - Fixed `sanitizeMarkdownContent` corrupting YAML frontmatter values in template mode output.
@@ -58,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed trailing spaces in YAML array formatting for nested objects.
 - Fixed redundant async I/O in `createFolderStructure`.
 - Fixed GraphQL response handler crashing on null/empty responses.
+- Fixed SSRF vulnerability in API URL builder.
+- Fixed potential directory traversal via `.` and `..` in filenames.
+- Prevented unbounded concurrent file reads in attachment migration.
 
 ### Removed
 - Removed unused template directive files (`#extends`, `#block`, `#include`) and utility files (`downloadUtils.ts`, `arenaApiUtils.ts`, `yamlUtils.ts`, `fileUtils.ts`) that were superseded or unused.

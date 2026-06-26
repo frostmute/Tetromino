@@ -22,12 +22,30 @@ This phase guides maintainers through the complete release process for Tetromino
   - Current version across `package.json`, `manifest.json`, and `versions.json` is **1.0.0**.
   - No local git tags exist yet.
 
-- [ ] Prepare release notes from changelog entries: Before starting a release:
+- [x] Prepare release notes from changelog entries: Before starting a release:
   - Review `CHANGELOG.md` and the `[Unreleased]` section to see what's been done since last release
   - Group changes by category: Added (new features), Fixed (bug fixes), Changed (breaking changes), Deprecated, Security
   - Ensure all PRs since last release have corresponding CHANGELOG entries
   - Check that all issues resolved by unreleased changes are marked with the next version milestone
   - Create a draft release summary that will become the GitHub release notes
+
+  **Notes:**
+  - Reviewed the `[Unreleased]` section in `CHANGELOG.md`. It contains 38 Added/Changed/Fixed/Removed/Test entries since v1.0.0 (2025-01-15).
+  - Cross-referenced 42 merged PRs against the CHANGELOG and identified several missing entries:
+    - **Security fixes** not previously documented: SSRF (PR #34), directory traversal (PR #40), API token leak in error logging (PR #5).
+    - **Performance improvements** not previously documented: concurrent channel syncing, bounded-concurrency block fetching, batch API `pMap` optimization, N+1 query elimination for channel images and block details, O(1) `SyncRecords` lookup.
+    - **Code-health changes** not previously documented: replaced direct `console` calls with internal logging (PR #39).
+  - Updated `CHANGELOG.md` to include all significant missing entries under the appropriate categories (`Fixed`, `Changed`).
+  - No version milestone exists in GitHub Issues yet; this will be addressed in the next task (version determination).
+  - Created a comprehensive draft release summary at `.maestro/playbooks/Working/draft-release-notes-v1.1.0.md` with:
+    - Executive summary paragraph.
+    - "New Features" section (12 major feature areas).
+    - "Bug Fixes" section (18 fixes).
+    - "Performance Improvements" section (5 optimizations).
+    - "Other Changes" section.
+    - "Tests" section.
+    - "Contributors" section.
+    - "Migration Guide" confirming backward compatibility.
 
 - [ ] Determine the next version number using semantic versioning: Analyze changes to decide on version bump:
   - Patch version (1.0.x): Only bug fixes and non-breaking changes
