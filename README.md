@@ -75,6 +75,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - `Import my channels` to bulk-create mappings from your Are.na account.
 - `Auto-enable imported channels` toggle for granular control.
 - Backup, restore, and reset tools for channel mappings.
+- `Restore from file...` to pick a specific historical backup instead of only the latest.
 - Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
 
 ## Commands

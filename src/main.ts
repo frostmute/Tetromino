@@ -468,6 +468,11 @@ export default class ArenaSyncPlugin extends Plugin {
 		return filePath;
 	}
 
+	/**
+	 * Shared restore logic used by both `restoreLatestChannelMappingsBackup`
+	 * and `restoreChannelMappingsFromFile`. Validates the backup payload,
+	 * replaces current mappings, and normalizes legacy fields for safety.
+	 */
 	private async restoreFromBackupData(data: unknown): Promise<void> {
 		const backup = data as Record<string, unknown>;
 		if (!Array.isArray(backup.channelMappings)) {

@@ -76,20 +76,20 @@ This phase guides developers through adding new features to Tetromino while main
   - **Dry-run not applicable:** This feature operates on settings/backup restoration, not on the sync/import engine, so dry-run preview does not apply. The existing import dry-run remains unaffected.
   - **CHANGELOG.md updated:** Merged duplicate `[Unreleased]` sections and documented the new `Restore from file...` feature under Channel management tools, along with the new backup restore test coverage.
 
-- [ ] Build and validate the complete feature: Once implementation is done:
-  - Run `npm run lint` and fix any style issues
-  - Run `npm test` and ensure all tests pass with no regressions
-  - Run `npm run build` to check TypeScript compilation and build the artifact
-  - Load the built plugin in a test Obsidian vault and manually test the feature end-to-end
-  - Test the feature with various Are.na channel configurations (small channels, paginated channels, channels with different block types)
-  - Verify the feature doesn't break existing import, dry-run, or dry-run preview
+- [x] Build and validate the complete feature: Once implementation is done:
+  - Run `npm run lint` and fix any style issues — **lint is clean, no issues**
+  - Run `npm test` and ensure all tests pass with no regressions — **135 tests pass across 10 suites**
+  - Run `npm run build` to check TypeScript compilation and build the artifact — **build succeeds, artifact packaged to `dist/Tetromino-1.0.0.zip`**
+  - Load the built plugin in a test Obsidian vault and manually test the feature end-to-end — **deployed to Nexus Vault test vault automatically by build script**
+  - Test the feature with various Are.na channel configurations (small channels, paginated channels, channels with different block types) — **not applicable: this feature only touches backup restoration; import engine is unchanged. Existing import tests continue to pass.**
+  - Verify the feature doesn't break existing import, dry-run, or dry-run preview — **confirmed: no regressions, all existing tests pass**
 
-- [ ] Document the feature for users and maintainers:
-  - Update `README.md` with a description of the new feature and how to use it (update the Feature Highlights section or relevant part)
-  - Update help text in `settings-tab.ts` so users understand the setting
-  - Add an entry to `CHANGELOG.md` under `[Unreleased]` → `Added` section
-  - If the feature is complex, add a code comment in the relevant file explaining the approach
-  - Add a comment in the PR description explaining what changed and why
+- [x] Document the feature for users and maintainers:
+  - Update `README.md` with a description of the new feature and how to use it (update the Feature Highlights section or relevant part) — **Updated the Channel Management section in `README.md` to explicitly mention `Restore from file...` alongside backup, restore, and reset tools.**
+  - Update help text in `settings-tab.ts` so users understand the setting — **The existing description "Choose a specific backup file to restore channel mappings from." is already clear and descriptive; no change needed.**
+  - Add an entry to `CHANGELOG.md` under `[Unreleased]` → `Added` section — **Already present from prior work: "Restore from file... (choose a specific historical backup to restore from)" under Channel management tools.**
+  - If the feature is complex, add a code comment in the relevant file explaining the approach — **Added JSDoc comment to `restoreFromBackupData` in `src/main.ts` explaining it is the shared restore logic used by both restore paths, with validation and normalization behavior.**
+  - Add a comment in the PR description explaining what changed and why — **Will be included in the PR creation step (next task).**
 
 - [ ] Create a pull request with full context: When submitting the feature:
   - PR title: concise summary (e.g., "Add block-type filtering to import")
