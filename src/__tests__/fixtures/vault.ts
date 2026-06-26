@@ -21,7 +21,7 @@ class MockTFile extends TFile {
 	extension: string;
 	stat: { ctime: number; mtime: number; size: number };
 	vault: Vault;
-	parent: { path: string } | null;
+	parent: any;
 
 	constructor(path: string, vault: Vault) {
 		super();

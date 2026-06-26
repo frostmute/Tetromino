@@ -200,11 +200,19 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
   - Created `docs/testing/untestable-code.md` documenting untestable modules (`settings-tab.ts`, `modals.ts`) and explaining uncovered branches in critical modules.
   - All **296 tests pass** across 15 suites. Lint passes.
 
-- [ ] Test in isolation, then integration: Create a testing strategy:
+- [x] Test in isolation, then integration: Create a testing strategy:
   - Unit tests: Each module (API, sync-engine, utils) tested in isolation with mocks
   - Integration tests: API client + sync-engine together (mock Are.na API, test full import flow)
   - Manual testing in Obsidian vault: Load plugin, test import with real Are.na channel, verify vault updates
   - Run all tests before committing: `npm run lint && npm test && npm run build`
+
+  **Notes:**
+  - Created `docs/testing/testing-strategy.md` documenting the three-layer pyramid: unit tests (isolated, mocked), integration tests (`SyncEngine` + `ArenaApi` + `MockVault`), and manual validation in a real Obsidian vault.
+  - Documented mocking patterns (per-test `spyOn`, module-level `jest.mock`, typed `jest.Mocked<T>`, fake timers), assertion best practices, and fixture reuse.
+  - Added manual testing checklist: build → copy to test vault → verify import, re-import determinism, dry-run, and edge cases (empty channels, special characters, unicode, large channels).
+  - Added `npm run validate` to `package.json` as a convenience script that runs `lint → test → build` sequentially.
+  - Verified the full pipeline: `npm run validate` passes with 0 errors, 296 tests passing, and coverage above all thresholds.
+  - Fixed a latent TypeScript error in `src/__tests__/fixtures/vault.ts` (`MockTFile.parent` type incompatibility with `TFile`) that was blocking the build.
 
 - [ ] Document test patterns and expectations for future contributors:
   - Create a testing guide referencing how to add new tests (where to place them, what to mock, what to verify)
