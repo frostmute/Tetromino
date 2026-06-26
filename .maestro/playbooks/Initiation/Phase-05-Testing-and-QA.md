@@ -175,12 +175,30 @@ This phase establishes comprehensive testing practices that ensure Tetromino's r
     4. **`markMissing` not cleaning up stale sync records** (`src/__tests__/sync-engine-extended.test.ts`): Added test verifying that when blocks disappear from a channel, their sync records are removed from both `syncRecordMap` and `settings.syncRecords`. This prevents stale record leaks.
   - All **244 tests pass** across 14 suites.
 
-- [ ] Run comprehensive test suite and check coverage: Execute full testing workflow:
+- [x] Run comprehensive test suite and check coverage: Execute full testing workflow:
   - Run `npm test` to execute all Jest tests
   - Review coverage report (lines, branches, functions) and identify any gaps
   - Set a coverage target (e.g., 80% for critical paths, 70% overall)
   - If coverage drops below target, add tests to cover the gap
   - Document any untestable code (e.g., Obsidian API integration) and why it's excluded
+
+  **Notes:**
+  - Created `src/__tests__/main.test.ts` with 52 new tests covering `loadSettings`, `saveSettings`, `runSync`, `runChannelSync`, `updateStatusBar`, `updateProgressStatus`, `notifySyncResult`, `writeImportReport`, `importMyChannelsMappings`, `resetChannelMappings`, `backupChannelMappings`, `normalizeMappings`, `ensureAttachmentBaseSnapshots`, `createMappingFromChannel`, `ensureFolder`, `runMigration`, `writeMigrationReport`, and `rescheduleInterval`.
+  - `main.ts` coverage increased from 19.75% to **83.58% statements / 82.97% branches / 60.34% functions / 86.55% lines**.
+  - Overall coverage increased from 60.71% to **72.9% statements / 72.36% branches / 45.65% functions / 74.1% lines**, exceeding the 70% overall target.
+  - Critical modules all exceed their targets:
+    - `api.ts`: 93.75% (> 85%)
+    - `sync-engine.ts`: 82.22% (> 80%)
+    - `utils.ts`: 99.04% (> 90%)
+    - `templateUtils.ts`: 100% (> 95%)
+    - `diff.ts`: 98.03% (> 95%)
+    - `migration.ts`: 94.11% (> 90%)
+    - `main.ts`: 83.58% (> 80%)
+    - `securityUtils.ts`: 90% (> 85%)
+    - `types.ts`: 100% (100%)
+  - Set coverage thresholds in `jest.config.cjs`: global minimums of 70% statements, 65% branches, 40% functions, 70% lines.
+  - Created `docs/testing/untestable-code.md` documenting untestable modules (`settings-tab.ts`, `modals.ts`) and explaining uncovered branches in critical modules.
+  - All **296 tests pass** across 15 suites. Lint passes.
 
 - [ ] Test in isolation, then integration: Create a testing strategy:
   - Unit tests: Each module (API, sync-engine, utils) tested in isolation with mocks

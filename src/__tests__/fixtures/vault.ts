@@ -104,7 +104,7 @@ export class MockVault {
 		}
 	}
 
-	async delete(file: TFile, _force?: boolean): Promise<void> {
+	async delete(file: TFile): Promise<void> {
 		this.files.delete(file.path);
 	}
 

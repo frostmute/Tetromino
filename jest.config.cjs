@@ -16,5 +16,13 @@ module.exports = {
 				useESM: true
 			}
 		]
-	}
+	},
+	coverageThreshold: {
+		global: {
+			statements: 70,
+			branches: 65,
+			functions: 40,
+			lines: 70,
+		},
+	},
 };

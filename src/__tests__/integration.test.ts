@@ -1,22 +1,16 @@
-import { App, Vault, TFile, normalizePath } from "obsidian";
+import {} from "obsidian";
 import { SyncEngine } from "../sync-engine";
 import { ArenaApi } from "../api";
 import { DEFAULT_SETTINGS, ChannelMapping } from "../types";
 import {
 	makeMockApp,
 	MockVault,
-	vaultWithExistingNotes,
 } from "./fixtures/vault";
 import {
 	makeChannel,
 	makeSmallChannelBlocks,
 	makeMixedChannelBlocks,
 	makePaginatedChannelBlocks,
-	makeConflictScenarioBlocks,
-	makeChannelResponse,
-	makePaginatedBlocksResponse,
-	makeEmptyPaginatedResponse,
-	makeErrorResponse,
 	emptyChannel,
 } from "./fixtures/scenarios";
 

@@ -1,4 +1,4 @@
-import { App, Vault, TFile, normalizePath } from "obsidian";
+import {} from "obsidian";
 import { SyncEngine } from "../sync-engine";
 import { ArenaApi } from "../api";
 import { DEFAULT_SETTINGS, ChannelMapping } from "../types";
@@ -9,12 +9,6 @@ import {
 	makeMixedChannelBlocks,
 	makePaginatedChannelBlocks,
 	makeTextBlock,
-	makeImageBlock,
-	makeLinkBlock,
-	makeEmbedBlock,
-	makeMediaBlock,
-	makeAttachmentBlock,
-	makeChannelBlock,
 } from "./fixtures/scenarios";
 
 jest.mock("obsidian", () => ({
