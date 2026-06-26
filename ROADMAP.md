@@ -15,7 +15,7 @@ related:
 
 # Tetromino Roadmap
 
-> **Guiding principle:** We only commit to features we are confident we can deliver. This roadmap is a living document — it is updated after every release to reflect completed work and new priorities.
+> **Guiding principle:** We only commit to features we are confident we can deliver. This roadmap is a living document — it is updated after every release to reflect completed work and new priorities. All proposals are evaluated against the project's core values; see [PHILOSOPHY.md](PHILOSOPHY.md).
 
 ## Current Version: 1.1.0
 

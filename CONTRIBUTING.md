@@ -17,7 +17,7 @@ This plugin is intentionally **one-way import only**:
 - Supported: Are.na -> Obsidian import
 - Out of scope: Obsidian -> Are.na push/sync
 
-Please keep changes aligned with that behavior unless maintainers explicitly decide otherwise.
+Please keep changes aligned with that behavior unless maintainers explicitly decide otherwise. For the full set of values that guide Tetromino, see [PHILOSOPHY.md](PHILOSOPHY.md).
 
 ## Setup
 
