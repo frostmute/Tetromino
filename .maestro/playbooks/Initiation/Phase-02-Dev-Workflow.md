@@ -325,10 +325,35 @@ With the development environment verified, this phase establishes best practices
   - Fixed the code-review checklist item about `console.log` to reference the debug-gated logging pattern.
   - Corrected the project structure diagram to reference `.maestro/playbooks/` instead of the non-existent `docs/plans/` directory.
 
-- [ ] Review security and privacy practices: Examine `src/securityUtils.ts` and check:
+- [x] Review security and privacy practices: Examine `src/securityUtils.ts` and check:
   - Are.na token handling (masking in logs, secure storage)
   - No telemetry or external calls beyond Are.na API
   - Deterministic output (same import = same notes every time)
   - Attachment handling and file path safety
+
+  **Completed:** Added a comprehensive "Security and privacy practices" section to `CONTRIBUTING.md` documenting the security architecture, threat mitigations, and privacy guarantees.
+
+  **Are.na token handling findings:**
+  - **Storage**: Token stored in Obsidian plugin data (`data.json`) — local vault storage only, never sent remotely.
+  - **UI masking**: Settings tab uses `inputEl.type = "password"` to mask the token visually.
+  - **API transmission**: Token sent only as `Authorization: Bearer <token>` to `https://api.are.na`.
+  - **Log safety**: `api.ts` logs request method and URL only (`this.log(`${method} ${params.url}`)`); headers are never logged. No explicit token redaction is implemented for error objects — contributors should avoid logging raw error objects from `requestUrl`.
+  - **Asset download safety**: `downloadBinary` explicitly sends `headers: {}` (line 462 of `api.ts`) to prevent Bearer token leakage to Are.na CDNs.
+
+  **External call boundary findings:**
+  - **Zero telemetry** — no analytics, tracking pixels, error reporting services, or telemetry endpoints.
+  - **Three call types only**: (1) Are.na API (`api.are.na`), (2) Are.na asset CDN for downloads, (3) `window.open` to `www.are.na` on explicit user command.
+
+  **Deterministic output findings:**
+  - `computeHash` (SHA-256, 16-char hex) used for content comparison instead of timestamps.
+  - Stable sorting everywhere: blocks by `position` then `id`; note paths alphabetically in indexes; connected channels by title.
+  - No timestamps in generated note content — only `import-history.md`, `migration-history.md`, and sync records contain dates.
+
+  **Attachment handling and file path safety findings:**
+  - `sanitiseFilename` replaces forbidden chars (`< > : " / \ | ? * \x00-\x1f`) with `_`, collapses whitespace, and neutralizes `.` / `..` / `...` directory traversal.
+  - All paths normalized via Obsidian's `normalizePath`.
+  - Asset filenames prefixed with `block.id-` for uniqueness.
+  - SSRF protection: `buildApiUrl` prefixes all API paths with `BASE_URL` (`https://api.are.na`).
+  - XSS prevention: `sanitizeMarkdownContent` strips `<script>`, `<style>`, `<iframe>`, inline event handlers, and neutralizes `javascript:` / `vbscript:` / `data:` protocols as well as executable plugin blocks (dataview, templater, etc.) via zero-width space insertion.
 
 **By the end of this phase**, you will understand the full development workflow, code review expectations, test coverage, and quality gates that keep Tetromino stable and maintainable. You're ready to work on features, bugs, and maintenance.

@@ -746,6 +746,49 @@ The plugin collects no telemetry and makes no external calls beyond:
 
 Same input always produces same output, ensuring reproducibility and auditability.
 
+## Security and privacy practices
+
+This section documents the security architecture, threat mitigations, and privacy guarantees contributors should preserve.
+
+### Are.na token handling
+
+| Aspect | Implementation | Notes |
+|--------|---------------|-------|
+| **Storage** | Obsidian plugin data (`data.json`) | Local vault storage only; never sent to any remote server |
+| **UI masking** | `inputEl.type = "password"` in settings-tab.ts | Token is visually masked in the settings UI |
+| **API transmission** | `Authorization: Bearer <token>` header | Sent only to `https://api.are.na` via `buildApiUrl` SSRF guard |
+| **Log safety** | URLs logged, headers never logged | `api.ts` logs `GET https://api.are.na/...` but never the Authorization value |
+| **Error safety** | No explicit redaction | Error objects from `requestUrl` could theoretically leak headers; contributors should avoid logging raw error objects |
+| **Asset download** | Empty headers for binary downloads | `downloadBinary` sends `headers: {}` to prevent token leakage to Are.na CDNs |
+
+### External call boundary
+
+The plugin makes **no telemetry, analytics, or tracking calls**. All network traffic:
+
+1. **Are.na API** (`https://api.are.na/v3/...`) — read-only, authenticated
+2. **Are.na asset CDN** — image/attachment downloads, unauthenticated, no token sent
+3. **Browser open** (`window.open`) — opens `https://www.are.na/channel/<slug>` on user command
+
+### Deterministic output guarantee
+
+Reproducibility is enforced through:
+
+- **`computeHash`** (SHA-256 truncated to 16 chars) — content comparison instead of timestamps
+- **Stable sorting** — blocks by `position` then `id`; paths alphabetically; channels by title
+- **No timestamps in note content** — only metadata files (`import-history.md`, `migration-history.md`, sync records) contain dates
+
+### Attachment handling and file path safety
+
+| Concern | Mitigation | Location |
+|---------|-----------|----------|
+| Forbidden filename characters | Replaced with `_` | `sanitiseFilename` in `utils.ts` |
+| Directory traversal (`.`, `..`) | Replaced with `_` | `sanitiseFilename` in `utils.ts` |
+| Path normalization | `normalizePath` from Obsidian API | All path construction sites |
+| Duplicate filenames | Prefixed with `block.id-` | `ensureBlockAsset` in `sync-engine.ts` |
+| SSRF (API calls) | `buildApiUrl` prefixes all paths with `BASE_URL` | `api.ts` |
+| XSS in imported content | `sanitizeMarkdownContent` strips scripts, event handlers, dangerous protocols | `securityUtils.ts` |
+| Executable plugin blocks | Zero-width space insertion breaks trigger syntax for dataview, templater, etc. | `securityUtils.ts` |
+
 ### Code Review Checklist
 
 For code changes:
