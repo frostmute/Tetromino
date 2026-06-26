@@ -41,13 +41,17 @@ This phase guides developers through adding new features to Tetromino while main
     - **No migration needed** — plugin data format (`ArenaSyncSettings`) is unchanged.
     - **Files to touch (in order):** `src/main.ts` (add `restoreChannelMappingsFromFile(filePath: string)` and shared helper), then `src/settings-tab.ts` (add button wired to the new method). The data flow sketch and acceptance criteria are documented in `.maestro/playbooks/Working/feature-choose-backup-file.md`.
 
-- [ ] Write tests for the feature before implementation (TDD approach): Create test cases in `src/__tests__/`:
+- [x] Write tests for the feature before implementation (TDD approach): Create test cases in `src/__tests__/`:
   - Write test mocks for any new Are.na API responses you'll need
   - Write Jest specs for new API methods (test pagination, retries, error cases)
   - Write specs for new sync-engine logic (test filtering, transformation, conflict resolution)
   - Write specs for utility functions
   - Keep existing mocks in `src/__mocks__/` organized; add new mocks for new API structures
   - Run `npm test` to confirm tests fail (since feature not yet implemented)
+  - **Completed:** Created `src/__tests__/main-backup.test.ts` with 10 test cases (7 new, 3 regression) covering `restoreChannelMappingsFromFile` and `restoreLatestChannelMappingsBackup`.
+  - Added missing Obsidian mocks (`Plugin`, `PluginSettingTab`, `Modal`, `Setting`, `Notice`, `addIcon`) to `src/__mocks__/obsidian.ts` to support main.ts testing.
+  - All 7 new tests correctly fail with `TypeError: plugin.restoreChannelMappingsFromFile is not a function` (TDD confirmed).
+  - All 128 existing tests continue to pass (no regressions).
 
 - [ ] Implement the feature incrementally with test-driven development:
   - Implement API methods first (if needed), ensuring pagination and error handling match existing patterns
