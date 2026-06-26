@@ -46,7 +46,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - Future API versions: how to handle breaking changes in Are.na API v4+
   - **Completed 2026-06-26.** Created `docs/API_DESIGN.md` with full base URL and auth details, endpoint-by-endpoint coverage (channel metadata, contents, blocks, user channels, token verification, asset downloads), retry/backoff matrix with exact formulas and timing tables, pagination stop conditions, rate-limit handling with `Retry-After` parsing, response normalisation for v3/v2/array shapes, caching strategy, and a migration guide for hypothetical Are.na API v4+. Cross-references to [[DEVELOPER_GUIDE]] and [[USER_GUIDE]] included in YAML front matter.
 
-- [ ] Create architecture decision records (ADRs) for major choices: Document key decisions:
+- [x] Create architecture decision records (ADRs) for major choices: Document key decisions:
   - Create `docs/ADRs/` folder and document decisions like:
     - ADR-001: One-way import only (why not two-way sync?)
     - ADR-002: Manual import triggered by user (why not background auto-sync?)
@@ -54,6 +54,7 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
     - ADR-004: Markdown-only format (why not rich HTML or other formats?)
     - ADR-005: Dry-run preview (how conflicts are detected, how preview differs from commit)
     - Include problem statement, decision, rationale, and consequences for each
+  - **Completed 2026-06-26.** Created `docs/ADRs/` folder with five ADR documents. Each ADR includes YAML front matter, status, context, decision, detailed rationale, consequences (positive and negative), implementation notes with code references, and cross-references to related ADRs and guides.
 
 - [ ] Document settings and configuration: Create reference docs for plugin settings:
   - Create `docs/SETTINGS_REFERENCE.md` with:
