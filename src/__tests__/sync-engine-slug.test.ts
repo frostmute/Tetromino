@@ -43,7 +43,6 @@ describe("SyncEngine - extractChannelSlugFromBlock", () => {
 	});
 
 	const callExtract = (block: Partial<ArenaBlock>) => {
-		/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 		return (engine as any).extractChannelSlugFromBlock(block as ArenaBlock);
 	};
 

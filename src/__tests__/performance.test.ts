@@ -175,25 +175,15 @@ describe("Performance profiling — large channel import", () => {
 		expect(avgBlockTime).toBeGreaterThanOrEqual(0);
 
 		// Log baseline metrics for documentation
-		// eslint-disable-next-line no-console
 		console.log("\n=== BASELINE PERFORMANCE METRICS (100 blocks) ===");
-		// eslint-disable-next-line no-console
 		console.log(`Total channel sync time: ${result.duration}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Channel metadata fetch: ${channelMetadataTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Block list fetch: ${fetchBlocksTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Total block processing: ${totalBlockTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Average per-block time: ${avgBlockTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Total attachment handling: ${totalAssetTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Index write: ${indexTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Blocks per second: ${(BLOCK_COUNT / (result.duration / 1000)).toFixed(1)}`);
-		// eslint-disable-next-line no-console
 		console.log("===================================================\n");
 	});
 
@@ -214,17 +204,11 @@ describe("Performance profiling — large channel import", () => {
 		const totalBlockTime = timingCapture.getTotal("arena-sync:block:");
 		const avgBlockTime = timingCapture.getAverage("arena-sync:block:");
 
-		// eslint-disable-next-line no-console
 		console.log("\n=== BASELINE PERFORMANCE METRICS (250 blocks) ===");
-		// eslint-disable-next-line no-console
 		console.log(`Total channel sync time: ${result.duration}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Total block processing: ${totalBlockTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Average per-block time: ${avgBlockTime.toFixed(2)}ms`);
-		// eslint-disable-next-line no-console
 		console.log(`Blocks per second: ${(BLOCK_COUNT / (result.duration / 1000)).toFixed(1)}`);
-		// eslint-disable-next-line no-console
 		console.log("===================================================\n");
 	});
 });

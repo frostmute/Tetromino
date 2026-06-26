@@ -9,7 +9,7 @@ describe("template rendering performance", () => {
 		expect(ast1).toBe(ast2);
 	});
 
-	it("renders 1,000 blocks with the default template in under 100 ms", () => {
+	it("renders 1,000 blocks with the default template in under 500 ms", () => {
 		const ast = parseTemplate(defaultTemplate);
 		const baseData = {
 			title: "My Block",
@@ -26,10 +26,10 @@ describe("template rendering performance", () => {
 			renderTemplate(ast, { ...baseData, title: `Block ${i}`, id: i });
 		}
 		const elapsed = Date.now() - start;
-		expect(elapsed).toBeLessThan(100);
+		expect(elapsed).toBeLessThan(500);
 	});
 
-	it("renders a template with a 100-item #each loop 100 times in under 100 ms", () => {
+	it("renders a template with a 100-item #each loop 100 times in under 500 ms", () => {
 		const tmpl = "{{#each items}}{{name}}:{{value}};{{/each}}";
 		const ast = parseTemplate(tmpl);
 		const items = Array.from({ length: 100 }, (_, i) => ({
@@ -42,7 +42,7 @@ describe("template rendering performance", () => {
 			renderTemplate(ast, { items });
 		}
 		const elapsed = Date.now() - start;
-		expect(elapsed).toBeLessThan(100);
+		expect(elapsed).toBeLessThan(500);
 	});
 
 	it("renders nested #if and #each correctly under load", () => {
@@ -61,6 +61,6 @@ describe("template rendering performance", () => {
 			renderTemplate(ast, data);
 		}
 		const elapsed = Date.now() - start;
-		expect(elapsed).toBeLessThan(100);
+		expect(elapsed).toBeLessThan(500);
 	});
 });

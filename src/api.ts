@@ -366,7 +366,6 @@ export class ArenaApi {
 		let consecutiveErrors = 0;
 		const MAX_CONSECUTIVE_ERRORS = 3;
 
-		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			try {
 				if (pageNumber > 1 && consecutiveErrors === 0) {
