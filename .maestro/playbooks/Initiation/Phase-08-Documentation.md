@@ -97,17 +97,27 @@ This phase ensures Tetromino has comprehensive, maintainable documentation that 
   - Referenced the script and automation in `.github/workflows/release.yml` with a full step-by-step breakdown of the automated pipeline, failure modes, and pre-release support.
   - Cross-references to [[DEVELOPER_GUIDE]], [[USER_GUIDE]], [[FAQ]], [[API_DESIGN]], and [[testing-guide]] included in YAML front matter.
 
-- [ ] Create troubleshooting guide and error reference: Help users solve problems:
-  - Create `docs/TROUBLESHOOTING.md` with:
+- [x] Create troubleshooting guide and error reference: Help users solve problems:
+  - Created `docs/TROUBLESHOOTING.md` with:
     - Common errors and their solutions:
       - "401 Unauthorized": invalid Are.na token
       - "404 Not Found": channel doesn't exist or is private
+      - "403 Access Denied": insufficient permissions
+      - "429 Too Many Requests": rate limiting with backoff explanation
+      - "500/502/503/504": Are.na server errors
       - "Import failed": network error, Are.na server down, retry
+      - "No valid channels configured": empty or disabled mappings
       - "Vault permission denied": Obsidian vault path not accessible
-      - "Template render error": invalid template syntax
-    - How to collect logs for bug reports
+      - "Template render error": invalid template syntax with minimal valid example
+      - "Tetromino is already running": stuck sync state
+      - "Attachment migration failed": move conflicts and permissions
+      - Assets not downloading: handling mode and disk space checks
+      - Fewer blocks imported than expected: exclusions and deduplication
+      - Notes not updating after re-import: cache and hash checks
+    - How to collect logs for bug reports (debug logging, DevTools, export, redaction notes)
     - How to check plugin version and Obsidian version
-    - How to test a fresh install if configuration is corrupted
+    - How to test a fresh install if configuration is corrupted (three options: reset plugin data, test vault, restore from backup)
+  - **Completed 2026-06-26.** Structured with YAML front matter, table of contents, quick diagnostic checklist, detailed error sections with symptoms/causes/fixes pattern, and cross-references to [[USER_GUIDE]], [[SETTINGS_REFERENCE]], [[FAQ]], [[DEVELOPER_GUIDE]], and [[API_DESIGN]].
 
 - [ ] Set up a knowledge base wiki or discussion board: Foster community knowledge:
   - Create a GitHub Discussions category for "Questions & Help" where users can ask questions
