@@ -48,13 +48,14 @@ This phase guides developers through profiling Tetromino, optimizing import perf
   - Test the updated plugin in a test Obsidian vault to ensure compatibility
   - **Completed:** Ran `npm outdated` and `npm audit` (0 vulnerabilities). Updated **Jest 29.7.0 → 30.4.2** successfully; adjusted performance test thresholds from 100ms → 500ms for CI stability. Updated **ESLint 8.57.1 → 9.39.4** and **@typescript-eslint 7.18.0 → 8.62.0**, migrating `.eslintrc.cjs` to the new flat config format (`eslint.config.mjs`). Removed obsolete `eslint-disable` directives across test files and `src/api.ts`. **TypeScript 5.9.3 kept** — TS 6.0.3 was attempted but reverted because it deprecates `baseUrl` (breaking `paths` resolution) and enables stricter `strictPropertyInitialization` checks that fail the build; upgrading to TS6 should be deferred until `baseUrl` usage is removed (before TS7). Plugin built and deployed successfully to the test Obsidian vault (`Nexus Vault`). All 309 tests pass, lint is clean, build succeeds.
 
-- [ ] Identify and document technical debt: Review the codebase for areas that could be improved:
+- [x] Identify and document technical debt: Review the codebase for areas that could be improved:
   - Look for duplicated code that could be extracted into utilities
   - Find overly complex functions that could be refactored into smaller, focused functions
   - Check for incomplete error handling or edge cases
   - Note any areas with low test coverage (from Phase 05)
   - Create a GitHub Discussions post or wiki page documenting technical debt items
   - Prioritize items by impact and effort; consider tackling high-impact, low-effort items in future releases
+  - **Completed:** Conducted a full codebase audit of 22 technical-debt items across duplication, complexity, error handling, test coverage, and maintainability. Identified 6 **Quick Win** candidates (high-impact, low-effort). Found three instances of duplicated `ensureFolder`, overlapping `extractConnectedChannels`/`extractChannelAppearsIn` logic, dual-path content rendering in `blockToMarkdown`, and scattered magic concurrency numbers. Mapped exact line ranges and coverage gaps from the latest Jest coverage report (73.55 % statements, 46 % functions). Created comprehensive `docs/technical-debt.md` with a summary table, detailed per-item analysis, risk ratings, recommended fixes, and a sprint-order roadmap. The document is cross-linked to `[[coverage-map]]` and `[[PERFORMANCE]]` for graph exploration.
 
 - [ ] Refactor complex functions for maintainability: If sync-engine.ts or other modules have complex logic:
   - Break large functions into smaller, well-named helper functions
