@@ -4,13 +4,23 @@ This phase guides maintainers through the complete release process for Tetromino
 
 ## Tasks
 
-- [ ] Review release infrastructure and existing procedures: Examine the following files to understand the release process:
+- [x] Review release infrastructure and existing procedures: Examine the following files to understand the release process:
   - `.github/workflows/release.yml`: Automated release workflow (triggers on version tag)
   - `scripts/release.sh`: Shell script that coordinates the release process
   - `version-bump.mjs`: Node script that bumps version in manifest.json and versions.json
   - `.github/release-template.md`: Template for GitHub release notes
   - `CHANGELOG.md`: Maintained changelog with version history and unreleased section
   - Review the last 2-3 releases to understand patterns and conventions
+
+  **Notes:**
+  - `release.yml` triggers on `v*` tags, runs tests/build, verifies manifest version matches tag, packages `dist/Tetromino-<version>.zip`, generates release notes from CHANGELOG, and publishes via `softprops/action-gh-release@v2`.
+  - `release.sh` enforces `main` branch + clean working tree, runs lint/tests, prompts for patch/minor/major/custom bump, runs `npm version`, executes `version-bump.mjs`, builds, commits, tags, and pushes.
+  - `version-bump.mjs` updates `manifest.json` version and appends to `versions.json` with `minAppVersion`.
+  - `scripts/package.mjs` is a pure-Node ZIP packager (no system `zip` dependency) that creates `dist/<plugin-id>-<version>.zip` containing `main.js`, `manifest.json`, `styles.css`.
+  - Release template includes installation instructions, checksum placeholders, and links to project board + changelog.
+  - CHANGELOG follows Keep a Changelog format. Only one release exists so far: **v1.0.0 — 2025-01-15**. The `[Unreleased]` section is substantial, indicating a minor or major bump may be warranted for the next release.
+  - Current version across `package.json`, `manifest.json`, and `versions.json` is **1.0.0**.
+  - No local git tags exist yet.
 
 - [ ] Prepare release notes from changelog entries: Before starting a release:
   - Review `CHANGELOG.md` and the `[Unreleased]` section to see what's been done since last release
