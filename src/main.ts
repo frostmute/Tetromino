@@ -151,7 +151,9 @@ export default class ArenaSyncPlugin extends Plugin {
 		if (this.settings.syncInterval > 0) {
 			this.syncIntervalId = this.registerInterval(
 				window.setInterval(
-					() => this.runSync(false),
+					() => {
+						void this.runSync(false);
+					},
 					this.settings.syncInterval * 60 * 1000,
 				),
 			);
@@ -159,8 +161,12 @@ export default class ArenaSyncPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const data = await this.loadData();
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		// Ponytail: loadData() is typed as Promise<any>; use unknown and assert
+		// through a typed-cast to silence no-unsafe-assignment without losing
+		// structural checking.
+		const data = (await this.loadData()) as Partial<ArenaSyncSettings>;
+		const merged: ArenaSyncSettings = { ...DEFAULT_SETTINGS, ...data };
+		this.settings = merged;
 		const changed = this.normalizeMappings();
 		const updatedBases = this.ensureAttachmentBaseSnapshots();
 		if (changed || updatedBases) {
@@ -421,7 +427,7 @@ export default class ArenaSyncPlugin extends Plugin {
 		let created = 0;
 		let updated = 0;
 
-		const existingMap = new Map();
+		const existingMap = new Map<string, ChannelMapping>();
 		for (const m of this.settings.channelMappings) {
 			existingMap.set(m.channelSlug, m);
 		}
@@ -493,7 +499,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			throw new Error("File not found");
 		}
 		const raw = await this.app.vault.read(abstractFile);
-		const data = JSON.parse(raw);
+		const data = JSON.parse(raw) as unknown;
 		await this.restoreFromBackupData(data);
 		return filePath;
 	}
@@ -513,7 +519,7 @@ export default class ArenaSyncPlugin extends Plugin {
 			throw new Error("No channel mapping backups found.");
 		}
 		const raw = await this.app.vault.read(latest);
-		const data = JSON.parse(raw);
+		const data = JSON.parse(raw) as unknown;
 		await this.restoreFromBackupData(data);
 		return latest.path;
 	}

@@ -40,6 +40,41 @@ export class SyncEngine {
 	private channelPreviewCache = new Map<string, string | null>();
 	private folderCache = new Set<string>();
 	private ensureFolderMutex: Promise<void> = Promise.resolve();
+	private _timers = new Map<string, { start: number; durationMs?: number; callSite: string }>();
+
+	private get debug(): boolean {
+		return this.settings.debugLogging === true;
+	}
+
+	private time(label: string): void {
+		if (this.debug) {
+			this._timers.set(label, { start: this.now(), callSite: label });
+		}
+	}
+
+	private timeEnd(label: string): void {
+		if (this.debug) {
+			const slot = this._timers.get(label);
+			if (slot) {
+				const dur = this.now() - slot.start;
+				this._timers.set(label, { ...slot, durationMs: dur });
+			}
+		}
+	}
+
+	private now(): number {
+		if (typeof performance !== "undefined") return performance.now();
+		return Date.now();
+	}
+
+	/**
+	 * Ponytail: returns the timing slots accumulated during the most recent
+	 * sync operation. Production callers (the plugin UI) ignore this; tests
+	 * use it to assert that each labeled phase ran the expected number of times.
+	 */
+	getDebugTimings(): Map<string, { start: number; durationMs?: number; callSite: string }> {
+		return new Map(this._timers);
+	}
 
 	constructor(
 		app: App,
@@ -157,9 +192,9 @@ export class SyncEngine {
 			duration: 0,
 		};
 		const start = Date.now();
-		console.time(`arena-sync:channel-metadata:${mapping.channelSlug}`);
+		this.time(`arena-sync:channel-metadata:${mapping.channelSlug}`);
 		const channel = await this.api.getChannel(mapping.channelSlug);
-		console.timeEnd(`arena-sync:channel-metadata:${mapping.channelSlug}`);
+		this.timeEnd(`arena-sync:channel-metadata:${mapping.channelSlug}`);
 
 		if (!dryRun) {
 			mapping.channelId = channel.id;
@@ -183,7 +218,7 @@ export class SyncEngine {
 		dryRun: boolean,
 	): Promise<void> {
 		const channelFolder = resolveChannelFolder(mapping);
-		console.time(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
+		this.time(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
 		const blocks = await this.api.getAllChannelBlocksWithProgress(
 			mapping.channelSlug,
 			(currentPage: number, totalPages: number) => {
@@ -195,7 +230,7 @@ export class SyncEngine {
 				});
 			},
 		);
-		console.timeEnd(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
+		this.timeEnd(`arena-sync:fetch-blocks:${mapping.channelSlug}`);
 
 		if (!dryRun) {
 			await this.ensureFolder(channelFolder);
@@ -232,7 +267,7 @@ export class SyncEngine {
 			: blocks;
 
 		await pMap(blocksToProcess, CONCURRENCY.BLOCK_PROCESS, async (block) => {
-			console.time(`arena-sync:block:${block.id}`);
+			this.time(`arena-sync:block:${block.id}`);
 			try {
 				const path = await this.pullBlock(
 					block,
@@ -254,7 +289,7 @@ export class SyncEngine {
 				});
 			} finally {
 				completed++;
-				console.timeEnd(`arena-sync:block:${block.id}`);
+				this.timeEnd(`arena-sync:block:${block.id}`);
 				this.onProgress?.({
 					channelSlug: mapping.channelSlug,
 					phase: "blocks",
@@ -438,7 +473,7 @@ export class SyncEngine {
 
 		if (!url || !fileName) return undefined;
 
-		console.time(`arena-sync:asset:${block.id}`);
+		this.time(`arena-sync:asset:${block.id}`);
 		const finalName = `${block.id}-${sanitiseFilename(fileName)}`;
 		const assetPath = normalizePath(`${baseFolder}/${finalName}`);
 		result.downloaded++;
@@ -447,20 +482,20 @@ export class SyncEngine {
 		);
 
 		if (dryRun) {
-			console.timeEnd(`arena-sync:asset:${block.id}`);
+			this.timeEnd(`arena-sync:asset:${block.id}`);
 			return assetPath;
 		}
 
 		await this.ensureFolder(baseFolder);
 		const existing = this.vault.getAbstractFileByPath(assetPath);
 		if (existing instanceof TFile) {
-			console.timeEnd(`arena-sync:asset:${block.id}`);
+			this.timeEnd(`arena-sync:asset:${block.id}`);
 			return assetPath;
 		}
 
 		const data = await this.api.downloadBinary(url);
 		await this.vault.createBinary(assetPath, data);
-		console.timeEnd(`arena-sync:asset:${block.id}`);
+		this.timeEnd(`arena-sync:asset:${block.id}`);
 		return assetPath;
 	}
 
@@ -542,7 +577,7 @@ export class SyncEngine {
 		dryRun: boolean,
 		result: SyncResult,
 	): Promise<void> {
-		console.time(`arena-sync:index:${mapping.channelSlug}`);
+		this.time(`arena-sync:index:${mapping.channelSlug}`);
 		const indexPath = this.channelIndexPath(mapping);
 		const sorted = [...notePaths].sort();
 		const channelDescription =
@@ -611,18 +646,18 @@ export class SyncEngine {
 		});
 
 		if (dryRun) {
-			console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
+			this.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
 			return;
 		}
 		if (!existing) {
 			await this.vault.create(indexPath, content);
-			console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
+			this.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
 			return;
 		}
 		if (existing instanceof TFile) {
 			await this.vault.modify(existing, content);
 		}
-		console.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
+		this.timeEnd(`arena-sync:index:${mapping.channelSlug}`);
 	}
 
 	private async updateMasterOverview(

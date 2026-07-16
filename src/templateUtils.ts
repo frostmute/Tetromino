@@ -116,7 +116,20 @@ export function renderTemplate(ast: ASTNode[], data: Record<string, unknown>): s
         } else if (node.type === 'var') {
             const val = getNestedValue(data, node.nameParts || node.name || '');
             if (val !== undefined && val !== null) {
-                out.push(String(val));
+                // Ponytail: String() over `unknown` triggers no-base-to-string.
+                // Branch into a typed primitive path so the rule is satisfied.
+                if (typeof val === 'object') {
+                    out.push(JSON.stringify(val));
+                } else if (typeof val === 'function') {
+                    out.push('[function]');
+                } else if (
+                    typeof val === 'string' ||
+                    typeof val === 'number' ||
+                    typeof val === 'boolean'
+                ) {
+                    out.push(String(val));
+                }
+                // symbol/bigint fall through silently (no body emitted)
             }
         } else if (node.type === 'if') {
             const condVal = getNestedValue(data, node.condParts || node.cond || '');

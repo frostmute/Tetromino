@@ -35,7 +35,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 		containerEl.createEl("p", {
-			text: "Quick start: set API token -> import your channels -> run Import all channels now.",
+			text: "Quick start: set API token -> import your channels -> run import all channels now.",
 			cls: "setting-item-description",
 		});
 
@@ -47,7 +47,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("API token")
 			.setDesc(
-				"Use a personal token from https://www.are.na/developers/personal-access-tokens.",
+				"Use a personal token from HTTPS://www.are.na/developers/personal-access-tokens.",
 			)
 			.addText((text) => {
 				text.setPlaceholder("Enter your Are.na token")
@@ -95,7 +95,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Banner frontmatter field")
-			.setDesc("Add an optional banner URL frontmatter field for the Banners plugin.")
+			.setDesc("Add an optional banner URL frontmatter field for the banners plugin.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.bannerFieldEnabled)
@@ -112,7 +112,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 				.setDesc("Set the frontmatter key that stores the banner URL.")
 				.addText((text) =>
 					text
-						.setPlaceholder("banner")
+						.setPlaceholder("Banner")
 						.setValue(this.plugin.settings.bannerFieldName)
 						.onChange(async (value) => {
 							this.plugin.settings.bannerFieldName =
@@ -180,7 +180,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Channel block preview image")
 			.setDesc(
-				"For Channel blocks, use a best-effort linked channel preview image.",
+				"For channel blocks, use a best-effort linked channel preview image.",
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -193,7 +193,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Channel index note naming")
-			.setDesc("Choose the channel index filename style for Folder Note compatibility.")
+			.setDesc("Choose the channel index filename style for folder note compatibility.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -230,7 +230,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Attachment handling")
-			.setDesc("Choose how PDFs and other non-image files are rendered.")
+			.setDesc("Choose how pdfs and other non-image files are rendered.")
 			.addDropdown((dd) =>
 				dd
 					.addOptions({
@@ -288,7 +288,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.setDesc("Use this path when attachment storage location is set to `Global folder`.")
 			.addText((text) =>
 				text
-					.setPlaceholder("Are.na/Attachments")
+					.setPlaceholder("Are.na/attachments")
 					.setValue(this.plugin.settings.globalAttachmentFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.globalAttachmentFolder =
@@ -302,7 +302,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.setDesc("Use this path when attachment storage location is set to `Custom folder`.")
 			.addText((text) =>
 				text
-					.setPlaceholder("Path/In/Vault")
+					.setPlaceholder("Path/in/vault")
 					.setValue(this.plugin.settings.customAttachmentFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.customAttachmentFolder =
@@ -330,7 +330,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			)
 			.addText((text) =>
 				text
-					.setPlaceholder("Image, Media")
+					.setPlaceholder("Image, media")
 					.setValue(this.plugin.settings.excludeClasses.join(", "))
 					.onChange(async (value) => {
 						this.plugin.settings.excludeClasses = value
@@ -515,7 +515,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 				"Map an Are.na channel slug to a local folder. Default: `Are.na/<channel-slug>`.",
 			)
 			.addButton((btn) =>
-				btn.setButtonText("+ Add mapping").onClick(async () => {
+				btn.setButtonText("+ add mapping").onClick(async () => {
 					this.plugin.settings.channelMappings.push({
 						channelSlug: "",
 						channelId: 0,
@@ -637,7 +637,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 				.setDesc("Override the global custom folder path for this channel.")
 				.addText((text) =>
 					text
-						.setPlaceholder("Path/In/Vault")
+						.setPlaceholder("Path/in/vault")
 						.setValue(mapping.customAttachmentFolderOverride || "")
 						.onChange(async (v) => {
 							mapping.customAttachmentFolderOverride = v.trim();

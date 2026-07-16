@@ -15,7 +15,7 @@ function buildDiffLines(before: string[], after: string[]): DiffLine[] {
 	}
 
 	const dp: number[][] = Array.from({ length: m + 1 }, () =>
-		Array(n + 1).fill(0),
+		new Array<number>(n + 1).fill(0),
 	);
 
 	for (let i = m - 1; i >= 0; i--) {

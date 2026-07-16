@@ -38,7 +38,7 @@ function renderStats(container: HTMLElement, result: SyncResult): void {
 		li.setText(`${label}: ${value}`);
 	}
 	const seconds = (result.duration / 1000).toFixed(1);
-	stats.createEl("div", {
+	stats.createDiv({
 		text: `Duration: ${seconds}s`,
 		cls: "arena-sync-summary-duration",
 	});
@@ -57,7 +57,7 @@ function renderDiffList(
 	const list = container.createDiv({ cls: "arena-sync-diff-list" });
 	for (const diff of diffs) {
 		const row = list.createDiv({ cls: "arena-sync-diff-row" });
-		row.createEl("div", {
+		row.createDiv({
 			text: `${diff.kind.toUpperCase()} ${diff.path}`,
 			cls: "arena-sync-diff-path",
 		});
@@ -99,14 +99,14 @@ export class SyncSummaryModal extends Modal {
 		}
 
 		if (this.result.missingPaths.length > 0) {
-			contentEl.createEl("h3", { text: "Missing (Deleted Upstream)" });
+			contentEl.createEl("h3", { text: "Missing (deleted upstream)" });
 			const list = contentEl.createEl("ul");
 			for (const path of this.result.missingPaths) {
 				list.createEl("li", { text: path });
 			}
 		}
 
-		contentEl.createEl("h3", { text: "File Diffs" });
+		contentEl.createEl("h3", { text: "File diffs" });
 		renderDiffList(contentEl, this.app, this.result.fileDiffs);
 	}
 }
@@ -125,7 +125,7 @@ export class MigrationPreviewModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("arena-sync-migration-modal");
-		contentEl.createEl("h2", { text: "Attachment Migration Preview" });
+		contentEl.createEl("h2", { text: "Attachment migration preview" });
 
 		contentEl.createEl("p", {
 			text: `Moves: ${this.plan.totalMoves} · Note updates: ${this.plan.totalUpdates}`,
@@ -141,15 +141,15 @@ export class MigrationPreviewModal extends Modal {
 			section.createEl("h3", {
 				text: `Channel: ${channel.channelSlug}`,
 			});
-			section.createEl("div", {
+			section.createDiv({
 				text: `From: ${channel.fromBase}`,
 				cls: "arena-sync-migration-path",
 			});
-			section.createEl("div", {
+			section.createDiv({
 				text: `To: ${channel.toBase}`,
 				cls: "arena-sync-migration-path",
 			});
-			section.createEl("div", {
+			section.createDiv({
 				text: `Moves: ${channel.moves.length} · Notes: ${channel.updates.length}`,
 				cls: "arena-sync-migration-counts",
 			});
@@ -158,7 +158,7 @@ export class MigrationPreviewModal extends Modal {
 				const list = section.createDiv({ cls: "arena-sync-diff-list" });
 				for (const update of channel.updates) {
 					const row = list.createDiv({ cls: "arena-sync-diff-row" });
-					row.createEl("div", {
+					row.createDiv({
 						text: update.path,
 						cls: "arena-sync-diff-path",
 					});

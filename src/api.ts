@@ -70,7 +70,7 @@ export class ArenaApi {
 
 	private log(message: string, ...args: unknown[]): void {
 		if (this.debug) {
-			console.log(`[arena-sync] ${message}`, ...args);
+			console.debug(`[arena-sync] ${message}`, ...args);
 		}
 	}
 

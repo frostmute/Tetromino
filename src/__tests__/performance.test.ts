@@ -120,6 +120,9 @@ describe("Performance profiling — large channel import", () => {
 		defaultSettings.syncRecords = [];
 		defaultSettings.imageHandling = "download";
 		defaultSettings.attachmentHandling = "download";
+		// Enable internal performance timers so SyncEngine populates
+		// the timing map that this test asserts against.
+		defaultSettings.debugLogging = true;
 
 		timingCapture = captureConsoleTimings();
 		timingCapture.install();
@@ -131,7 +134,38 @@ describe("Performance profiling — large channel import", () => {
 
 	async function runSync(mapping: ChannelMapping, options?: { dryRun?: boolean }) {
 		const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
-		return engine.syncChannel(mapping, options);
+		const result = await engine.syncChannel(mapping, options);
+		// Return engine reference so tests can assert against debug timings,
+		// which the production code accumulates internally instead of via
+		// console.time (the Obsidian community plugin rule forbids console.*).
+		return { result, engine };
+	}
+
+	function timingsFor(engine: SyncEngine, prefix: string) {
+		const all = Array.from(engine.getDebugTimings().entries());
+		return all
+			.filter(([, slot]) => slot.callSite.startsWith(prefix))
+			.map(([, slot]) => ({
+				label: slot.callSite,
+				durationMs: slot.durationMs ?? 0,
+			}));
+	}
+
+	function countTimings(engine: SyncEngine, prefix: string) {
+		return timingsFor(engine, prefix).length;
+	}
+
+	function totalDuration(engine: SyncEngine, prefix: string) {
+		return timingsFor(engine, prefix).reduce(
+			(sum, t) => sum + t.durationMs,
+			0,
+		);
+	}
+
+	function averageDuration(engine: SyncEngine, prefix: string) {
+		const matches = timingsFor(engine, prefix);
+		if (matches.length === 0) return 0;
+		return matches.reduce((sum, t) => sum + t.durationMs, 0) / matches.length;
 	}
 
 	it("profiles a 100-block channel import and reports baseline metrics", async () => {
@@ -143,30 +177,30 @@ describe("Performance profiling — large channel import", () => {
 		mockApi.downloadBinary.mockResolvedValue(new ArrayBuffer(8));
 
 		const mapping = makeMapping("perf-100");
-		const result = await runSync(mapping);
+		const { result, engine } = await runSync(mapping);
 
 		expect(result.created).toBe(BLOCK_COUNT);
 
 		// Verify timing data was captured
-		const timings = timingCapture.getTimings();
-		expect(timings.length).toBeGreaterThan(0);
+		const timings = engine.getDebugTimings();
+		expect(timings.size).toBeGreaterThan(0);
 
 		// Extract key metrics
-		const channelMetadataTime = timingCapture.getTotal("arena-sync:channel-metadata:");
-		const fetchBlocksTime = timingCapture.getTotal("arena-sync:fetch-blocks:");
-		const totalBlockTime = timingCapture.getTotal("arena-sync:block:");
-		const avgBlockTime = timingCapture.getAverage("arena-sync:block:");
-		const totalAssetTime = timingCapture.getTotal("arena-sync:asset:");
-		const indexTime = timingCapture.getTotal("arena-sync:index:");
+		const channelMetadataTime = totalDuration(engine, "arena-sync:channel-metadata:");
+		const fetchBlocksTime = totalDuration(engine, "arena-sync:fetch-blocks:");
+		const totalBlockTime = totalDuration(engine, "arena-sync:block:");
+		const avgBlockTime = averageDuration(engine, "arena-sync:block:");
+		const totalAssetTime = totalDuration(engine, "arena-sync:asset:");
+		const indexTime = totalDuration(engine, "arena-sync:index:");
 
 		// All these phases should have been timed
-		expect(timingCapture.getCount("arena-sync:channel-metadata:")).toBe(1);
-		expect(timingCapture.getCount("arena-sync:fetch-blocks:")).toBe(1);
-		expect(timingCapture.getCount("arena-sync:block:")).toBe(BLOCK_COUNT);
-		expect(timingCapture.getCount("arena-sync:index:")).toBe(1);
+		expect(countTimings(engine, "arena-sync:channel-metadata:")).toBe(1);
+		expect(countTimings(engine, "arena-sync:fetch-blocks:")).toBe(1);
+		expect(countTimings(engine, "arena-sync:block:")).toBe(BLOCK_COUNT);
+		expect(countTimings(engine, "arena-sync:index:")).toBe(1);
 
 		// Attachments: 20% of blocks are images + 20% are attachments = ~40 assets
-		expect(timingCapture.getCount("arena-sync:asset:")).toBeGreaterThan(0);
+		expect(countTimings(engine, "arena-sync:asset:")).toBeGreaterThan(0);
 
 		// Baseline assertions (these are loose because mock performance varies by machine)
 		expect(channelMetadataTime).toBeGreaterThanOrEqual(0);
@@ -196,19 +230,19 @@ describe("Performance profiling — large channel import", () => {
 		mockApi.downloadBinary.mockResolvedValue(new ArrayBuffer(8));
 
 		const mapping = makeMapping("perf-250");
-		const result = await runSync(mapping);
+		const { result: result250, engine: engine250 } = await runSync(mapping);
 
-		expect(result.created).toBe(BLOCK_COUNT);
-		expect(timingCapture.getCount("arena-sync:block:")).toBe(BLOCK_COUNT);
+		expect(result250.created).toBe(BLOCK_COUNT);
+		expect(countTimings(engine250, "arena-sync:block:")).toBe(BLOCK_COUNT);
 
-		const totalBlockTime = timingCapture.getTotal("arena-sync:block:");
-		const avgBlockTime = timingCapture.getAverage("arena-sync:block:");
+		const totalBlockTime = totalDuration(engine250, "arena-sync:block:");
+		const avgBlockTime = averageDuration(engine250, "arena-sync:block:");
 
 		console.log("\n=== BASELINE PERFORMANCE METRICS (250 blocks) ===");
-		console.log(`Total channel sync time: ${result.duration}ms`);
+		console.log(`Total channel sync time: ${result250.duration}ms`);
 		console.log(`Total block processing: ${totalBlockTime.toFixed(2)}ms`);
 		console.log(`Average per-block time: ${avgBlockTime.toFixed(2)}ms`);
-		console.log(`Blocks per second: ${(BLOCK_COUNT / (result.duration / 1000)).toFixed(1)}`);
+		console.log(`Blocks per second: ${(BLOCK_COUNT / (result250.duration / 1000)).toFixed(1)}`);
 		console.log("===================================================\n");
 	});
 });

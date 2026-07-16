@@ -25,11 +25,23 @@ const DANGEROUS_TAGS_PATTERN = DANGEROUS_TAGS.join('|');
 const DANGEROUS_TAGS_REGEX = new RegExp(`<(?:\\/\\s*)?(?:${DANGEROUS_TAGS_PATTERN})(?:\\s+[^>]*)?>`, 'gi');
 
 export function sanitizeMarkdownContent(content: unknown): string {
-    if (typeof content !== 'string') {
-        if (content === null || content === undefined) return '';
-        return typeof content === 'object' ? JSON.stringify(content) : String(content);
+    if (typeof content === 'string') {
+        return scrubMarkdown(content);
     }
+    if (content === null || content === undefined) {
+        return '';
+    }
+    if (typeof content === 'object') {
+        return JSON.stringify(content);
+    }
+    if (typeof content === 'number' || typeof content === 'boolean') {
+        return String(content);
+    }
+    // Ponytail: unknown primitive types => render empty rather than [object Object].
+    return '';
+}
 
+function scrubMarkdown(content: string): string {
     let sanitized = content;
 
     // 1. Prevent execution of active code blocks (e.g. dataview, templater, inline scripts)
@@ -86,13 +98,14 @@ const NAMED_ENTITIES: Record<string, string> = {
  * This handles numeric (&#58;), hex (&#x3a;), and named (&colon;) entities.
  */
 function decodeAllHTMLEntities(str: string): string {
-    return str.replace(/&#x([0-9a-fA-F]+);|&#([0-9]+);|&([a-zA-Z]+);/gi, (match, hex, dec, named) => {
+    const callback = (_match: string, hex: string, dec: string, named: string): string => {
         if (hex) return String.fromCharCode(parseInt(hex, 16));
         if (dec) return String.fromCharCode(parseInt(dec, 10));
         if (named) {
             const key = `&${named.toLowerCase()};`;
-            return NAMED_ENTITIES[key] ?? match;
+            return NAMED_ENTITIES[key] ?? _match;
         }
-        return match;
-    });
+        return _match;
+    };
+    return str.replace(/&#x([0-9a-fA-F]+);|&#([0-9]+);|&([a-zA-Z]+);/gi, callback);
 }

@@ -28,12 +28,12 @@ export class TFile {
 }
 
 export class App {
-    vault: Vault;
-    constructor() {}
+	vault: Vault;
+	constructor() {}
 }
 
 export class Vault {
-    constructor() {}
+	constructor() {}
 }
 
 export class Notice {
@@ -45,18 +45,15 @@ export class Notice {
 
 export class Plugin {
 	app: App;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	manifest: any;
-	constructor(app: App, manifest: unknown) {
+	manifest: PluginManifest;
+	constructor(app: App, manifest: PluginManifest) {
 		this.app = app;
 		this.manifest = manifest;
 	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async loadData(): Promise<any> {
+	async loadData(): Promise<unknown> {
 		return {};
 	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	async saveData(_data: any): Promise<void> {
+	async saveData(_data: unknown): Promise<void> {
 		void _data;
 	}
 	addSettingTab(): void {}
@@ -72,17 +69,82 @@ export class Plugin {
 	}
 }
 
-export class PluginSettingTab {
+export type PluginManifest = {
+	id: string;
+	name: string;
+	version: string;
+	minAppVersion: string;
+	description?: string;
+	author?: string;
+	authorUrl?: string;
+	isDesktopOnly?: boolean;
+};
+
+export class PluginSettingTab<P extends Plugin = Plugin> {
 	app: App;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	plugin: any;
+	plugin: P;
 	containerEl: HTMLElement;
-	constructor(app: App, plugin: unknown) {
+	constructor(app: App, plugin: P) {
 		this.app = app;
 		this.plugin = plugin;
 		this.containerEl = document.createElement("div");
 	}
 	display(): void {}
+}
+
+type SettingCtor<T> = (component: T) => void;
+
+export class Setting {
+	constructor(_containerEl: HTMLElement) {
+		void _containerEl;
+	}
+	setName<T extends string>(_name: T): this {
+		void _name;
+		return this;
+	}
+	setDesc(_desc: string): this {
+		void _desc;
+		return this;
+	}
+	addText<T = unknown>(cb: SettingCtor<{ setValue(v: string): unknown; setPlaceholder(p: string): unknown; onChange(fn: (v: string) => unknown): unknown; inputEl: { type: string } }>): this {
+		void cb;
+		return this;
+	}
+	addToggle(cb: SettingCtor<{ setValue(v: boolean): unknown; onChange(fn: (v: boolean) => unknown): unknown }>): this {
+		void cb;
+		return this;
+	}
+	addDropdown<T extends string>(cb: SettingCtor<{ addOptions(opts: Record<string, string>): unknown; setValue(v: T): unknown; onChange(fn: (v: T) => unknown): unknown }>): this {
+		void cb;
+		return this;
+	}
+	addButton(cb: SettingCtor<{ setButtonText(t: string): unknown; setWarning(): unknown; setDestructive(): unknown; setCta(): unknown; setDisabled(d: boolean): unknown; onClick(fn: () => unknown): unknown }>): this {
+		void cb;
+		return this;
+	}
+}
+
+export class FuzzySuggestModal<T> {
+	app: App;
+	constructor(app: App) {
+		this.app = app;
+	}
+	setPlaceholder(_placeholder: string): this {
+		void _placeholder;
+		return this;
+	}
+	getItems(): T[] {
+		return [];
+	}
+	getItemText(_item: T): string {
+		void _item;
+		return "";
+	}
+	onChooseItem(_item: T, _evt: MouseEvent | KeyboardEvent): void {
+		void _item;
+		void _evt;
+	}
+	open(): void {}
 }
 
 export class Modal {
@@ -96,71 +158,6 @@ export class Modal {
 	close(): void {}
 	onOpen(): void {}
 	onClose(): void {}
-}
-
-export class Setting {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	constructor(_containerEl: any) {
-		void _containerEl;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	setName(_name: any): this {
-		void _name;
-		return this;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	setDesc(_desc: any): this {
-		void _desc;
-		return this;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	addText(_cb: any): this {
-		void _cb;
-		return this;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	addToggle(_cb: any): this {
-		void _cb;
-		return this;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	addDropdown(_cb: any): this {
-		void _cb;
-		return this;
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	addButton(_cb: any): this {
-		void _cb;
-		return this;
-	}
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class FuzzySuggestModal<T = any> {
-	app: App;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	constructor(app: App, _onSelect?: any) {
-		this.app = app;
-		void _onSelect;
-	}
-	setPlaceholder(_placeholder: string): this {
-		void _placeholder;
-		return this;
-	}
-	getItems(): T[] {
-		return [];
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	getItemText(_item: any): string {
-		void _item;
-		return "";
-	}
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	onChooseItem(_item: any, _evt: unknown): void {
-		void _item;
-		void _evt;
-	}
-	open(): void {}
 }
 
 export function addIcon(): void {}
