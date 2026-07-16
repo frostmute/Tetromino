@@ -4,9 +4,9 @@
 
 - **Playbook**: Superpowers Setup
 - **Agent**: OpenCODECODER
-- **Project**: /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Project**: /Users/thewytchhaus/workspace/Tetromino
 - **Date**: 2026-06-26
-- **Working Folder**: /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Working Folder**: /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 
 ## Purpose
 
@@ -14,8 +14,8 @@ Turn the detected provider into a concrete, ordered list of install actions. Dis
 
 ## Inputs
 
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/PROVIDER.md` — produced by document 1
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/assets/INSTALL_RECIPES.md` — per-provider recipe lookup
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/PROVIDER.md` — produced by document 1
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/assets/INSTALL_RECIPES.md` — per-provider recipe lookup
 
 ## Tasks
 
@@ -25,7 +25,7 @@ Turn the detected provider into a concrete, ordered list of install actions. Dis
   - Provider: copilot-cli
   - Supported: yes
 
-- [x] **Read the recipe section for the detected provider** in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/assets/INSTALL_RECIPES.md`. If the provider is `unknown` or `qwen3-coder`, there is no recipe to load — skip to Task 4 and write a short plan that records "no automated install path" and instructs document 3 to exit cleanly.
+- [x] **Read the recipe section for the detected provider** in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/assets/INSTALL_RECIPES.md`. If the provider is `unknown` or `qwen3-coder`, there is no recipe to load — skip to Task 4 and write a short plan that records "no automated install path" and instructs document 3 to exit cleanly.
   - Note: INSTALL_RECIPES.md does not exist. Provider is copilot-cli (supported), so proceeding with plan based on provider-specific guidance. Copilot-cli likely has only user-required steps.
 
 ### Task 2: Check prerequisites
@@ -55,7 +55,7 @@ Turn the detected provider into a concrete, ordered list of install actions. Dis
 
 - [x] **Provider-specific prerequisite check**:
 
-  - `opencode`: locate the active config file. Check in this order: `</Users/thewytchhaus/Documents/GitHub/Tetromino>/opencode.json`, then `~/.config/opencode/opencode.json`. Record which one (if any) exists. If neither, document 3 will create `~/.config/opencode/opencode.json`.
+  - `opencode`: locate the active config file. Check in this order: `</Users/thewytchhaus/workspace/Tetromino>/opencode.json`, then `~/.config/opencode/opencode.json`. Record which one (if any) exists. If neither, document 3 will create `~/.config/opencode/opencode.json`.
   - All other providers: no extra prerequisite check.
   - Result: copilot-cli → no extra check needed
 
@@ -73,7 +73,7 @@ Turn the detected provider into a concrete, ordered list of install actions. Dis
 
 ### Task 4: Write `INSTALL_PLAN.md`
 
-- [x] **Write `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_PLAN.md`** using this structure:
+- [x] **Write `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_PLAN.md`** using this structure:
   - ✓ Created with all required sections: Provider metadata, Prerequisites, Strategy, Automatable Steps, User-Required Steps, Skip/Block
 
 ### Task 5: Sanity-check the plan

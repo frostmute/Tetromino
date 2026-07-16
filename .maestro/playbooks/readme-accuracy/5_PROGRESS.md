@@ -3,8 +3,8 @@
 ## Context
 - **Playbook:** Usage
 - **Agent:** OpenCODECODER
-- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
-- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Project:** /Users/thewytchhaus/workspace/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 - **Loop:** 00001
 
 ## Purpose
@@ -13,7 +13,7 @@ This document is the **accuracy gate** for the usage documentation pipeline. It 
 
 ## Instructions
 
-1. **Read the plan** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
+1. **Read the plan** from `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 2. **Check for remaining `PENDING` items** with CRITICAL/HIGH importance and EASY/MEDIUM effort
 3. **If such PENDING items exist**: Reset all tasks in documents 1-4 to continue the loop
 4. **If NO such items exist**: Do NOT reset - pipeline exits (README is accurate)
@@ -26,10 +26,10 @@ This document is the **accuracy gate** for the usage documentation pipeline. It 
 
 If the accuracy gate check above determines we need to continue, reset all tasks in the following documents:
 
-- [x] **Reset 1_ANALYZE.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/1_ANALYZE.md` (reset performed).
-- [x] **Reset 2_FIND_GAPS.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/2_FIND_GAPS.md` (reset performed).
-- [x] **Reset 3_EVALUATE.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/3_EVALUATE.md` (reset performed).
-- [x] **Reset 4_IMPLEMENT.md**: Unchecked all tasks in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/4_IMPLEMENT.md` (reset performed).
+- [x] **Reset 1_ANALYZE.md**: Unchecked all tasks in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/1_ANALYZE.md` (reset performed).
+- [x] **Reset 2_FIND_GAPS.md**: Unchecked all tasks in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/2_FIND_GAPS.md` (reset performed).
+- [x] **Reset 3_EVALUATE.md**: Unchecked all tasks in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/3_EVALUATE.md` (reset performed).
+- [x] **Reset 4_IMPLEMENT.md**: Unchecked all tasks in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/4_IMPLEMENT.md` (reset performed).
 
 **IMPORTANT**: Only reset documents 1-4 if there are PENDING items with CRITICAL/HIGH importance and EASY/MEDIUM effort. If all such items are IMPLEMENTED, or only HARD effort items remain, leave these reset tasks unchecked to allow the pipeline to exit.
 

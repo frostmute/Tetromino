@@ -74,7 +74,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				);
 				if (!mapping) return false;
 				if (checking) return true;
-				this.runChannelSync(mapping.channelSlug, false);
+				void this.runChannelSync(mapping.channelSlug, false);
 				return true;
 			},
 		});
@@ -90,7 +90,7 @@ export default class ArenaSyncPlugin extends Plugin {
 				);
 				if (!mapping) return false;
 				if (checking) return true;
-				this.runChannelSync(mapping.channelSlug, true);
+				void this.runChannelSync(mapping.channelSlug, true);
 				return true;
 			},
 		});
@@ -132,11 +132,11 @@ export default class ArenaSyncPlugin extends Plugin {
 
 		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
 
-		this.checkForMigrationPrompt(false);
+		void this.checkForMigrationPrompt(false);
 
 		if (this.settings.syncOnStartup) {
 			this.app.workspace.onLayoutReady(() => {
-				this.runSync(false);
+				void this.runSync(false);
 			});
 		}
 

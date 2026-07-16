@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import { renderTemplate, parseTemplate } from "./templateUtils";
 import { sanitizeMarkdownContent } from "./securityUtils";
 import { normalizePath } from "obsidian";
@@ -344,10 +343,10 @@ export function markdownToBlockContent(md: string): {
 	}
 
 	let title = "";
-	const h1 = body.match(/^# (.+)$/m);
-	if (h1) {
-		title = h1[1].trim();
-		body = body.replace(h1[0], "").trimStart();
+	const h1Match = /^# (.+)$/m.exec(body);
+	if (h1Match) {
+		title = h1Match[1].trim();
+		body = body.replace(h1Match[0], "").trimStart();
 	}
 
 	body = body.replace(/\n---\s*$/g, "").trimEnd();
@@ -355,12 +354,23 @@ export function markdownToBlockContent(md: string): {
 	return { title, content: body };
 }
 
-export function computeHash(input: string): string {
-	return createHash("sha256").update(input, "utf8").digest("hex").slice(0, 16);
+export async function computeHash(input: string): Promise<string> {
+	// Use Web Crypto `subtle.digest`. Available in both Electron (desktop)
+	// and Capacitor (mobile) renderers without any node-integration dance.
+	const data = new TextEncoder().encode(input);
+	const digest = await crypto.subtle.digest("SHA-256", data);
+	const bytes = new Uint8Array(digest);
+	let hex = "";
+	for (const b of bytes) hex += b.toString(16).padStart(2, "0");
+	return hex.slice(0, 16);
 }
 
 export function sanitiseFilename(name: string): string {
 	const sanitised = name
+		// Windows-illegal filename chars per platform; the regex intentionally
+		// matches control bytes (U+0000–U+001F). Disabling no-control-regex here
+		// is necessary because this whole expression is specifically a sanitizer
+		// for filenames that may carry such bytes from upstream sources.
 		// eslint-disable-next-line no-control-regex
 		.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
 		.replace(/\s+/g, " ")

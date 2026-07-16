@@ -3,8 +3,8 @@
 ## Context
 - **Playbook:** Usage
 - **Agent:** OpenCODECODER
-- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
-- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Project:** /Users/thewytchhaus/workspace/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 - **Loop:** 00001
 
 ## Objective
@@ -13,14 +13,14 @@ Survey the codebase to discover user-facing features and read the current README
 
 ## Instructions
 
-1. **Read the README.md** at `/Users/thewytchhaus/Documents/GitHub/Tetromino/README.md` (or `/Users/thewytchhaus/Documents/GitHub/Tetromino/readme.md`)
+1. **Read the README.md** at `/Users/thewytchhaus/workspace/Tetromino/README.md` (or `/Users/thewytchhaus/workspace/Tetromino/readme.md`)
 2. **Survey the codebase** to identify major user-facing features
 3. **Create a feature inventory** listing both documented and actual features
-4. **Output report** to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
+4. **Output report** to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
 
 ## Analysis Checklist
 
-- [x] **Discover features and scan README (if needed)**: First check if `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md` already exists with feature data (at least one feature listed in either "Features Documented in README" or "Features Found in Code" tables). If it does, skip the survey and mark this task complete—the feature inventory is already in place. If it doesn't exist, read the project's README.md to extract what features are currently documented. Survey the codebase (entry points, CLI commands, API endpoints, UI components, configuration options) to identify actual user-facing features. Output a feature inventory to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`.
+- [x] **Discover features and scan README (if needed)**: First check if `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md` already exists with feature data (at least one feature listed in either "Features Documented in README" or "Features Found in Code" tables). If it does, skip the survey and mark this task complete—the feature inventory is already in place. If it doesn't exist, read the project's README.md to extract what features are currently documented. Survey the codebase (entry points, CLI commands, API endpoints, UI components, configuration options) to identify actual user-facing features. Output a feature inventory to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`.
 
 **Completion Notes:**
 - Created feature inventory with comprehensive analysis of README.md documentation
@@ -28,7 +28,7 @@ Survey the codebase to discover user-facing features and read the current README
 - Identified 40 user-facing features from code survey of main.ts and settings-tab.ts
 - Found 14 features in code that could benefit from README documentation (ribbon icon, status bar, various settings toggles)
 - Confirmed 0 stale features (all README features are implemented)
-- Inventory saved to: `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
+- Inventory saved to: `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
 
 ## What to Look For in the Codebase
 
@@ -70,7 +70,7 @@ Survey the codebase to discover user-facing features and read the current README
 
 ## Output Format
 
-Create/update `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md` with:
+Create/update `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md` with:
 
 ```markdown
 # Feature Inventory - Loop 00001
@@ -78,7 +78,7 @@ Create/update `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
 ## README Analysis
 
 ### README Location
-`/Users/thewytchhaus/Documents/GitHub/Tetromino/README.md`
+`/Users/thewytchhaus/workspace/Tetromino/README.md`
 
 ### README Structure
 | Section | Description | Line Numbers |

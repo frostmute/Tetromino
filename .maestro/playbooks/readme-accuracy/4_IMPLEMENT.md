@@ -3,25 +3,25 @@
 ## Context
 - **Playbook:** Usage
 - **Agent:** OpenCODECODER
-- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
-- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Project:** /Users/thewytchhaus/workspace/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 - **Loop:** 00001
 
 ## Objective
 
-Implement ONE documentation fix from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` that has status `PENDING`. Update the project's README.md and log the change.
+Implement ONE documentation fix from `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` that has status `PENDING`. Update the project's README.md and log the change.
 
 ## Instructions
 
-1. **Read the plan** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
+1. **Read the plan** from `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
 2. **Find a `PENDING` item** with CRITICAL/HIGH importance and EASY/MEDIUM effort
-3. **Implement the fix** in `/Users/thewytchhaus/Documents/GitHub/Tetromino/README.md`
+3. **Implement the fix** in `/Users/thewytchhaus/workspace/Tetromino/README.md`
 4. **Update status** to `IMPLEMENTED` in the plan file
-5. **Log the change** to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
+5. **Log the change** to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
 
 ## Implementation Checklist
 
-- [x] **Fix one documentation gap (or skip if none)**: Read /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md. Only fix ONE gap per task.
+- [x] **Fix one documentation gap (or skip if none)**: Read /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md. If the file doesn't exist OR contains no items with status exactly `PENDING`, mark this task complete without changes. Otherwise, find an item with status exactly `PENDING`, implement the fix in the project's README.md, mark as IMPLEMENTED in the plan, and log to /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md. Only fix ONE gap per task.
   - **Implemented (Loop 1):** DOC-001 (Import my channels command) - CRITICAL/EASY
   - **Implemented (Loop 1):** DOC-002 (Backup channel mappings command) - HIGH/EASY
   - **Change:** Added commands to Commands section in README
@@ -71,7 +71,7 @@ Implement ONE documentation fix from `/Users/thewytchhaus/Documents/GitHub/Tetro
 
 ## Output Format
 
-After implementing, append to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`:
+After implementing, append to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`:
 
 ```markdown
 ---
@@ -79,7 +79,7 @@ After implementing, append to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.m
 ## [YYYY-MM-DD HH:MM] - [Brief Description]
 
 **Agent:** OpenCODECODER
-**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Project:** /Users/thewytchhaus/workspace/Tetromino
 **Loop:** 00001
 **Doc ID:** DOC-XXX
 **Gap ID:** GAP-XXX
@@ -131,9 +131,9 @@ After implementing, update `LOOP_00001_PLAN.md`:
 This task is complete when ONE of the following is true:
 
 **Option A - Implemented a fix:**
-1. You've implemented exactly ONE fix from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
-2. You've appended the change details to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
-3. You've updated the item status in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` to `IMPLEMENTED`
+1. You've implemented exactly ONE fix from `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md`
+2. You've appended the change details to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USAGE_LOG_OpenCODECODER_2026-06-26.md`
+3. You've updated the item status in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_PLAN.md` to `IMPLEMENTED`
 
 **Option B - No PENDING fixes available:**
 1. `LOOP_00001_PLAN.md` doesn't exist, OR
@@ -152,7 +152,7 @@ If there are no items with status exactly `PENDING` in the plan file, append to 
 ## [YYYY-MM-DD HH:MM] - Loop 00001 Complete
 
 **Agent:** OpenCODECODER
-**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Project:** /Users/thewytchhaus/workspace/Tetromino
 **Loop:** 00001
 **Status:** No PENDING fixes available
 

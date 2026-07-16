@@ -13,7 +13,7 @@ See USER_ACTIONS.md
 
 ## Files Modified
 
-- /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USER_ACTIONS.md (created)
+- /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USER_ACTIONS.md (created)
 
 ## Outcome
 

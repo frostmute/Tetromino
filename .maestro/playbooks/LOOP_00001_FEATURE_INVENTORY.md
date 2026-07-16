@@ -3,7 +3,7 @@
 ## README Analysis
 
 ### README Location
-`/Users/thewytchhaus/Documents/GitHub/Tetromino/README.md`
+`/Users/thewytchhaus/workspace/Tetromino/README.md`
 
 ### README Structure
 | Section | Description | Line Numbers |

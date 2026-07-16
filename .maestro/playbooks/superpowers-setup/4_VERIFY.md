@@ -4,9 +4,9 @@
 
 - **Playbook**: Superpowers Setup
 - **Agent**: OpenCODECODER
-- **Project**: /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Project**: /Users/thewytchhaus/workspace/Tetromino
 - **Date**: 2026-06-26
-- **Working Folder**: /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Working Folder**: /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 
 ## Purpose
 
@@ -16,10 +16,10 @@ The agent is verifying its **own** environment. This is unusual, and there is a 
 
 ## Inputs
 
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/PROVIDER.md`
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_PLAN.md`
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_LOG.md`
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USER_ACTIONS.md` (may not exist if no user actions were needed)
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/PROVIDER.md`
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_PLAN.md`
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_LOG.md`
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USER_ACTIONS.md` (may not exist if no user actions were needed)
 
 ## Tasks
 
@@ -74,7 +74,7 @@ The agent is verifying its **own** environment. This is unusual, and there is a 
 
 ### Task 4: Write `VERIFY.md`
 
-- [x] **Write `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/VERIFY.md`** (the outer fence here uses four backticks so the inner three-backtick fences render correctly — replicate that when you write the file):
+- [x] **Write `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/VERIFY.md`** (the outer fence here uses four backticks so the inner three-backtick fences render correctly — replicate that when you write the file):
 
   ````markdown
   # Verification Report

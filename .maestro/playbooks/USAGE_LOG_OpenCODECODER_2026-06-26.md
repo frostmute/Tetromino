@@ -5,7 +5,7 @@
 ## 2026-06-26 01:02 - Added Import my channels command to Commands section
 
 **Agent:** OpenCODECODER
-**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Project:** /Users/thewytchhaus/workspace/Tetromino
 **Loop:** 00001
 **Doc ID:** DOC-001
 **Gap ID:** GAP-005
@@ -35,7 +35,7 @@ Added the `Import my channels` command to the Commands section for better comman
 ## 2026-06-26 01:08 - Added Backup channel mappings command to Commands section
 
 **Agent:** OpenCODECODER
-**Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
+**Project:** /Users/thewytchhaus/workspace/Tetromino
 **Loop:** 00001
 **Doc ID:** DOC-002
 **Gap ID:** GAP-006

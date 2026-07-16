@@ -4,9 +4,9 @@
 
 - **Playbook**: Superpowers Setup
 - **Agent**: OpenCODECODER
-- **Project**: /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Project**: /Users/thewytchhaus/workspace/Tetromino
 - **Date**: 2026-06-26
-- **Working Folder**: /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Working Folder**: /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 
 ## Purpose
 
@@ -14,13 +14,13 @@ Execute the **Automatable Steps** from `INSTALL_PLAN.md`, capture results, and s
 
 ## Inputs
 
-- `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_PLAN.md` — produced by document 2
+- `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_PLAN.md` — produced by document 2
 
 ## Tasks
 
 ### Task 1: Load the plan
 
-- [x] **Read `INSTALL_PLAN.md`**. If it has a non-empty **Skip / Block** section, do not run any install steps. Write `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_LOG.md` with a single line:
+- [x] **Read `INSTALL_PLAN.md`**. If it has a non-empty **Skip / Block** section, do not run any install steps. Write `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_LOG.md` with a single line:
 
   ```text
   SKIPPED: <reason from Skip / Block>
@@ -45,7 +45,7 @@ Execute the **Automatable Steps** from `INSTALL_PLAN.md`, capture results, and s
 
 ### Task 3: Stage user-required steps
 
-- [x] **Compose `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/USER_ACTIONS.md`** containing only the user-required steps from the plan, in the exact order the user should perform them. Use this structure (the outer fence here uses four backticks so the inner three-backtick fences render correctly — replicate that when you write the file):
+- [x] **Compose `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/USER_ACTIONS.md`** containing only the user-required steps from the plan, in the exact order the user should perform them. Use this structure (the outer fence here uses four backticks so the inner three-backtick fences render correctly — replicate that when you write the file):
 
   ````markdown
   # User Actions Required
@@ -79,7 +79,7 @@ Execute the **Automatable Steps** from `INSTALL_PLAN.md`, capture results, and s
 
 ### Task 4: Write the install log
 
-- [x] **Write `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/INSTALL_LOG.md`** summarizing what happened:
+- [x] **Write `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/INSTALL_LOG.md`** summarizing what happened:
 
   ```markdown
   # Install Log

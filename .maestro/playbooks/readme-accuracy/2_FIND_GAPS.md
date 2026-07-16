@@ -3,8 +3,8 @@
 ## Context
 - **Playbook:** Usage
 - **Agent:** OpenCODECODER
-- **Project:** /Users/thewytchhaus/Documents/GitHub/Tetromino
-- **Auto Run Folder:** /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Project:** /Users/thewytchhaus/workspace/Tetromino
+- **Auto Run Folder:** /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 - **Loop:** 00001
 
 ## Objective
@@ -13,14 +13,14 @@ Compare the feature inventory against the README to identify specific documentat
 
 ## Instructions
 
-1. **Read the feature inventory** from `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
+1. **Read the feature inventory** from `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_FEATURE_INVENTORY.md`
 2. **Identify discrepancies** between code and README
 3. **Classify each gap** by type (missing, stale, inaccurate)
-4. **Output findings** to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
+4. **Output findings** to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
 
 ## Gap Discovery Checklist
 
-- [x] **Find documentation gaps (or skip if no discrepancies)**: Read LOOP_00001_FEATURE_INVENTORY.md and compare features in code vs README. If the feature inventory shows NO discrepancies (code and README are fully aligned), mark this task complete without creating LOOP_00001_GAPS.md. Otherwise, identify: (1) features in code but missing from README, (2) features in README but removed from code, (3) features documented inaccurately. Output findings to `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`.
+- [x] **Find documentation gaps (or skip if no discrepancies)**: Read LOOP_00001_FEATURE_INVENTORY.md and compare features in code vs README. If the feature inventory shows NO discrepancies (code and README are fully aligned), mark this task complete without creating LOOP_00001_GAPS.md. Otherwise, identify: (1) features in code but missing from README, (2) features in README but removed from code, (3) features documented inaccurately. Output findings to `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`.
 
 **COMPLETED**: Identified and documented 14 gaps:
 - 8 MISSING features (not documented in README)
@@ -35,7 +35,7 @@ This task is complete when ONE of the following is true:
 **Option A - Found gaps:**
 1. You've compared features in code vs README
 2. You've identified one or more discrepancies
-3. You've documented all gaps in `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
+3. You've documented all gaps in `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md`
 
 **Option B - No discrepancies found:**
 1. The feature inventory shows code and README are fully aligned
@@ -72,7 +72,7 @@ This graceful handling of empty states prevents the pipeline from stalling when 
 
 ## Output Format
 
-Create/update `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md` with:
+Create/update `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/LOOP_00001_GAPS.md` with:
 
 ```markdown
 # Documentation Gaps - Loop 00001

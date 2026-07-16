@@ -316,7 +316,7 @@ export class SyncEngine {
 			assetPath,
 			...(await this.buildBlockContext(block, channel.slug)),
 		});
-		const remoteHash = computeHash(markdown);
+		const remoteHash = await computeHash(markdown);
 
 		if (!existing) {
 			result.created++;
@@ -360,7 +360,7 @@ export class SyncEngine {
 			localHash = record.remoteHash;
 		} else {
 			localContent = await this.vault.read(existing);
-			localHash = computeHash(localContent);
+			localHash = await computeHash(localContent);
 		}
 
 		if (localHash === remoteHash) {

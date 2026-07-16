@@ -4,9 +4,9 @@
 
 - **Playbook**: Superpowers Setup
 - **Agent**: OpenCODECODER
-- **Project**: /Users/thewytchhaus/Documents/GitHub/Tetromino
+- **Project**: /Users/thewytchhaus/workspace/Tetromino
 - **Date**: 2026-06-26
-- **Working Folder**: /Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks
+- **Working Folder**: /Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks
 
 ## Purpose
 
@@ -53,9 +53,9 @@ The agent running this playbook **is** the harness we are setting up. Detection 
 
   **Result**: Provider is `copilot-cli` with high confidence. Self-identification is definitive, and PATH probe confirms with `/usr/local/bin/copilot` present.
 
-- [x] **Write `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/PROVIDER.md`** with this exact structure:
+- [x] **Write `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/PROVIDER.md`** with this exact structure:
 
-  **Result**: File created at `/Users/thewytchhaus/Documents/GitHub/Tetromino/.maestro/playbooks/PROVIDER.md` with all four required sections.
+  **Result**: File created at `/Users/thewytchhaus/workspace/Tetromino/.maestro/playbooks/PROVIDER.md` with all four required sections.
 
 ## Success Criteria
 

@@ -17,7 +17,7 @@ const JITTER = 50;
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 
 function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function withJitter(ms: number): number {

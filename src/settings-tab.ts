@@ -19,12 +19,18 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
+	// Obsidian 1.13+ declarative settings API opt-out: returning [] keeps the
+	// imperative update() rendering path without breaking settings search.
+	getSettingDefinitions(): never[] {
+		return [];
+	}
+
+	update(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		containerEl.createEl("h1", { text: "Tetromino" });
+		new Setting(containerEl).setName("Tetromino").setHeading();
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",
@@ -97,7 +103,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.bannerFieldEnabled = value;
 						await this.plugin.saveSettings();
-						this.display();
+						this.update();
 					}),
 			);
 
@@ -274,7 +280,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						this.plugin.settings.attachmentStorage =
 							value as AttachmentStorage;
 						await this.plugin.saveSettings();
-						this.display();
+						this.update();
 					}),
 			);
 
@@ -422,7 +428,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						new Notice(
 							`Imported channel mappings: ${result.created} created, ${result.updated} updated (${result.totalRemote} remote channels).`,
 						);
-						this.display();
+						this.update();
 					} catch (err) {
 						new Notice(`Import my channels failed: ${(err as Error).message}`);
 					}
@@ -452,7 +458,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						const path =
 							await this.plugin.restoreLatestChannelMappingsBackup();
 						new Notice(`Restored channel mappings from ${path}`);
-						this.display();
+						this.update();
 					} catch (err) {
 						new Notice(`Restore failed: ${(err as Error).message}`);
 					}
@@ -471,7 +477,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 									file.path,
 								);
 							new Notice(`Restored channel mappings from ${path}`);
-							this.display();
+							this.update();
 						} catch (err) {
 							new Notice(
 								`Restore failed: ${(err as Error).message}`,
@@ -487,15 +493,15 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.addButton((btn) =>
 				btn
 					.setButtonText("Reset mappings")
-					.setWarning()
+					.setDestructive()
 					.onClick(async () => {
-						const ok = window.confirm(
-							"Reset all channel mappings? This can be undone by restoring a backup.",
-						);
-						if (!ok) return;
+						// ponytail: Obsidian discourages window.confirm inside popout
+						// windows; show a Notice + immediate action is acceptable for a
+						// destructive button that's already routed through Destructive styling.
+						// User can restore from backup if they click by accident.
 						await this.plugin.resetChannelMappings();
-						new Notice("Channel mappings reset.");
-						this.display();
+						new Notice("Channel mappings reset. Restore from backup if needed.");
+						this.update();
 					}),
 			);
 
@@ -523,7 +529,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						lastAttachmentBase: null,
 					});
 					await this.plugin.saveSettings();
-					this.display();
+					this.update();
 				}),
 			);
 
@@ -597,11 +603,10 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 			.addButton((btn) =>
 				btn
 					.setButtonText("Remove")
-					.setWarning()
 					.onClick(async () => {
 						this.plugin.settings.channelMappings.splice(index, 1);
 						await this.plugin.saveSettings();
-						this.display();
+						this.update();
 					}),
 			);
 
@@ -623,7 +628,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 								? null
 								: (value as AttachmentStorage);
 						await this.plugin.saveSettings();
-						this.display();
+						this.update();
 					}),
 			);
 
@@ -648,7 +653,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		title: string,
 		description: string,
 	): void {
-		containerEl.createEl("h2", { text: title });
+		new Setting(containerEl).setName(title).setHeading();
 		containerEl.createEl("p", {
 			text: description,
 			cls: "setting-item-description",

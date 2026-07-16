@@ -308,17 +308,17 @@ describe("markdownToBlockContent", () => {
 /* ------------------------------------------------------------------ */
 
 describe("computeHash", () => {
-	it("returns a 16-char hex string", () => {
-		const h = computeHash("test");
+	it("returns a 16-char hex string", async () => {
+		const h = await computeHash("test");
 		expect(h).toMatch(/^[0-9a-f]{16}$/);
 	});
 
-	it("is deterministic", () => {
-		expect(computeHash("abc")).toBe(computeHash("abc"));
+	it("is deterministic", async () => {
+		expect(await computeHash("abc")).toBe(await computeHash("abc"));
 	});
 
-	it("differs for different inputs", () => {
-		expect(computeHash("a")).not.toBe(computeHash("b"));
+	it("differs for different inputs", async () => {
+		expect(await computeHash("a")).not.toBe(await computeHash("b"));
 	});
 });
 
