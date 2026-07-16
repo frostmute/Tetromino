@@ -160,7 +160,7 @@ Want to contribute or understand the internals?
 4. Open Tetromino settings and add your Are.na API token.
 5. Add at least one channel mapping, or run `Import my channels`.
 
-**Plugin directory:** <https://obsidian.md/plugins?id=Tetromino>
+**Plugin directory:** <https://community.obsidian.md/plugins/tetromino>
 
 ### Manual Installation
 
