@@ -1,7 +1,7 @@
 {
 	"id": "tetromino",
 	"name": "Tetromino",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"minAppVersion": "1.13.0",
 	"description": "One-way import from Are.na channels into your vault as Markdown notes.",
 	"author": "frostmute",
