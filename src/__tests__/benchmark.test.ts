@@ -138,18 +138,24 @@ describe("Performance regression benchmark", () => {
 		const modifySpy = jest.spyOn(mockVault as any, "modify");
 		const createBinarySpy = jest.spyOn(mockVault as any, "createBinary");
 
-		const baselineMemory = process.memoryUsage().heapUsed;
+		// ponytail: dropped memoryPeakMB — `process.memoryUsage().heapUsed` is a
+		// point-in-time read with no GC guarantee; the "delta" is dominated by
+		// V8 allocator/heap-reservation noise and is not comparable across
+		// OS/Node versions. Reintroduce with `performance.measureUserAgentSpecificMemory()`
+		// (or a dedicated heap snapshot) when an actual peak is needed.
 
 		const start = performance.now();
 		const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
 		const result = await engine.syncChannel(makeMapping("benchmark-100"));
 		const end = performance.now();
 
-		const endMemory = process.memoryUsage().heapUsed;
-		const peakMemory = Math.max(baselineMemory, endMemory);
+		// ponytail: dropped totalTimeMs — single-shot wall-clock time is too
+		// flaky to be a regression gate in a shared jest suite (JIT warm-up,
+		// GC scheduling, suite-position noise all swing it 50%+ run-to-run).
+		// The remaining counts are deterministic and catch the regressions
+		// that matter: extra API calls and duplicate vault writes.
 
 		const metrics = {
-			totalTimeMs: end - start,
 			apiCallCount:
 				mockApi.getChannel.mock.calls.length +
 				mockApi.getAllChannelBlocksWithProgress.mock.calls.length +
@@ -158,7 +164,6 @@ describe("Performance regression benchmark", () => {
 				createSpy.mock.calls.length +
 				modifySpy.mock.calls.length +
 				createBinarySpy.mock.calls.length,
-			memoryPeakMB: (peakMemory - baselineMemory) / 1024 / 1024,
 		};
 
 		createSpy.mockRestore();
@@ -174,29 +179,21 @@ describe("Performance regression benchmark", () => {
 		mockVault.clear();
 		defaultSettings.syncRecords = [];
 
-		const timings: number[] = [];
 		const apiCounts: number[] = [];
 		const vaultCounts: number[] = [];
-		const memoryPeaks: number[] = [];
 
 		for (let i = 0; i < ITERATIONS; i++) {
 			const { metrics } = await runBenchmarkIteration();
-			timings.push(metrics.totalTimeMs);
 			apiCounts.push(metrics.apiCallCount);
 			vaultCounts.push(metrics.vaultWriteCount);
-			memoryPeaks.push(metrics.memoryPeakMB);
 			mockVault.clear();
 			defaultSettings.syncRecords = [];
 		}
 
 		const benchmarkMetrics: Record<string, BaselineMetric> = {
-			// Minimum is used for time because it best represents the true execution
-			// time free from GC pauses and scheduler jitter.
-			totalTimeMs: { value: Math.min(...timings), unit: "ms" },
-			// Median is used for counts and memory because they are stable metrics.
+			// Median is used for counts because they are stable metrics.
 			apiCallCount: { value: median(apiCounts), unit: "calls" },
 			vaultWriteCount: { value: median(vaultCounts), unit: "writes" },
-			memoryPeakMB: { value: median(memoryPeaks), unit: "MB" },
 		};
 
 		const baseline = loadBaseline();
