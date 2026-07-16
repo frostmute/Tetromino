@@ -367,10 +367,7 @@ export async function computeHash(input: string): Promise<string> {
 
 export function sanitiseFilename(name: string): string {
 	const sanitised = name
-		// Windows-illegal filename chars per platform; the regex intentionally
-		// matches control bytes (U+0000–U+001F). Disabling no-control-regex here
-		// is necessary because this whole expression is specifically a sanitizer
-		// for filenames that may carry such bytes from upstream sources.
+		// sanitizer for filenames that may carry control bytes (U+0000–U+001F) from upstream sources
 		// eslint-disable-next-line no-control-regex
 		.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
 		.replace(/\s+/g, " ")

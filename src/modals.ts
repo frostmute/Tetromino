@@ -22,7 +22,7 @@ export class DiffModal extends Modal {
 }
 
 function renderStats(container: HTMLElement, result: SyncResult): void {
-	const stats = container.createEl("div", { cls: "arena-sync-summary-stats" });
+	const stats = container.createDiv({ cls: "arena-sync-summary-stats" });
 	const items: Array<[string, number]> = [
 		["Created", result.created],
 		["Updated", result.updated],

@@ -30,7 +30,6 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");
 
-		new Setting(containerEl).setName("Tetromino").setHeading();
 		containerEl.createEl("p", {
 			text: "Deterministic one-way import from Are.na into your Obsidian vault.",
 			cls: "setting-item-description",
@@ -85,7 +84,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						title: "Block title",
 						id: "Block ID",
 						"title-id": "Title (ID)",
-					} as Record<BlockNamingScheme, string>)
+					})
 					.setValue(this.plugin.settings.blockNaming)
 					.onChange(async (value) => {
 						this.plugin.settings.blockNaming =
@@ -128,9 +127,9 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 				.addDropdown((dd) =>
 					dd
 						.addOptions({
-							"thumb-first": "Thumb first",
-							"display-first": "Display first",
-						} as Record<BannerImagePriority, string>)
+						"thumb-first": "Thumb first",
+						"display-first": "Display first",
+						})
 						.setValue(this.plugin.settings.bannerImagePriority)
 						.onChange(async (value) => {
 							this.plugin.settings.bannerImagePriority =
@@ -200,7 +199,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.addOptions({
 						index: "index.md",
 						"folder-name": "match folder name",
-					} as Record<ChannelIndexNoteStyle, string>)
+					})
 					.setValue(this.plugin.settings.channelIndexNoteStyle)
 					.onChange(async (value) => {
 						this.plugin.settings.channelIndexNoteStyle =
@@ -220,7 +219,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						download: "Download to vault",
 						embed: "Embed reference",
 						link: "External link",
-					} as Record<ImageHandling, string>)
+					})
 					.setValue(this.plugin.settings.imageHandling)
 					.onChange(async (value) => {
 						this.plugin.settings.imageHandling =
@@ -237,7 +236,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.addOptions({
 						download: "Download to vault",
 						link: "External link",
-					} as Record<AttachmentHandling, string>)
+					})
 					.setValue(this.plugin.settings.attachmentHandling)
 					.onChange(async (value) => {
 						this.plugin.settings.attachmentHandling =
@@ -254,7 +253,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.addOptions({
 						link: "Link",
 						embed: "Embed",
-					} as Record<DownloadedAttachmentLinkStyle, string>)
+					})
 					.setValue(
 						this.plugin.settings.downloadedAttachmentLinkStyle,
 					)
@@ -274,7 +273,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 						channel: "With channel notes",
 						global: "Global folder",
 						custom: "Custom folder",
-					} as Record<AttachmentStorage, string>)
+					})
 					.setValue(this.plugin.settings.attachmentStorage)
 					.onChange(async (value) => {
 						this.plugin.settings.attachmentStorage =
