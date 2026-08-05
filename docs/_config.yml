@@ -4,7 +4,10 @@ baseurl: /Tetromino
 url: https://frostmute.github.io
 remote_theme: b2a3e8/jekyll-theme-console
 header_pages:
+  - index.md
   - USER_GUIDE.md
   - DEVELOPER_GUIDE.md
 plugins:
   - jekyll-remote-theme
+exclude:
+  - research/

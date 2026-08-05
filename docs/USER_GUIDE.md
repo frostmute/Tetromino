@@ -1,6 +1,7 @@
 ---
+layout: page
 type: reference
-title: Tetromino User Guide
+title: User Guide
 created: 2026-06-26
 tags:
   - user-guide
@@ -308,3 +309,5 @@ Enable it in settings under **Content rendering** → **Template engine**.
 - Visit the [Troubleshooting Guide](TROUBLESHOOTING.md) for deeper debugging help.
 - Read the [FAQ](FAQ.md) for additional questions.
 - See [CONTRIBUTING.md](../CONTRIBUTING.md) if you want to contribute to Tetromino.
+
+[← Home](index.md) · [Developer Guide](DEVELOPER_GUIDE.md)

@@ -1,6 +1,7 @@
 ---
+layout: page
 type: reference
-title: Developer Guide for Contributors
+title: Developer Guide
 created: 2026-06-26
 tags:
   - developers
@@ -393,6 +394,20 @@ Tetromino's development is organised into playbook phases in `.maestro/playbooks
 | Community sustainability | Phase 09 | Governance, contributor onboarding, issue triage, long-term health. |
 
 When you start work on a new area, read the corresponding phase document for step-by-step instructions and checklists.
+
+---
+
+## Related documentation
+
+- [API Design](API_DESIGN.md)
+- [Architecture Decision Records](ADRs/)
+- [Testing](testing/)
+- [Performance](PERFORMANCE.md)
+- [Technical Debt](technical-debt.md)
+- [Release Guide](RELEASE_GUIDE.md)
+- [User Guide](USER_GUIDE.md)
+
+[← Home](index.md)
 
 ---
 

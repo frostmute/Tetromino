@@ -22,13 +22,21 @@ Welcome to Tetromino. This site covers user guides, settings, troubleshooting, a
 
 - [Developer Guide](DEVELOPER_GUIDE.md) — architecture and contribution setup
 - [API Design](API_DESIGN.md) — Are.na integration patterns
-- [ADRs](ADRs/) — architecture decision records
-- [Testing](testing/testing-guide.md) — tests, fixtures, coverage
+- [Architecture Decision Records](ADRs/) — ADR-001 through ADR-005
+- [Testing](testing/) — guides, strategy, fixtures, and coverage
+- [Performance](PERFORMANCE.md)
+- [Technical Debt](technical-debt.md)
+- [Release Guide](RELEASE_GUIDE.md)
+
+## Community
+
+- [Community Health](COMMUNITY_HEALTH.md)
+- [Community Engagement](COMMUNITY_ENGAGEMENT.md)
+- [Community Celebration](COMMUNITY_CELEBRATION.md)
+- [Community Survey](COMMUNITY_SURVEY.md)
 
 ## Project
 
-- [Performance](PERFORMANCE.md)
-- [Release Guide](RELEASE_GUIDE.md)
-- [Community Health](COMMUNITY_HEALTH.md)
 - [GitHub Repository](https://github.com/frostmute/Tetromino)
 - [Changelog](https://github.com/frostmute/Tetromino/blob/main/CHANGELOG.md)
+- [Contributing](https://github.com/frostmute/Tetromino/blob/main/CONTRIBUTING.md)
