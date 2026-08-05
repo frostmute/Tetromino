@@ -119,7 +119,7 @@ Folder creation is guarded by an async mutex in `SyncEngine` to prevent race con
 | `src/settings-tab.ts` | ~657 | Obsidian `PluginSettingTab` UI for every plugin setting and channel-mapping row. |
 | `src/modals.ts` | ~214 | Modal components: `DiffModal`, `SyncSummaryModal`, `MigrationPreviewModal`, `BackupFileSuggestModal`. |
 | `src/utils.ts` | ~420 | Markdown rendering (`blockToMarkdown`), file-name utilities, hash computation, folder resolution, attachment-base resolution, `pMap` concurrency helper. |
-| `src/templateUtils.ts` | ~139 | Custom template parser and renderer (Handlebars-like syntax: `{{var}}`, `{{#if}}`, `{{#each}}`). |
+| `src/templateUtils.ts` | ~139 | Custom template parser and renderer (Handlebars-like syntax: {% raw %}`{{var}}`, `{{#if}}`, `{{#each}}`{% endraw %}). |
 | `src/types.ts` | ~219 | TypeScript interfaces for Are.na API entities, plugin settings, sync records, and results. Also defines `DEFAULT_SETTINGS`. |
 | `src/diff.ts` | ~76 | Unified-diff generator using LCS (longest-common-subsequence) with a safety cap (`MAX_DIFF_CELLS`). |
 | `src/migration.ts` | ~215 | Attachment-migration planner and executor: detects path changes, computes move/update plans, rewrites wiki-link embeds in notes. |

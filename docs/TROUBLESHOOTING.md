@@ -218,6 +218,7 @@ Tetromino's retry logic: up to 3 retries with exponential backoff (2s, 4s, 8s + 
 - The Sync Summary modal shows errors for specific blocks.
 
 **Causes:**
+{% raw %}
 - Missing closing tag (`{{/if}}` or `{{/each}}`).
 - Typos in variable names.
 - Nested `{{#each}}` blocks with incorrect syntax.
@@ -241,8 +242,9 @@ arena_id: {{id}}
 
 {{content}}
 ```
+{% endraw %}
 
-For the full variable reference and syntax, see [[SETTINGS_REFERENCE]] — Template Engine.
+For the full variable reference and syntax, see [SETTINGS_REFERENCE](SETTINGS_REFERENCE.md) — Template Engine.
 
 ---
 

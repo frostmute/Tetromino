@@ -284,6 +284,7 @@ Simply change the setting and run **"Import all channels now"** again. Tetromino
 
 Tetromino includes an optional custom template system that lets you control the exact Markdown output for each block using Handlebars-like syntax:
 
+{% raw %}
 ```handlebars
 ---
 title: "{{title}}"
@@ -296,6 +297,7 @@ arena_id: {{id}}
 
 {{content}}
 ```
+{% endraw %}
 
 Available variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`, `created_at`, `updated_at`.
 

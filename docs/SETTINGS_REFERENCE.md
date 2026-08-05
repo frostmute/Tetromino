@@ -84,6 +84,7 @@ These settings control how imported blocks are converted into Markdown notes.
 
 When **Template engine** is enabled and no custom string is set, Tetromino uses this default:
 
+{% raw %}
 ```handlebars
 ---
 title: "{{title}}"
@@ -104,6 +105,7 @@ arena_url: "{{arena_url}}"
 {{description}}
 {{/if}}
 ```
+{% endraw %}
 
 ---
 
@@ -201,6 +203,7 @@ Templates are configured via the plugin data store (`data.json`). Set `templateE
 
 ### Available Template Variables
 
+{% raw %}
 | Variable | Type | Description |
 |----------|------|-------------|
 | `{{id}}` | `number` | Are.na block ID. |
@@ -247,6 +250,7 @@ source: "{{source_url}}"
 {{/each}}
 {{/if}}
 ```
+{% endraw %}
 
 > **Tip:** The rendered output is sanitized for security. Active code blocks (e.g., `dataviewjs`, `templater`) are neutralized to prevent accidental execution.
 

@@ -443,9 +443,11 @@ Any tag starting with `v` triggers the workflow. Tags without `v` are ignored.
 
 If the version string contains a hyphen (e.g., `v1.2.0-beta.1`), the workflow marks the GitHub Release as a **pre-release** automatically:
 
+{% raw %}
 ```yaml
 prerelease: ${{ contains(steps.version.outputs.version, '-') }}
 ```
+{% endraw %}
 
 This is useful for beta testing before a stable release.
 
