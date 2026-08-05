@@ -2,6 +2,9 @@ title: Tetromino Documentation
 description: Documentation for the Tetromino Obsidian plugin
 baseurl: /Tetromino
 url: https://frostmute.github.io
+remote_theme: b2a3e8/jekyll-theme-console
+header_pages:
+  - USER_GUIDE.md
+  - DEVELOPER_GUIDE.md
 plugins:
   - jekyll-remote-theme
-theme: jekyll-theme-hacker

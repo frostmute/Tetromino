@@ -1,3 +1,8 @@
+---
+layout: page
+title: Home
+---
+
 # Tetromino Documentation
 
 > Deterministic, one-way import from Are.na into your Obsidian vault.
