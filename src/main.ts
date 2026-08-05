@@ -132,8 +132,8 @@ export default class ArenaSyncPlugin extends Plugin {
 
 		this.addSettingTab(new ArenaSyncSettingTab(this.app, this));
 
-		void this.checkForMigrationPrompt(false);
-
+		// Imports and migrations are user-triggered only. Optional sync-on-startup /
+		// interval run solely when the user enables them in settings (both off by default).
 		if (this.settings.syncOnStartup) {
 			this.app.workspace.onLayoutReady(() => {
 				void this.runSync(false);
@@ -187,7 +187,6 @@ export default class ArenaSyncPlugin extends Plugin {
 			(progress) => this.updateProgressStatus(progress),
 		);
 		this.rescheduleInterval();
-		await this.checkForMigrationPrompt(false);
 	}
 
 	async runSync(dryRun = false): Promise<void> {

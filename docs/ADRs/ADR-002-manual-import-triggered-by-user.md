@@ -30,8 +30,8 @@ Imports are **manual by default**. The user must explicitly trigger an import vi
 
 As an opt-in convenience, Tetromino supports two automatic modes, both **disabled by default**:
 
-- **Sync on startup**: runs once when Obsidian loads.
-- **Sync interval**: runs on a repeating timer (configurable in minutes, default `30`).
+- **Sync on startup**: runs once when Obsidian loads (`false` by default).
+- **Sync interval**: runs on a repeating timer when set to a value greater than `0` minutes (`0` by default = off).
 
 ## Rationale
 

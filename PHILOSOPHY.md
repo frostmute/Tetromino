@@ -46,9 +46,9 @@ Tetromino is built for predictability and auditability. If you run an import tod
 
 ## 3. User-Controlled
 
-**No background jobs. No surprises. You decide when to run.**
+**No automatic imports. No surprises. You decide when to run.**
 
-Every import is triggered by the user, either manually or through an explicit, opt-in schedule. Background sync exists only as an optional, disabled-by-default convenience. The plugin never phones home, never auto-deletes your notes, and never modifies files while you are not looking.
+Every import is triggered by the user — Command Palette, ribbon icon, or an explicit opt-in schedule you turn on yourself. Sync-on-startup and sync-interval both default to **off**. The plugin never phones home, never auto-deletes your notes, and never modifies vault files while you are not looking (attachment migration is also command/settings-triggered only).
 
 - **Why this matters:** Users should never wonder "what just changed in my vault?" Control breeds trust.
 - **What this means in practice:** Auto-magic features that silently reorganize files or delete stale content are antithetical to Tetromino. Any automation must be transparent, previewable, and easy to disable.

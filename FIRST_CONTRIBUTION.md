@@ -196,8 +196,8 @@ All four must pass. CI runs the same checks and will block merge on failure.
    ```
 2. Copy the output to a test vault:
    ```bash
-   mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/Tetromino
-   cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/Tetromino/
+   mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/tetromino
+   cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/tetromino/
    ```
 3. Open Obsidian, enable the plugin, and exercise your change.
 4. Use **dry-run preview** commands to verify planned actions before making vault changes.

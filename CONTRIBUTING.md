@@ -4,7 +4,7 @@ Thanks for contributing to `Tetromino`.
 
 > **New to open source or this project?** Start with [FIRST_CONTRIBUTION.md](FIRST_CONTRIBUTION.md) — a step-by-step walkthrough from fork to merged PR.
 
-All contributors are expected to adhere to our [Code of Conduct](../CODE_OF_CONDUCT.md). Please read it before participating.
+All contributors are expected to adhere to our [Code of Conduct](CODE_OF_CONDUCT.md). Please read it before participating.
 
 ## Good First Issues
 
@@ -218,12 +218,12 @@ Test plugin behavior in a real Obsidian vault environment to verify the plugin w
 1. **Copy the plugin files** to your test vault:
 
    ```bash
-   cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/Tetromino/
+   cp main.js manifest.json styles.css ~/Obsidian-TestVault/.obsidian/plugins/tetromino/
    ```
    Create the plugins directory if it doesn't exist:
 
    ```bash
-   mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/Tetromino
+   mkdir -p ~/Obsidian-TestVault/.obsidian/plugins/tetromino
    ```
 
 2. **Enable the plugin**: In Obsidian, go to Settings → Community Plugins → Enable **Tetromino**

@@ -42,12 +42,12 @@ Manual imports also:
 
 - **Preserve rate-limit budget:** Are.na's API limits are respected because imports happen only when you intentionally trigger them, not via constant background polling.
 - **Enable the dry-run workflow:** You can preview exactly what will change before committing, which would be meaningless if imports happened automatically.
-- **Avoid hidden network and battery usage:** No background timers or webhooks means Tetromino is idle when you are not importing.
+- **Avoid hidden network and battery usage:** With automation off (the defaults), Tetromino is idle until you run a command. No webhooks.
 
 If you do want automation, you can opt in:
 
-- **Sync on startup** — runs once when Obsidian loads.
-- **Sync interval** — runs on a repeating timer (e.g., every 30 minutes).
+- **Sync on startup** — runs once when Obsidian loads (off by default).
+- **Sync interval** — runs on a repeating timer; set minutes `> 0` to enable (default `0` = off).
 
 Both are disabled by default. See [[ADR-002]] for the full architectural rationale.
 
@@ -128,7 +128,7 @@ Common failure patterns:
 | `429 Too Many Requests` | Are.na rate limiting | Wait a moment and retry; Tetromino backs off automatically. |
 | Network timeout | Poor connection or large channel | Try again later or start with a smaller channel. |
 | Vault permission denied | Path is outside vault or folder is read-only | Ensure the target folder is inside your vault and writable. |
-| Template render error | Invalid custom template syntax | Disable the **Template engine** temporarily to confirm, then fix syntax. |
+| Template render error | Invalid custom template syntax | Set `templateEnabled: false` in `data.json` temporarily to confirm, then fix syntax. |
 
 For a deeper guide, see [[TROUBLESHOOTING]].
 

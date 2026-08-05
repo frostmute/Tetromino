@@ -225,7 +225,7 @@ Tetromino's retry logic: up to 3 retries with exponential backoff (2s, 4s, 8s + 
 - Using undefined variables that the template parser does not recognize.
 
 **Fix:**
-1. **Temporarily disable the template engine:** Settings → uncheck **Template engine** → re-run import. If this works, the issue is in your template.
+1. **Temporarily disable the template engine:** set `templateEnabled: false` in `data.json` (or remove a broken `templateString`) while Obsidian is closed, then re-run import. If this works, the issue is in your template.
 2. Check for balanced tags:
    - Every `{{#if condition}}` must have a matching `{{/if}}`.
    - Every `{{#each array}}` must have a matching `{{/each}}`.
@@ -336,7 +336,7 @@ For the full variable reference and syntax, see [SETTINGS_REFERENCE](SETTINGS_RE
 
 **Fix:**
 1. Run **Import all channels now** (not dry-run) and wait for completion.
-2. If using a custom template, ensure **Template engine** is enabled.
+2. If using a custom template, ensure `templateEnabled` is `true` in `data.json`.
 3. In Obsidian, close and reopen the note, or run **Reload app without saving** to clear the file cache.
 4. Check `Are.na/import-history.md` to confirm the import ran and note the number of updated files.
 
@@ -397,9 +397,9 @@ Check `Are.na/import-history.md` in your vault for a timestamped record of past 
 
 1. Open **Settings → Community Plugins**.
 2. Find **Tetromino** in the installed plugins list.
-3. The version number is shown next to the plugin name (e.g., `v1.1.0`).
+3. The version number is shown next to the plugin name (e.g., `v1.1.1`).
 
-Alternatively, check the `manifest.json` file inside `<vault>/.obsidian/plugins/Tetromino/`.
+Alternatively, check the `manifest.json` file inside `<vault>/.obsidian/plugins/tetromino/`.
 
 ### Obsidian Version
 
@@ -422,7 +422,7 @@ If you suspect corrupted settings or want to verify behavior without your existi
 2. **Disable Tetromino:** Settings → Community Plugins → toggle Tetromino **OFF**.
 3. **Delete plugin data:**
    - Close Obsidian.
-   - Delete `<vault>/.obsidian/plugins/Tetromino/data.json`.
+   - Delete `<vault>/.obsidian/plugins/tetromino/data.json`.
    - (On some systems this file may be named differently; delete any `.json` in the Tetromino plugin folder except `manifest.json`.)
 4. **Re-enable Tetromino:** Open Obsidian, toggle Tetromino **ON**.
 5. **Reconfigure:** Enter your API token and re-import channel mappings (or restore from the backup you created).

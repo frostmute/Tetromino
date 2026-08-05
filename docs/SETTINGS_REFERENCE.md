@@ -36,7 +36,7 @@ This document describes every setting available in Tetromino, including default 
 
 ## How Settings Are Stored
 
-Tetromino stores all settings in **Obsidian's plugin data store** (`data.json` inside `<vault>/.obsidian/plugins/Tetromino/`). This file is managed by Obsidian's `Plugin.loadData()` / `Plugin.saveData()` API and is **not** meant to be edited by hand.
+Tetromino stores all settings in **Obsidian's plugin data store** (`data.json` inside `<vault>/.obsidian/plugins/tetromino/`). This file is managed by Obsidian's `Plugin.loadData()` / `Plugin.saveData()` API and is **not** meant to be edited by hand for routine changes — except advanced template fields, which are not yet in the Settings UI.
 
 Channel mappings, sync records, and your API token live in the same data blob. You can back up and restore channel mappings independently using the built-in backup buttons (see [Backup and Restoration](#backup-and-restoration)).
 
@@ -113,8 +113,8 @@ arena_url: "{{arena_url}}"
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| **Sync on startup** | `boolean` | `false` | Automatically import when Obsidian launches. |
-| **Sync interval (minutes)** | `number` | `30` | Repeating auto-import schedule. Set to `0` to disable. |
+| **Sync on startup** | `boolean` | `false` | Automatically import when Obsidian launches. Off by default. |
+| **Sync interval (minutes)** | `number` | `0` | Repeating auto-import schedule. `0` (default) disables it. |
 | **Show notifications** | `boolean` | `true` | Show toast notices for import progress and completion. |
 | **Debug logging** | `boolean` | `false` | Write detailed logs to the Obsidian Developer Console (`Cmd/Ctrl + Shift + I`). |
 
@@ -199,7 +199,7 @@ The template engine lets you control the exact Markdown output for every block u
 
 Templates are configured via the plugin data store (`data.json`). Set `templateEnabled: true` and provide a `templateString`. The default template string is shown in [Content Rendering](#content-rendering).
 
-> **UI note:** Template settings are not yet exposed in the Settings tab UI. Advanced users can enable them by editing `<vault>/.obsidian/plugins/Tetromino/data.json` while Obsidian is closed, or by using a community snippet that modifies plugin settings.
+> **UI note:** Template settings are **not** exposed in the Settings tab UI yet. Enable them by editing `<vault>/.obsidian/plugins/tetromino/data.json` while Obsidian is closed: set `templateEnabled: true` and optionally `templateString`. The plugin id folder is lowercase `tetromino`.
 
 ### Available Template Variables
 
@@ -286,7 +286,7 @@ The backup file contains:
 To back up **all** settings (including templates, toggles, and tokens):
 
 1. Close Obsidian.
-2. Copy `<vault>/.obsidian/plugins/Tetromino/data.json` to a safe location.
+2. Copy `<vault>/.obsidian/plugins/tetromino/data.json` to a safe location.
 3. Restart Obsidian.
 
 > **Caution:** `data.json` contains your API token. Store backups securely.
@@ -315,7 +315,7 @@ If you need to migrate settings manually (e.g., moving to a new vault):
 
 1. Back up `data.json` from the old vault.
 2. Install Tetromino in the new vault.
-3. Close Obsidian and copy the backup into `<new-vault>/.obsidian/plugins/Tetromino/data.json`.
+3. Close Obsidian and copy the backup into `<new-vault>/.obsidian/plugins/tetromino/data.json`.
 4. Restart Obsidian and verify settings in the UI.
 
 ---

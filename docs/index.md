@@ -9,6 +9,8 @@ title: Home
 
 Welcome to Tetromino. This site covers user guides, settings, troubleshooting, and developer docs.
 
+Source files also live in the repo under [`docs/`](https://github.com/frostmute/Tetromino/tree/main/docs).
+
 ---
 
 ## For Users

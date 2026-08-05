@@ -17,26 +17,29 @@ One-way only: <strong>Are.na → Obsidian</strong> • Manual runs • Dry-run p
 
 </div>
 
-Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, with no background jobs and no push-back to Are.na.
+Tetromino brings channels, blocks, metadata, and attachments into your vault as stable Markdown notes. It is designed for clarity and control: same input, same output, **no automatic imports**, and no push-back to Are.na. Optional sync-on-startup / interval settings exist but stay off until you enable them.
 
 API compatibility targets the current Are.na REST API v3 documentation: <https://www.are.na/developers/explore>.
 
+Published docs: <https://frostmute.github.io/Tetromino/>
+
 ## Quick Navigation
 
+- **Docs site:** [https://frostmute.github.io/Tetromino/](https://frostmute.github.io/Tetromino/)
 - **For users:** [User Guide](docs/USER_GUIDE.md) | [Settings Reference](docs/SETTINGS_REFERENCE.md) | [FAQ](docs/FAQ.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
 - **For developers:** [Developer Guide](docs/DEVELOPER_GUIDE.md) | [API Design](docs/API_DESIGN.md) | [ADRs](docs/ADRs/)
-- **Project docs:** [README](README.md) | [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [PHILOSOPHY](PHILOSOPHY.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [FIRST_CONTRIBUTION](FIRST_CONTRIBUTION.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md) | [CONTRIBUTORS](CONTRIBUTORS.md) | [MAINTAINERS](MAINTAINERS.md) | [COMMUNITY HEALTH](docs/COMMUNITY_HEALTH.md) | [COMMUNITY CELEBRATION](docs/COMMUNITY_CELEBRATION.md) | [COMMUNITY SURVEY](docs/COMMUNITY_SURVEY.md)
-- **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Release template](.github/release-template.md)
+- **Project docs:** [CHANGELOG](CHANGELOG.md) | [ROADMAP](ROADMAP.md) | [PHILOSOPHY](PHILOSOPHY.md) | [SECURITY](SECURITY.md) | [CONTRIBUTING](CONTRIBUTING.md) | [FIRST_CONTRIBUTION](FIRST_CONTRIBUTION.md) | [CODE OF CONDUCT](CODE_OF_CONDUCT.md) | [CONTRIBUTORS](CONTRIBUTORS.md) | [MAINTAINERS](MAINTAINERS.md) | [COMMUNITY HEALTH](docs/COMMUNITY_HEALTH.md) | [COMMUNITY CELEBRATION](docs/COMMUNITY_CELEBRATION.md) | [COMMUNITY SURVEY](docs/COMMUNITY_SURVEY.md)
+- **CI and releases:** [CI workflow](.github/workflows/ci.yml) | [Release workflow](.github/workflows/release.yml) | [Pages workflow](.github/workflows/jekyll-gh-pages.yml) | [Release template](.github/release-template.md)
 - **Planning and reporting:** [Project board](.github/PROJECT_BOARD.md) | [Bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
 - **Community:** [GitHub Discussions](https://github.com/frostmute/Tetromino/discussions)
 
 ## What This Plugin Is (and Is Not)
 
 - It is a deterministic importer from Are.na to Obsidian.
-- It is vault-first, manual, and transparent.
+- It is vault-first, manual, and transparent: **nothing imports unless you run a command** (or click the ribbon).
 - It is not a two-way sync engine.
 - It does not auto-delete local notes when remote blocks disappear.
-- Background sync is optional and disabled by default (you can enable sync-on-startup and periodic intervals in settings).
+- Optional sync-on-startup and sync-interval exist for power users, but both are **off by default** (`syncOnStartup: false`, `syncInterval: 0`).
 
 ## Feature Highlights
 
@@ -46,7 +49,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Supports full pagination for large channels (not limited to the first 100 blocks).
 - Retries transient upstream failures (`429`, `500`, `502`, `503`, `504`) with backoff.
 - Shows status bar progress for channels and block pages.
-- **Learn more:** [User Guide — First Import](docs/USER_GUIDE.md#first-import) | [API Design — Retry Logic](docs/API_DESIGN.md#retry-and-backoff-strategy)
+- **Learn more:** [User Guide — First Import](docs/USER_GUIDE.md#first-import-walkthrough) | [API Design — Retry Budget](docs/API_DESIGN.md#retry-budget)
 
 ### Deterministic Writing
 
@@ -55,7 +58,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Writes channel index notes and a master overview note (`Are.na/overview.md`).
 - Supports channel index naming mode for Folder Note compatibility (`index.md` or folder-name note).
 - Sync summary modal with per-file diff viewer after every import or dry-run.
-- **Learn more:** [ADR-003 — Deterministic Output](docs/ADRs/ADR-003-deterministic-output.md) | [User Guide — Dry-Run](docs/USER_GUIDE.md#dry-run-feature)
+- **Learn more:** [ADR-003 — Deterministic Output](docs/ADRs/ADR-003-deterministic-output.md) | [User Guide — Dry-Run](docs/USER_GUIDE.md#dry-run-preview)
 
 ### Block Enrichment (Optional)
 
@@ -71,8 +74,8 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Optional custom template system for full control over generated Markdown.
 - Handlebars-like syntax: `{{title}}`, `{{#if image}}...{{/if}}`, `{{#each comments}}...{{/each}}`.
 - Template variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`.
-- Toggle between default output and custom template in settings.
-- **Learn more:** [Settings Reference — Templates](docs/SETTINGS_REFERENCE.md#template-engine)
+- Enabled via plugin data (`templateEnabled` / `templateString`); not yet exposed in the Settings tab UI.
+- **Learn more:** [Settings Reference — Custom Templates](docs/SETTINGS_REFERENCE.md#advanced-custom-templates)
 
 ### Attachments and Media
 
@@ -82,7 +85,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Storage modes: channel-local, global folder, custom folder.
 - Per-channel storage overrides.
 - Migration tools with preview, diff, execution, and history logging.
-- **Learn more:** [Settings Reference — Attachments](docs/SETTINGS_REFERENCE.md#attachment-handling) | [User Guide — Attachment Handling](docs/USER_GUIDE.md#attachment-handling)
+- **Learn more:** [Settings Reference — Content Rendering](docs/SETTINGS_REFERENCE.md#content-rendering) | [Settings Reference — Attachment Migration](docs/SETTINGS_REFERENCE.md#attachment-migration)
 
 ### Channel Management
 
@@ -91,7 +94,7 @@ API compatibility targets the current Are.na REST API v3 documentation: <https:/
 - Backup, restore, and reset tools for channel mappings.
 - `Restore from file...` to pick a specific historical backup instead of only the latest.
 - Default mapping target folder: `Are.na/<channel-slug>` unless overridden.
-- **Learn more:** [User Guide — Channel Management](docs/USER_GUIDE.md#channel-management)
+- **Learn more:** [User Guide — Channel Management](docs/USER_GUIDE.md#channel-management) | [Settings Reference — Channel Management](docs/SETTINGS_REFERENCE.md#channel-management)
 
 ## Commands
 
@@ -113,7 +116,9 @@ Available from the Obsidian Command Palette (`Ctrl/Cmd + P`):
 - Optional enrichments (description, comments, connected channels, channel preview image).
 - Image and attachment rendering controls.
 - Attachment storage controls (global defaults and per-channel overrides).
-- Template engine toggle and custom template string.
+- Optional enrichments and channel index naming.
+- Exclude block classes (skip selected Are.na block types).
+- Template engine via plugin data (advanced; not yet in Settings UI).
 - Frontmatter, notifications, and debug logging toggles.
 - Channel mapping management and migration actions.
 - **Full reference:** [Settings Reference](docs/SETTINGS_REFERENCE.md)
@@ -129,15 +134,19 @@ Available from the Obsidian Command Palette (`Ctrl/Cmd + P`):
 7. It shows a sync summary with diffs for changed files.
 8. It records import state and timestamps in plugin data.
 
-**Detailed walkthrough:** [User Guide — First Import](docs/USER_GUIDE.md#first-import)
+**Detailed walkthrough:** [User Guide — First Import](docs/USER_GUIDE.md#first-import-walkthrough)
 
 ## Documentation
+
+### Docs site
+
+Browse the published documentation: <https://frostmute.github.io/Tetromino/>
 
 ### For Users
 
 New to Tetromino? Start here:
 
-- **[User Guide](docs/USER_GUIDE.md)** — Overview, installation, first import walkthrough, dry-run explanation, settings reference, troubleshooting, and FAQ.
+- **[User Guide](docs/USER_GUIDE.md)** — Overview, installation, first import walkthrough, dry-run explanation, settings overview, troubleshooting, and FAQ.
 - **[Settings Reference](docs/SETTINGS_REFERENCE.md)** — Every setting explained with defaults, examples, and advanced template syntax.
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** — Common errors, solutions, and how to collect logs for bug reports.
 - **[FAQ](docs/FAQ.md)** — Answers to the most common questions about sync behavior, security, and offline usage.
@@ -165,7 +174,7 @@ Want to contribute or understand the internals?
 ### Manual Installation
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/frostmute/Tetromino/releases/latest).
-2. Place them into `<your-vault>/.obsidian/plugins/Tetromino/`.
+2. Place them into `<your-vault>/.obsidian/plugins/tetromino/`.
 3. Enable **Tetromino** in Obsidian Community Plugins.
 4. Open settings and add your API token.
 5. Add at least one channel mapping, or run `Import my channels`.
@@ -260,5 +269,6 @@ MIT
 
 See [CHANGELOG.md](CHANGELOG.md) for a complete version history.
 
-- **v1.1.0** (2025-06-26) — Sync summary modal, overview note generation, attachment migration, channel management tools, banner frontmatter, block enrichment, channel index enhancements, background sync, and numerous security and performance fixes.
+- **v1.1.1** (2026-07-16) — Version bump for Obsidian community plugins directory re-scan (no source changes).
+- **v1.1.0** (2025-06-26) — Sync summary modal, overview note generation, attachment migration, channel management tools, banner frontmatter, block enrichment, channel index enhancements, optional background sync, and numerous security and performance fixes.
 - **v1.0.0** (2025-01-15) — Initial stable release with deterministic Are.na → Obsidian import, pagination, retries, stable Markdown output, and attachment support.

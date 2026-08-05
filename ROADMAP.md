@@ -17,11 +17,11 @@ related:
 
 > **Guiding principle:** We only commit to features we are confident we can deliver. This roadmap is a living document — it is updated after every release to reflect completed work and new priorities. All proposals are evaluated against the project's core values; see [PHILOSOPHY.md](PHILOSOPHY.md).
 
-## Current Version: 1.1.0
+## Current Version: 1.1.1
 
-Released: 2025-06-26
+Released: 2026-07-16 (version bump for community plugins re-scan; feature set matches 1.1.0)
 
-### What's in 1.1.0
+### What's in 1.1.x
 
 - **Sync summary modal** with per-file diff viewer after every import.
 - **Master overview note** (`Are.na/overview.md`) linking all mapped channels.
@@ -31,7 +31,7 @@ Released: 2025-06-26
 - **Banner frontmatter** compatibility for the Obsidian Banners plugin.
 - **Block enrichments**: descriptions, comments, connected channels, and best-effort channel preview images.
 - **Channel index enhancements**: folder-note compatibility (`index.md` or `<folder-name>.md`), info sections, and "This Channel Appears In" backlinks.
-- **Background sync**: optional sync-on-startup and periodic auto-import intervals.
+- **Optional background sync**: sync-on-startup and periodic auto-import intervals (**both off by default**; interval `0` disables).
 - **Performance**: concurrent channel syncing, bounded-concurrency block fetching, optimized `SyncRecords` lookup, and resolved N+1 API queries.
 - **Security fixes**: credential leak prevention, XSS filter hardening, SSRF mitigation, and directory traversal protection.
 

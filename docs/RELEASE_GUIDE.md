@@ -47,7 +47,7 @@ Tetromino releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 | **Minor** `1.x.0` | New feature, backward compatible | Sync summary modal, attachment migration, banner frontmatter |
 | **Major** `x.0.0` | Breaking change | Settings format change, note structure change, API change |
 
-**Current version:** `1.1.0` (as of this writing). Check `manifest.json` for the source of truth.
+**Current version:** `1.1.1` (as of this writing). Check `manifest.json` for the source of truth.
 
 ### Who Can Release
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Default **Sync interval** is now `0` (disabled), so fresh installs never start a background timer. Matches the “manual by default” scope (`syncOnStartup` was already `false`).
+- Removed automatic attachment-migration modal on plugin load and after saving settings. Migration runs only via the command palette or Settings buttons.
+
+## [1.1.1] — 2026-07-16
+
+### Changed
+- Version bump only (no source changes) to trigger an Obsidian community plugins directory re-scan.
+- `minAppVersion` remains `1.13.0`.
+
 ## [1.1.0] — 2025-06-26
 
 ### Added
@@ -129,6 +139,7 @@ Each release entry follows this structure:
 ### Security   — vulnerability patches
 ```
 
-[Unreleased]: https://github.com/frostmute/Tetromino/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/frostmute/Tetromino/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/frostmute/Tetromino/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/frostmute/Tetromino/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/frostmute/Tetromino/releases/tag/v1.0.0

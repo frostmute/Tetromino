@@ -348,7 +348,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 		);
 		new Setting(containerEl)
 			.setName("Sync on startup")
-			.setDesc("Automatically run import when Obsidian opens.")
+			.setDesc("Automatically run import when Obsidian opens. Off by default.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.syncOnStartup)
@@ -360,7 +360,7 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Sync interval (minutes)")
-			.setDesc("Auto-import on a repeating schedule. Set to 0 to disable.")
+			.setDesc("Auto-import on a repeating schedule. Leave at 0 (default) to disable.")
 			.addText((text) =>
 				text
 					.setPlaceholder("0")

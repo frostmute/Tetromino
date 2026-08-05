@@ -40,7 +40,7 @@ Welcome to Tetromino — a deterministic, one-way importer that brings your Are.
 - **Paginates automatically**: large channels with thousands of blocks are fully imported, not truncated to the first 100.
 - **Retries transient failures**: if Are.na is rate-limiting or experiencing issues, Tetromino backs off and retries.
 - **Produces deterministic output**: the same channel imported twice generates the same Markdown (unless the remote content changed).
-- **Supports optional background sync**: you can enable sync-on-startup and periodic auto-import in settings (both are disabled by default).
+- **Supports optional background sync**: sync-on-startup and sync-interval exist in settings, but **both stay off** until you enable them (`Sync interval` default is `0`).
 
 ### What Tetromino Does **Not** Do
 
@@ -56,7 +56,7 @@ Welcome to Tetromino — a deterministic, one-way importer that brings your Are.
 ### From Obsidian Community Plugins (Recommended)
 
 1. Open **Settings** → **Community Plugins** in Obsidian.
-2. Turn on **Safe Mode** if it is on (you will be prompted to disable it).
+2. Turn **off Safe Mode** if it is on (Community Plugins require Safe Mode disabled).
 3. Click **Browse** and search for **Tetromino**.
 4. Click **Install**, then **Enable**.
 5. Open **Tetromino Settings** (under Community Plugins) and add your Are.na API token.
@@ -64,7 +64,7 @@ Welcome to Tetromino — a deterministic, one-way importer that brings your Are.
 ### Manual Installation
 
 1. Download the latest release (`main.js`, `manifest.json`, and `styles.css`) from the [Releases page](https://github.com/frostmute/Tetromino/releases).
-2. Create a folder named `Tetromino` inside `<your-vault>/.obsidian/plugins/`.
+2. Create a folder named `tetromino` inside `<your-vault>/.obsidian/plugins/` (must match the plugin `id` in `manifest.json`).
 3. Copy the three files into that folder.
 4. Restart Obsidian, then enable **Tetromino** under Community Plugins.
 
@@ -166,7 +166,7 @@ Before committing changes to your vault, you can preview exactly what Tetromino 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | **Sync on startup** | Off | Automatically import when Obsidian launches. |
-| **Sync interval (minutes)** | `30` | Repeating auto-import schedule. Set to `0` to disable. |
+| **Sync interval (minutes)** | `0` | Repeating auto-import schedule. Set to `0` to disable (default). |
 | **Show notifications** | On | Show toast notices for import progress and completion. |
 | **Debug logging** | Off | Write detailed logs to the Obsidian Developer Console. |
 
@@ -243,7 +243,7 @@ Each mapping can override the global attachment storage strategy:
 
 **Yes, optionally.** By default, imports are manual. You can enable:
 - **Sync on startup** to import when Obsidian opens.
-- **Sync interval** to run imports on a repeating schedule (e.g., every 30 minutes).
+- **Sync interval** to run imports on a repeating schedule (set minutes greater than `0`; default is off).
 
 Both are disabled by default so you remain in full control.
 
@@ -301,7 +301,7 @@ arena_id: {{id}}
 
 Available variables include: `title`, `id`, `class`, `content`, `description`, `image`, `arena_url`, `source_url`, `channel_title`, `channel_slug`, `comments`, `connected_channels`, `created_at`, `updated_at`.
 
-Enable it in settings under **Content rendering** → **Template engine**.
+Enable it by setting `templateEnabled: true` (and optionally `templateString`) in `<vault>/.obsidian/plugins/tetromino/data.json` while Obsidian is closed. Template controls are not yet in the Settings tab UI — see [Settings Reference — Custom Templates](SETTINGS_REFERENCE.md#advanced-custom-templates).
 
 ---
 

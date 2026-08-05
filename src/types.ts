@@ -190,7 +190,7 @@ export interface ArenaSyncSettings {
 
 export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	apiToken: "",
-	syncInterval: 30,
+	syncInterval: 0,
 	syncOnStartup: false,
 	autoEnableImportedChannels: true,
 	blockNaming: "title",
