@@ -1,0 +1,7 @@
+title: Tetromino Documentation
+description: Documentation for the Tetromino Obsidian plugin
+baseurl: /Tetromino
+url: https://frostmute.github.io
+plugins:
+  - jekyll-remote-theme
+theme: jekyll-theme-hacker
