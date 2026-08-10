@@ -197,7 +197,7 @@ describe("SyncEngine extended coverage", () => {
 	});
 
 	describe("conflict resolution", () => {
-		it("updates a note when remote content changed", async () => {
+		it("preserves a local edit when remote content also changes", async () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, { title: "Note", content: "Remote" });
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -216,8 +216,9 @@ describe("SyncEngine extended coverage", () => {
 			]);
 			const result = await runSync(mapping);
 
-			expect(result.updated).toBe(1);
-			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toContain("Remote changed");
+			expect(result.updated).toBe(0);
+			expect(result.conflicts).toHaveLength(1);
+			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toBe("Local edit");
 		});
 
 		it("skips unchanged note on re-sync", async () => {
@@ -232,6 +233,45 @@ describe("SyncEngine extended coverage", () => {
 
 			expect(result2.skipped).toBe(1);
 			expect(result2.updated).toBe(0);
+		});
+
+		it("supports review later, keep local, and use remote resolutions", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Note", content: "Remote one" }),
+			]);
+			const mapping = makeMapping("test-channel");
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+			await engine.syncChannel(mapping);
+
+			const file = mockVault.files.get("Are.na/test-channel/Note.md")!;
+			await mockVault.modify(file.file, "Local edit");
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Note", content: "Remote two" }),
+			]);
+			const firstConflict = await engine.syncChannel(mapping);
+			expect(firstConflict.conflicts).toHaveLength(1);
+			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toBe("Local edit");
+
+			await engine.resolveConflict(firstConflict.conflicts![0], "review-later");
+			const repeatedConflict = await engine.syncChannel(mapping);
+			expect(repeatedConflict.conflicts).toHaveLength(1);
+			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toBe("Local edit");
+
+			await engine.resolveConflict(repeatedConflict.conflicts![0], "keep-local");
+			const afterKeep = await engine.syncChannel(mapping);
+			expect(afterKeep.conflicts).toHaveLength(0);
+			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toBe("Local edit");
+
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Note", content: "Remote three" }),
+			]);
+			const laterConflict = await engine.syncChannel(mapping);
+			expect(laterConflict.conflicts).toHaveLength(1);
+			await engine.resolveConflict(laterConflict.conflicts![0], "use-remote");
+			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toContain("Remote three");
+			expect(defaultSettings.syncRecords[0].pendingConflict).toBeNull();
 		});
 	});
 
@@ -410,12 +450,46 @@ describe("SyncEngine extended coverage", () => {
 			]);
 			const result = await runSync(mapping);
 
-			expect(result.deleted).toBe(1);
+			expect(result.deleted).toBe(0);
+			expect(result.noLongerRemote).toHaveLength(1);
 			expect(result.missingPaths).toContain("Are.na/test-channel/Remove.md");
-			expect(result.actions).toContain("missing Are.na/test-channel/Remove.md");
+			expect(result.actions).toContain("no longer remote Are.na/test-channel/Remove.md");
+			expect(mockVault.files.has("Are.na/test-channel/Remove.md")).toBe(true);
 		});
 
-		it("removes stale sync records when blocks go missing (regression)", async () => {
+		it("does not persist missing markers during a dry-run", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Remove" }),
+			]);
+			const mapping = makeMapping("test-channel");
+			await runSync(mapping);
+
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([]);
+			const result = await runSync(mapping, { dryRun: true });
+			expect(result.noLongerRemote).toHaveLength(1);
+			expect(defaultSettings.syncRecords[0].remoteMissingAt).toBeNull();
+		});
+
+		it("does not report excluded remote blocks as missing", async () => {
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			const mapping = makeMapping("test-channel");
+			mockApi.getChannel.mockResolvedValue(channel);
+			const originalBlock = makeBlock(1, { title: "Excluded later" });
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([originalBlock]);
+			await runSync(mapping);
+
+			defaultSettings.excludeClasses = ["Image"];
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
+				makeBlock(1, { title: "Excluded later", class: "Image" }),
+			]);
+			const result = await runSync(mapping);
+			expect(result.noLongerRemote).toHaveLength(0);
+			expect(defaultSettings.syncRecords[0].remoteMissingAt).toBeNull();
+		});
+
+		it("retains sync records for no-longer-remote notes", async () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
@@ -436,10 +510,11 @@ describe("SyncEngine extended coverage", () => {
 			]);
 			const result = await engine.syncChannel(mapping);
 
-			expect(result.deleted).toBe(1);
-			expect(defaultSettings.syncRecords.length).toBe(1);
+			expect(result.deleted).toBe(0);
+			expect(result.noLongerRemote).toHaveLength(1);
+			expect(defaultSettings.syncRecords.length).toBe(2);
 			expect(defaultSettings.syncRecords[0].blockId).toBe(1);
-			expect(defaultSettings.syncRecords.some((r) => r.blockId === 2)).toBe(false);
+			expect(defaultSettings.syncRecords.some((r) => r.blockId === 2 && r.remoteMissingAt)).toBe(true);
 		});
 	});
 

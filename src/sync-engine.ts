@@ -5,7 +5,9 @@ import type {
 	ArenaChannel,
 	ArenaSyncSettings,
 	ChannelMapping,
+	ConflictResolution,
 	ImportProgress,
+	SyncConflict,
 	SyncOptions,
 	SyncRecord,
 	SyncResult,
@@ -109,6 +111,8 @@ export class SyncEngine {
 			fileDiffs: [],
 			missingPaths: [],
 			errors: [],
+			conflicts: [],
+			noLongerRemote: [],
 			duration: 0,
 		};
 		const start = Date.now();
@@ -161,6 +165,8 @@ export class SyncEngine {
 			aggregate.fileDiffs.push(...result.fileDiffs);
 			aggregate.missingPaths.push(...result.missingPaths);
 			aggregate.errors.push(...result.errors);
+			aggregate.conflicts?.push(...(result.conflicts ?? []));
+			aggregate.noLongerRemote?.push(...(result.noLongerRemote ?? []));
 		}
 
 		await this.updateMasterOverview(aggregate, dryRun);
@@ -189,6 +195,8 @@ export class SyncEngine {
 			fileDiffs: [],
 			missingPaths: [],
 			errors: [],
+			conflicts: [],
+			noLongerRemote: [],
 			duration: 0,
 		};
 		const start = Date.now();
@@ -240,7 +248,7 @@ export class SyncEngine {
 		await this.prefetchBlockDetails(blocks);
 
 		const importedPaths: string[] = [];
-		const importedBlockIds: number[] = [];
+		const remoteBlockIds = blocks.map((block) => block.id);
 		const attachmentBaseFolder = resolveAttachmentBaseFolder(
 			this.settings,
 			mapping,
@@ -279,7 +287,6 @@ export class SyncEngine {
 					dryRun,
 				);
 				importedPaths.push(path);
-				importedBlockIds.push(block.id);
 			} catch (err) {
 				result.errors.push({
 					blockId: block.id,
@@ -307,7 +314,7 @@ export class SyncEngine {
 			result,
 		);
 
-		this.markMissing(mapping, importedBlockIds, result);
+		this.markMissing(mapping, remoteBlockIds, result, dryRun);
 	}
 
 	private async pullBlock(
@@ -328,6 +335,9 @@ export class SyncEngine {
 			result,
 		);
 		const record = this.findRecord(block.id, mapping.channelId);
+		if (!dryRun && record?.remoteMissingAt) {
+			record.remoteMissingAt = null;
+		}
 		let existing = this.vault.getAbstractFileByPath(notePath);
 		let moved = false;
 
@@ -385,6 +395,7 @@ export class SyncEngine {
 		let localContent: string | undefined;
 		if (
 			record &&
+			!record.pendingConflict &&
 			record.localPath === notePath &&
 			record.remoteHash === remoteHash &&
 			typeof (existing.stat as { mtime?: number } | undefined)?.mtime ===
@@ -398,9 +409,59 @@ export class SyncEngine {
 			localHash = await computeHash(localContent);
 		}
 
+		const remoteChanged = !record || record.remoteHash !== remoteHash;
+		const localChanged = !record || record.localHash !== localHash;
+		const unresolvedConflict =
+			Boolean(record?.pendingConflict) && localHash !== remoteHash;
+		const shouldReportConflict =
+			localHash !== remoteHash &&
+			(unresolvedConflict ||
+				!record ||
+				(remoteChanged && localChanged));
+
+		if (shouldReportConflict) {
+			const content = localContent ?? (await this.vault.read(existing));
+			const conflict: SyncConflict = {
+				blockId: block.id,
+				channelId: mapping.channelId,
+				channelSlug: mapping.channelSlug,
+				localPath: notePath,
+				localHash,
+				remoteHash,
+				remoteContent: markdown,
+				diff: unifiedDiff(content, markdown, notePath, notePath),
+			};
+			result.conflicts?.push(conflict);
+			result.actions.push(`conflict ${notePath}`);
+			if (!dryRun) {
+				if (!record) {
+					this.upsertRecord(
+						block.id,
+						mapping.channelId,
+						notePath,
+						localHash,
+						remoteHash,
+					);
+				}
+				const pending = this.findRecord(block.id, mapping.channelId);
+				if (pending) {
+					pending.pendingConflict = {
+						localHash,
+						remoteHash,
+						detectedAt: new Date().toISOString(),
+					};
+					pending.remoteMissingAt = null;
+				}
+			}
+			return notePath;
+		}
+
 		if (localHash === remoteHash) {
 			result.skipped++;
 			result.actions.push(`skip ${notePath}`);
+			if (!dryRun && record?.pendingConflict) {
+				record.pendingConflict = null;
+			}
 			if (!record && !dryRun) {
 				this.upsertRecord(
 					block.id,
@@ -418,6 +479,12 @@ export class SyncEngine {
 					remoteHash,
 				);
 			}
+			return notePath;
+		}
+
+		if (localChanged && !remoteChanged) {
+			result.skipped++;
+			result.actions.push(`preserve ${notePath} (local edit)`);
 			return notePath;
 		}
 
@@ -441,6 +508,59 @@ export class SyncEngine {
 			);
 		}
 		return notePath;
+	}
+
+	async resolveConflict(
+		conflict: SyncConflict,
+		resolution: ConflictResolution,
+	): Promise<void> {
+		const record = this.findRecord(conflict.blockId, conflict.channelId);
+		if (!record) {
+			throw new Error(`Conflict record not found for ${conflict.localPath}`);
+		}
+
+		if (resolution === "review-later") {
+			record.pendingConflict = {
+				localHash: conflict.localHash,
+				remoteHash: conflict.remoteHash,
+				detectedAt: new Date().toISOString(),
+			};
+			return;
+		}
+
+		const file = this.vault.getAbstractFileByPath(conflict.localPath);
+		if (!(file instanceof TFile)) {
+			throw new Error(`Conflict file not found: ${conflict.localPath}`);
+		}
+
+		if (resolution === "keep-local") {
+			// Keep the generated remote hash as the baseline. This preserves the
+			// local divergence so a later remote change becomes a new conflict.
+			this.upsertRecord(
+				conflict.blockId,
+				conflict.channelId,
+				conflict.localPath,
+				conflict.remoteHash,
+				conflict.remoteHash,
+			);
+			return;
+		}
+
+		const currentContent = await this.vault.read(file);
+		const currentHash = await computeHash(currentContent);
+		if (currentHash !== conflict.localHash) {
+			throw new Error(
+				`The local file changed since the conflict was previewed: ${conflict.localPath}`,
+			);
+		}
+		await this.vault.modify(file, conflict.remoteContent);
+		this.upsertRecord(
+			conflict.blockId,
+			conflict.channelId,
+			conflict.localPath,
+			conflict.remoteHash,
+			conflict.remoteHash,
+		);
 	}
 
 	private async ensureBlockAsset(
@@ -983,6 +1103,8 @@ export class SyncEngine {
 				lastSyncedAt: new Date().toISOString(),
 				localHash,
 				remoteHash,
+				pendingConflict: null,
+				remoteMissingAt: null,
 			});
 		} else {
 			const record: SyncRecord = {
@@ -992,6 +1114,8 @@ export class SyncEngine {
 				lastSyncedAt: new Date().toISOString(),
 				localHash,
 				remoteHash,
+				pendingConflict: null,
+				remoteMissingAt: null,
 			};
 			this.syncRecordMap.set(key, record);
 			this.settings.syncRecords.push(record);
@@ -1034,6 +1158,7 @@ export class SyncEngine {
 		mapping: ChannelMapping,
 		importedBlockIds: number[],
 		result: SyncResult,
+		dryRun: boolean,
 	): void {
 		if (!mapping.channelId) return;
 		const imported = new Set(importedBlockIds);
@@ -1044,15 +1169,19 @@ export class SyncEngine {
 		);
 		if (missing.length === 0) return;
 		for (const record of missing) {
-			result.deleted++;
+			const detectedAt = record.remoteMissingAt ?? new Date().toISOString();
+			if (!dryRun) {
+				record.remoteMissingAt = detectedAt;
+				record.pendingConflict = null;
+			}
 			result.missingPaths.push(record.localPath);
-			result.actions.push(`missing ${record.localPath}`);
-			this.syncRecordMap.delete(this.getRecordKey(record.blockId, record.channelId));
+			result.noLongerRemote?.push({
+				blockId: record.blockId,
+				channelId: record.channelId,
+				localPath: record.localPath,
+				detectedAt,
+			});
+			result.actions.push(`no longer remote ${record.localPath}`);
 		}
-		this.settings.syncRecords = this.settings.syncRecords.filter(
-			(record) =>
-				record.channelId !== mapping.channelId ||
-				imported.has(record.blockId),
-		);
 	}
 }

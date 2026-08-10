@@ -102,6 +102,12 @@ export interface ChannelMapping {
 	lastAttachmentBase?: string | null;
 }
 
+export interface PendingConflict {
+	localHash: string;
+	remoteHash: string;
+	detectedAt: string;
+}
+
 export interface SyncRecord {
 	blockId: number;
 	channelId: number;
@@ -109,7 +115,31 @@ export interface SyncRecord {
 	lastSyncedAt: string;
 	localHash: string;
 	remoteHash: string;
+	/** Set while a local/remote conflict is waiting for an explicit decision. */
+	pendingConflict?: PendingConflict | null;
+	/** Set when the block is no longer present in its remote channel. */
+	remoteMissingAt?: string | null;
 }
+
+export interface SyncConflict {
+	blockId: number;
+	channelId: number;
+	channelSlug: string;
+	localPath: string;
+	localHash: string;
+	remoteHash: string;
+	remoteContent: string;
+	diff: string;
+}
+
+export interface NoLongerRemoteCandidate {
+	blockId: number;
+	channelId: number;
+	localPath: string;
+	detectedAt: string;
+}
+
+export type ConflictResolution = "keep-local" | "use-remote" | "review-later";
 
 export interface SyncResult {
 	created: number;
@@ -124,6 +154,10 @@ export interface SyncResult {
 	fileDiffs: FileDiff[];
 	missingPaths: string[];
 	errors: SyncError[];
+	/** Conflicts are optional for compatibility with existing result fixtures. */
+	conflicts?: SyncConflict[];
+	/** Missing upstream blocks are reported without deleting local notes. */
+	noLongerRemote?: NoLongerRemoteCandidate[];
 	duration: number;
 }
 
