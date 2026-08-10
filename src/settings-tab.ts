@@ -10,6 +10,7 @@ import type {
 	DownloadedAttachmentLinkStyle,
 	ImageHandling,
 } from "./types";
+import { parseSyncIntervalInput } from "./types";
 
 export class ArenaSyncSettingTab extends PluginSettingTab {
 	plugin: ArenaSyncPlugin;
@@ -366,8 +367,15 @@ export class ArenaSyncSettingTab extends PluginSettingTab {
 					.setPlaceholder("0")
 					.setValue(String(this.plugin.settings.syncInterval))
 					.onChange(async (value) => {
-						const n = parseInt(value, 10);
-						this.plugin.settings.syncInterval = Number.isFinite(n) && n >= 0 ? n : 0;
+						const minutes = parseSyncIntervalInput(value);
+						if (minutes === null) {
+							new Notice(
+								"Sync interval must be a non-negative number of minutes (e.g. 0 or 30).",
+							);
+							text.setValue(String(this.plugin.settings.syncInterval));
+							return;
+						}
+						this.plugin.settings.syncInterval = minutes;
 						await this.plugin.saveSettings();
 					}),
 			);

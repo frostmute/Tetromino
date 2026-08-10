@@ -37,8 +37,10 @@ export class Vault {
 }
 
 export class Notice {
+	static instances: Notice[] = [];
 	message: string;
 	constructor(message: string) {
+		Notice.instances.push(this);
 		this.message = message;
 	}
 }
@@ -94,7 +96,18 @@ export class PluginSettingTab<P extends Plugin = Plugin> {
 
 type SettingCtor<T> = (component: T) => void;
 
+export type TextComponentLike = {
+	value: string;
+	placeholder: string;
+	inputEl: { type: string };
+	setValue(v: string): unknown;
+	setPlaceholder(p: string): unknown;
+	onChange(fn: (v: string) => unknown): unknown;
+	onChangeFn?: (v: string) => unknown;
+};
+
 export class Setting {
+	static textComponents: TextComponentLike[] = [];
 	constructor(_containerEl: HTMLElement) {
 		void _containerEl;
 	}
@@ -102,12 +115,33 @@ export class Setting {
 		void _name;
 		return this;
 	}
+	setHeading(): this {
+		return this;
+	}
 	setDesc(_desc: string): this {
 		void _desc;
 		return this;
 	}
-	addText<T = unknown>(cb: SettingCtor<{ setValue(v: string): unknown; setPlaceholder(p: string): unknown; onChange(fn: (v: string) => unknown): unknown; inputEl: { type: string } }>): this {
-		void cb;
+	addText(cb: SettingCtor<TextComponentLike>): this {
+		const component: TextComponentLike = {
+			value: "",
+			placeholder: "",
+			inputEl: { type: "text" },
+			setValue(v: string) {
+				component.value = v;
+				return component;
+			},
+			setPlaceholder(p: string) {
+				component.placeholder = p;
+				return component;
+			},
+			onChange(fn: (v: string) => unknown) {
+				component.onChangeFn = fn;
+				return component;
+			},
+		};
+		Setting.textComponents.push(component);
+		cb(component);
 		return this;
 	}
 	addToggle(cb: SettingCtor<{ setValue(v: boolean): unknown; onChange(fn: (v: boolean) => unknown): unknown }>): this {

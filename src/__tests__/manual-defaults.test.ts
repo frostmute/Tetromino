@@ -9,8 +9,14 @@
  *   and the user-triggered migration command still builds a plan.
  */
 import { App, Vault } from "obsidian";
+import {
+	Notice as MockNotice,
+	Setting as MockSetting,
+	TextComponentLike,
+} from "../__mocks__/obsidian";
 import ArenaSyncPlugin from "../main";
-import { DEFAULT_SETTINGS } from "../types";
+import { ArenaSyncSettingTab } from "../settings-tab";
+import { DEFAULT_SETTINGS, parseSyncIntervalInput } from "../types";
 
 jest.mock("../migration", () => ({
 	buildMigrationPlan: jest.fn(),
@@ -214,6 +220,174 @@ describe("manual-by-default behavior (a1acdb9)", () => {
 			} finally {
 				setIntervalSpy.mockRestore();
 			}
+		});
+	});
+
+	describe("syncInterval validation", () => {
+		it.each([
+			[-5],
+			[NaN],
+			[Infinity],
+			["abc"],
+			["30"],
+			[null],
+		])("rejects %p and falls back to 0 when saving settings", async (bad) => {
+			const { plugin, saveDataMock } = await makeLoadedPlugin({
+				syncInterval: 30,
+			});
+			plugin.settings.syncInterval = bad as unknown as number;
+			await plugin.saveSettings();
+			expect(plugin.settings.syncInterval).toBe(0);
+			expect(saveDataMock).toHaveBeenCalledWith(
+				expect.objectContaining({ syncInterval: 0 }),
+			);
+		});
+
+		it.each([[-1], [NaN], ["abc"], ["30"]])(
+			"repairs invalid %p from saved data on load and persists it",
+			async (bad) => {
+				const { plugin, saveDataMock } = await makeLoadedPlugin({
+					syncInterval: bad as unknown as number,
+				});
+				expect(plugin.settings.syncInterval).toBe(0);
+				expect(saveDataMock).toHaveBeenCalledWith(
+					expect.objectContaining({ syncInterval: 0 }),
+				);
+			},
+		);
+
+		it("preserves a valid positive syncInterval through save", async () => {
+			const { plugin, saveDataMock } = await makeLoadedPlugin({
+				syncInterval: 15,
+			});
+			saveDataMock.mockClear();
+			await plugin.saveSettings();
+			expect(plugin.settings.syncInterval).toBe(15);
+			expect(saveDataMock).toHaveBeenCalledWith(
+				expect.objectContaining({ syncInterval: 15 }),
+			);
+		});
+
+		it("never schedules an interval for invalid syncInterval values", async () => {
+			const setIntervalSpy = jest.spyOn(window, "setInterval");
+			try {
+				const { plugin } = await makeLoadedPlugin({ syncInterval: 30 });
+				setIntervalSpy.mockClear();
+				for (const bad of [-1, NaN, Infinity, "30"]) {
+					plugin.settings.syncInterval = bad as unknown as number;
+					plugin["rescheduleInterval"]();
+				}
+				expect(setIntervalSpy).not.toHaveBeenCalled();
+			} finally {
+				setIntervalSpy.mockRestore();
+			}
+		});
+	});
+
+	describe("parseSyncIntervalInput", () => {
+		it.each([
+			["0", 0],
+			["30", 30],
+			["0.5", 0.5],
+			[" 45 ", 45],
+			["", 0],
+			["   ", 0],
+		])("accepts %p as %p", (input, expected) => {
+			expect(parseSyncIntervalInput(input)).toBe(expected);
+		});
+
+		it.each([["abc"], ["-5"], ["30abc"], ["1.5x"], ["Infinity"], ["0x10"], ["1e3"]])(
+			"rejects %p",
+			(input) => {					expect(parseSyncIntervalInput(input)).toBeNull();
+				},
+			);
+		});
+
+		describe("sync interval settings tab input", () => {
+
+
+		function stubDomExtensions(el: HTMLElement): void {
+			const ext = el as unknown as {
+				empty(): void;
+				addClass(c: string): void;
+				createEl(
+					tag: string,
+					opts?: { text?: string; cls?: string },
+				): HTMLElement;
+				createDiv(opts?: { text?: string; cls?: string }): HTMLElement;
+			};
+			ext.empty = () => {
+				while (el.firstChild) el.removeChild(el.firstChild);
+			};
+			ext.addClass = (c: string) => {
+				el.classList.add(c);
+			};
+			ext.createEl = (tag, opts) => {
+				const child = document.createElement(tag);
+				if (opts?.text) child.textContent = opts.text;
+				if (opts?.cls) child.className = opts.cls;
+				el.appendChild(child);
+				return child;
+			};
+			ext.createDiv = (opts) => ext.createEl("div", opts);
+		}
+
+		function renderTab(plugin: ArenaSyncPlugin): TextComponentLike {
+			const tab = new ArenaSyncSettingTab(plugin.app, plugin);
+			stubDomExtensions(tab.containerEl);
+			tab.update();
+			const field = MockSetting.textComponents.find(
+				(c) => c.placeholder === "0",
+			);
+			expect(field).toBeDefined();
+			return field!;
+		}
+
+		it("rejects invalid input with a Notice, keeps the previous value, and does not save", async () => {
+			const { plugin, saveDataMock } = await makeLoadedPlugin({
+				syncInterval: 30,
+			});
+			saveDataMock.mockClear();
+			MockNotice.instances.length = 0;
+			MockSetting.textComponents.length = 0;
+
+			const field = renderTab(plugin);
+			expect(field.value).toBe("30");
+
+			await field.onChangeFn!("abc");
+			expect(plugin.settings.syncInterval).toBe(30);
+			expect(saveDataMock).not.toHaveBeenCalled();
+			expect(field.value).toBe("30");
+			expect(
+				MockNotice.instances.some((n) =>
+						n.message.includes("Sync interval must be"),
+					),
+				).toBe(true);
+
+			await field.onChangeFn!("-5");
+			expect(plugin.settings.syncInterval).toBe(30);
+			expect(saveDataMock).not.toHaveBeenCalled();
+
+			await field.onChangeFn!("45");
+			expect(plugin.settings.syncInterval).toBe(45);
+			expect(saveDataMock).toHaveBeenCalledWith(
+				expect.objectContaining({ syncInterval: 45 }),
+			);
+		});
+
+		it("treats empty input as disabled (0)", async () => {
+			const { plugin, saveDataMock } = await makeLoadedPlugin({
+				syncInterval: 30,
+			});
+			saveDataMock.mockClear();
+			MockSetting.textComponents.length = 0;
+
+			const field = renderTab(plugin);
+			await field.onChangeFn!("");
+			expect(plugin.settings.syncInterval).toBe(0);
+			expect(saveDataMock).toHaveBeenCalledWith(
+				expect.objectContaining({ syncInterval: 0 }),
+			);
 		});
 	});
 

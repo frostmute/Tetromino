@@ -9,7 +9,7 @@ import type {
 	ImportProgress,
 	SyncResult,
 } from "./types";
-import { DEFAULT_SETTINGS } from "./types";
+import { DEFAULT_SETTINGS, isNonNegativeFinite } from "./types";
 import { SyncSummaryModal, MigrationPreviewModal } from "./modals";
 import { resolveChannelFolder } from "./utils";
 import {
@@ -148,7 +148,10 @@ export default class ArenaSyncPlugin extends Plugin {
 			window.clearInterval(this.syncIntervalId);
 			this.syncIntervalId = null;
 		}
-		if (this.settings.syncInterval > 0) {
+		if (
+			isNonNegativeFinite(this.settings.syncInterval) &&
+			this.settings.syncInterval > 0
+		) {
 			this.syncIntervalId = this.registerInterval(
 				window.setInterval(
 					() => {
@@ -169,12 +172,14 @@ export default class ArenaSyncPlugin extends Plugin {
 		this.settings = merged;
 		const changed = this.normalizeMappings();
 		const updatedBases = this.ensureAttachmentBaseSnapshots();
-		if (changed || updatedBases) {
+		const intervalSanitized = this.sanitizeSyncInterval();
+		if (changed || updatedBases || intervalSanitized) {
 			await this.saveData(this.settings);
 		}
 	}
 
 	async saveSettings(): Promise<void> {
+		this.sanitizeSyncInterval();
 		await this.saveData(this.settings);
 		this.api = new ArenaApi(
 			this.settings.apiToken,
@@ -411,6 +416,20 @@ export default class ArenaSyncPlugin extends Plugin {
 			}
 		}
 		return changed;
+	}
+
+	/**
+	 * Rejects invalid syncInterval values (negative, NaN, Infinity, or
+	 * non-numbers — e.g. from a hand-edited data file) by resetting them to
+	 * 0 (disabled), so a broken value can never reach rescheduleInterval()
+	 * or persist to disk. Called on load and before every save.
+	 */
+	private sanitizeSyncInterval(): boolean {
+		if (!isNonNegativeFinite(this.settings.syncInterval)) {
+			this.settings.syncInterval = 0;
+			return true;
+		}
+		return false;
 	}
 
 	async importMyChannelsMappings(): Promise<{

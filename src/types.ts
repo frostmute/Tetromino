@@ -188,6 +188,29 @@ export interface ArenaSyncSettings {
 	templateString: string;
 }
 
+/**
+ * True when `value` is a finite, non-negative number (0 means "disabled").
+ * Rejects NaN, Infinity, negative values, and non-numbers (e.g. strings in
+ * a hand-edited data file) so a bad syncInterval can never schedule a timer.
+ */
+export function isNonNegativeFinite(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * Parses a user-typed sync-interval string. Accepts a non-negative decimal
+ * number ("0", "30", "0.5"); an empty string means "disabled" (0). Returns
+ * null for anything else (negative, NaN, trailing/embedded garbage) so the
+ * caller can reject it instead of silently coercing.
+ */
+export function parseSyncIntervalInput(value: string): number | null {
+	const trimmed = value.trim();
+	if (trimmed === "") return 0;
+	if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+	const minutes = Number(trimmed);
+	return isNonNegativeFinite(minutes) ? minutes : null;
+}
+
 export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	apiToken: "",
 	syncInterval: 0,
