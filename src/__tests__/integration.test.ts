@@ -271,8 +271,10 @@ describe("Integration tests with realistic fixtures", () => {
 			expect(result.created).toBe(1); // New Note
 			expect(result.updated).toBe(1); // Changing Note
 			expect(result.skipped).toBe(1); // Stable Note
-			expect(result.deleted).toBe(1); // Delete Me
+			expect(result.deleted).toBe(0); // Missing blocks are not deleted
+			expect(result.noLongerRemote).toHaveLength(1);
 			expect(result.missingPaths).toContain("Are.na/existing-channel/Delete Me.md");
+			expect(mockVault.has("Are.na/existing-channel/Delete Me.md")).toBe(true);
 		});
 	});
 
@@ -427,8 +429,10 @@ describe("Integration tests with realistic fixtures", () => {
 			);
 			const result = await runSync(mapping);
 
-			expect(result.deleted).toBe(1);
+			expect(result.deleted).toBe(0);
+			expect(result.noLongerRemote).toHaveLength(1);
 			expect(result.missingPaths).toContain("Are.na/shrinking-channel/Delete Me.md");
+			expect(mockVault.has("Are.na/shrinking-channel/Delete Me.md")).toBe(true);
 		});
 	});
 

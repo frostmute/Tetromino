@@ -6,7 +6,9 @@ import type {
 	ArenaChannelListItem,
 	ArenaSyncSettings,
 	ChannelMapping,
+	ConflictResolution,
 	ImportProgress,
+	SyncConflict,
 	SyncResult,
 } from "./types";
 import { DEFAULT_SETTINGS, isNonNegativeFinite } from "./types";
@@ -320,6 +322,10 @@ export default class ArenaSyncPlugin extends Plugin {
 			parts.push(`${result.downloaded} assets downloaded`);
 		if (result.errors.length > 0)
 			parts.push(`${result.errors.length} errors`);
+		if ((result.conflicts?.length ?? 0) > 0)
+			parts.push(`${result.conflicts?.length ?? 0} conflicts`);
+		if ((result.noLongerRemote?.length ?? 0) > 0)
+			parts.push(`${result.noLongerRemote?.length ?? 0} no longer remote`);
 		if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
 		const summary = parts.length > 0 ? parts.join(", ") : "no changes";
 		const seconds = (result.duration / 1000).toFixed(1);
@@ -356,6 +362,8 @@ export default class ArenaSyncPlugin extends Plugin {
 			`- downloaded: ${result.downloaded}`,
 			`- skipped: ${result.skipped}`,
 			`- errors: ${result.errors.length}`,
+			`- conflicts: ${result.conflicts?.length ?? 0}`,
+			`- no_longer_remote: ${result.noLongerRemote?.length ?? 0}`,
 			`- duration_ms: ${result.duration}`,
 			"",
 			"### Actions",
@@ -378,7 +386,28 @@ export default class ArenaSyncPlugin extends Plugin {
 
 	private showSummaryModal(result: SyncResult, label: string): void {
 		const title = `Tetromino ${label} Summary`;
-		new SyncSummaryModal(this.app, result, title).open();
+		const actions = result.dryRun
+			? undefined
+			: {
+				onKeepLocal: async (conflict: SyncConflict) => {
+					await this.resolveConflict(conflict, "keep-local");
+				},
+				onUseRemote: async (conflict: SyncConflict) => {
+					await this.resolveConflict(conflict, "use-remote");
+				},
+				onReviewLater: async (conflict: SyncConflict) => {
+					await this.resolveConflict(conflict, "review-later");
+				},
+			};
+		new SyncSummaryModal(this.app, result, title, actions).open();
+	}
+
+	private async resolveConflict(
+		conflict: SyncConflict,
+		resolution: ConflictResolution,
+	): Promise<void> {
+		await this.engine.resolveConflict(conflict, resolution);
+		await this.saveSettings();
 	}
 
 	private normalizeMappings(): boolean {

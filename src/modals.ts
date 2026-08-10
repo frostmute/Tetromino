@@ -1,5 +1,5 @@
-import { App, FuzzySuggestModal, Modal, Setting, TFile } from "obsidian";
-import type { FileDiff, SyncResult } from "./types";
+import { App, FuzzySuggestModal, Modal, Notice, Setting, TFile } from "obsidian";
+import type { FileDiff, SyncConflict, SyncResult } from "./types";
 import type { MigrationPlan } from "./migration";
 
 export class DiffModal extends Modal {
@@ -31,6 +31,8 @@ function renderStats(container: HTMLElement, result: SyncResult): void {
 		["Skipped", result.skipped],
 		["Downloaded", result.downloaded],
 		["Errors", result.errors.length],
+		["Conflicts", result.conflicts?.length ?? 0],
+		["No longer remote", result.noLongerRemote?.length ?? result.missingPaths.length],
 	];
 	const list = stats.createEl("ul");
 	for (const [label, value] of items) {
@@ -71,14 +73,71 @@ function renderDiffList(
 	}
 }
 
+export interface SyncConflictActions {
+	onKeepLocal: (conflict: SyncConflict) => Promise<void>;
+	onUseRemote: (conflict: SyncConflict) => Promise<void>;
+	onReviewLater: (conflict: SyncConflict) => Promise<void>;
+}
+
+function renderConflictList(
+	container: HTMLElement,
+	app: App,
+	conflicts: SyncConflict[],
+	actions?: SyncConflictActions,
+): void {
+	if (conflicts.length === 0) return;
+	container.createEl("h3", { text: "Conflicts (local edits preserved)" });
+	const list = container.createDiv({ cls: "arena-sync-conflict-list" });
+	for (const conflict of conflicts) {
+		const row = list.createDiv({ cls: "arena-sync-conflict-row" });
+		row.createDiv({ text: conflict.localPath, cls: "arena-sync-diff-path" });
+		const viewButton = row.createEl("button", {
+			text: "View diff",
+			cls: "mod-cta",
+		});
+		viewButton.addEventListener("click", () => {
+			new DiffModal(app, conflict.localPath, conflict.diff).open();
+		});
+
+		if (!actions) continue;
+		const buttons: HTMLButtonElement[] = [];
+		const addAction = (label: string, callback: (conflict: SyncConflict) => Promise<void>) => {
+			const button = row.createEl("button", { text: label });
+			buttons.push(button);
+			button.addEventListener("click", () => {
+				void (async () => {
+					buttons.forEach((item) => { item.disabled = true; });
+					try {
+						await callback(conflict);
+						button.setText(`${label} ✓`);
+					} catch (error) {
+						buttons.forEach((item) => { item.disabled = false; });
+						new Notice(`Could not resolve conflict: ${(error as Error).message}`);
+					}
+				})();
+			});
+		};
+		addAction("Keep local", actions.onKeepLocal);
+		addAction("Use remote", actions.onUseRemote);
+		addAction("Review later", actions.onReviewLater);
+	}
+}
+
 export class SyncSummaryModal extends Modal {
 	private result: SyncResult;
 	private titleText: string;
+	private actions?: SyncConflictActions;
 
-	constructor(app: App, result: SyncResult, titleText: string) {
+	constructor(
+		app: App,
+		result: SyncResult,
+		titleText: string,
+		actions?: SyncConflictActions,
+	) {
 		super(app);
 		this.result = result;
 		this.titleText = titleText;
+		this.actions = actions;
 	}
 
 	onOpen(): void {
@@ -98,13 +157,26 @@ export class SyncSummaryModal extends Modal {
 			}
 		}
 
-		if (this.result.missingPaths.length > 0) {
-			contentEl.createEl("h3", { text: "Missing (deleted upstream)" });
+		const noLongerRemote = this.result.noLongerRemote ?? this.result.missingPaths.map((localPath) => ({
+			blockId: 0,
+			channelId: 0,
+			localPath,
+			detectedAt: "",
+		}));
+		if (noLongerRemote.length > 0) {
+			contentEl.createEl("h3", { text: "No longer remote (local files preserved)" });
 			const list = contentEl.createEl("ul");
-			for (const path of this.result.missingPaths) {
-				list.createEl("li", { text: path });
+			for (const candidate of noLongerRemote) {
+				list.createEl("li", { text: candidate.localPath });
 			}
 		}
+
+		renderConflictList(
+			contentEl,
+			this.app,
+			this.result.conflicts ?? [],
+			this.result.dryRun ? undefined : this.actions,
+		);
 
 		contentEl.createEl("h3", { text: "File diffs" });
 		renderDiffList(contentEl, this.app, this.result.fileDiffs);
