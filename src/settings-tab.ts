@@ -12,7 +12,7 @@ import type {
 } from "./types";
 import { parseSyncIntervalInput } from "./types";
 
-export class ArenaSyncSettingTab extends PluginSettingTab {
+export class SettingsTab extends PluginSettingTab {
 	plugin: ArenaSyncPlugin;
 
 	constructor(app: App, plugin: ArenaSyncPlugin) {

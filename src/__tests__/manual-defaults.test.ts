@@ -15,7 +15,7 @@ import {
 	TextComponentLike,
 } from "../__mocks__/obsidian";
 import ArenaSyncPlugin from "../main";
-import { ArenaSyncSettingTab } from "../settings-tab";
+import { SettingsTab } from "../settings-tab";
 import { DEFAULT_SETTINGS, parseSyncIntervalInput } from "../types";
 
 jest.mock("../migration", () => ({
@@ -333,7 +333,7 @@ describe("manual-by-default behavior (a1acdb9)", () => {
 		}
 
 		function renderTab(plugin: ArenaSyncPlugin): TextComponentLike {
-			const tab = new ArenaSyncSettingTab(plugin.app, plugin);
+			const tab = new SettingsTab(plugin.app, plugin);
 			stubDomExtensions(tab.containerEl);
 			tab.update();
 			const field = MockSetting.textComponents.find(
