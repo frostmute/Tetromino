@@ -304,6 +304,31 @@ describe("SyncEngine extended coverage", () => {
 			expect(note).toContain("![[Are.na/Attachments/1-test.png]]");
 		});
 
+		it("falls back to a display URL when the original image URL is missing", async () => {
+			defaultSettings.imageHandling = "download";
+			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
+			const block = makeBlock(1, {
+				class: "Image",
+				title: "Pic",
+				image: {
+					filename: "test.png",
+					content_type: "image/png",
+					display: { url: "https://example.com/test-display.png" },
+				},
+			});
+			mockApi.getChannel.mockResolvedValue(channel);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
+			mockApi.downloadBinary.mockResolvedValue(new ArrayBuffer(8));
+
+			const mapping = makeMapping("test-channel");
+			await runSync(mapping);
+
+			expect(mockApi.downloadBinary).toHaveBeenCalledWith("https://example.com/test-display.png");
+			expect(mockVault.files.get("Are.na/test-channel/Pic.md")?.content).toContain(
+				"![[Are.na/Attachments/1-test.png]]",
+			);
+		});
+
 		it("does not download in dry-run but reports action", async () => {
 			defaultSettings.imageHandling = "download";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;

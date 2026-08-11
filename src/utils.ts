@@ -8,7 +8,7 @@ import type {
 	ChannelMapping,
 } from "./types";
 
-const FRONTMATTER_REGEX = /^(---\n[\s\S]*?\n---\n?)(\s*[\s\S]*)$/;
+const FRONTMATTER_REGEX = /^(---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$))([\s\S]*)$/;
 
 export interface MarkdownContext {
 	channelSlug?: string;
@@ -40,20 +40,35 @@ function yamlQuote(value: string): string {
 	return JSON.stringify(value);
 }
 
-export function resolveImageUrl(block: ArenaBlock): string | null {
-	return block.image?.display?.url || block.image?.thumb?.url || block.image?.original?.url || null;
-}
+type ImageUrlPriority = "thumb-first" | "display-first" | "original-first";
+type ImageVariant = "thumb" | "display" | "original";
 
-function resolveBlockBannerUrlWithPriority(
+const IMAGE_URL_ORDER: Record<ImageUrlPriority, ImageVariant[]> = {
+	"thumb-first": ["thumb", "display", "original"],
+	"display-first": ["display", "thumb", "original"],
+	"original-first": ["original", "display", "thumb"],
+};
+
+export function resolveImageUrl(
 	block: ArenaBlock,
-	priority: "thumb-first" | "display-first",
+	priority: ImageUrlPriority = "display-first",
 ): string | null {
 	const image = block.image;
 	if (!image) return null;
-	if (priority === "display-first") {
-		return image.display?.url || image.thumb?.url || image.original?.url || null;
+
+	for (const variant of IMAGE_URL_ORDER[priority]) {
+		const url = image[variant]?.url;
+		if (url) return url;
 	}
-	return image.thumb?.url || image.display?.url || image.original?.url || null;
+	return null;
+}
+
+function sanitizeMarkdownOutput(markdown: string): string {
+	const frontmatter = FRONTMATTER_REGEX.exec(markdown);
+	if (frontmatter) {
+		return frontmatter[1] + sanitizeMarkdownContent(frontmatter[2]);
+	}
+	return sanitizeMarkdownContent(markdown);
 }
 
 /** Render the complete block body shared by legacy and template output. */
@@ -166,20 +181,13 @@ export function blockToMarkdown(
 		}
 
 		if (settings.bannerFieldEnabled) {
-			const bannerValue = context.bannerImageUrl || resolveBlockBannerUrlWithPriority(block, settings.bannerImagePriority);
+			const bannerValue = context.bannerImageUrl || resolveImageUrl(block, settings.bannerImagePriority);
 			if (bannerValue) {
 				vars[settings.bannerFieldName.trim() || "banner"] = bannerValue;
 			}
 		}
 
-		const rendered = renderTemplate(ast, vars);
-
-		// Sanitize only the body, preserving YAML frontmatter
-		const fmMatch = FRONTMATTER_REGEX.exec(rendered);
-		if (fmMatch) {
-			return fmMatch[1] + sanitizeMarkdownContent(fmMatch[2]);
-		}
-		return sanitizeMarkdownContent(rendered);
+		return sanitizeMarkdownOutput(renderTemplate(ast, vars));
 	}
 
 	// Legacy hardcoded logic
@@ -208,10 +216,7 @@ export function blockToMarkdown(
 		if (settings.bannerFieldEnabled) {
 			const bannerValue =
 				context.bannerImageUrl ||
-				resolveBlockBannerUrlWithPriority(
-					block,
-					settings.bannerImagePriority,
-				);
+				resolveImageUrl(block, settings.bannerImagePriority);
 			if (bannerValue) {
 				const bannerFieldName = settings.bannerFieldName.trim() || "banner";
 				parts.push(`${bannerFieldName}: ${yamlQuote(bannerValue)}`);
@@ -268,7 +273,7 @@ export function blockToMarkdown(
 	}
 
 	parts.push("");
-	return parts.join("\n");
+	return sanitizeMarkdownOutput(parts.join("\n"));
 }
 
 export function resolveAttachmentBaseFolder(
