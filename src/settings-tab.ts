@@ -20,13 +20,24 @@ export class SettingsTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// Obsidian 1.13+ declarative settings API opt-out: returning [] keeps the
-	// imperative update() rendering path without breaking settings search.
+	// Obsidian 1.13+ settings search calls this to index the tab. The UI remains
+	// imperative because it contains dynamic channel mappings and migration controls.
 	getSettingDefinitions(): never[] {
 		return [];
 	}
 
+	// Obsidian opens a tab through display(), while update() refreshes its search index.
+	// Keep both lifecycle hooks: rendering only in update() leaves the opened tab empty.
+	display(): void {
+		this.render();
+	}
+
 	update(): void {
+		super.update();
+		this.render();
+	}
+
+	private render(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.addClass("arena-sync-settings");

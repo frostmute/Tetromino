@@ -335,7 +335,7 @@ describe("manual-by-default behavior (a1acdb9)", () => {
 		function renderTab(plugin: ArenaSyncPlugin): TextComponentLike {
 			const tab = new SettingsTab(plugin.app, plugin);
 			stubDomExtensions(tab.containerEl);
-			tab.update();
+			tab.display();
 			const field = MockSetting.textComponents.find(
 				(c) => c.placeholder === "0",
 			);
@@ -387,6 +387,18 @@ describe("manual-by-default behavior (a1acdb9)", () => {
 			expect(plugin.settings.syncInterval).toBe(0);
 			expect(saveDataMock).toHaveBeenCalledWith(
 				expect.objectContaining({ syncInterval: 0 }),
+			);
+		});
+
+		it("renders settings when Obsidian opens the tab", async () => {
+			const { plugin } = await makeLoadedPlugin({});
+			const tab = new SettingsTab(plugin.app, plugin);
+			stubDomExtensions(tab.containerEl);
+
+			tab.display();
+
+			expect(tab.containerEl.textContent).toContain(
+				"Deterministic one-way import from Are.na into your Obsidian vault.",
 			);
 		});
 	});

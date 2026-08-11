@@ -8,7 +8,7 @@ export const copyToVaults = () => {
     }
 
     const targetVaultPaths = [
-        '/Users/thewytchhaus/workspace/Nexus Vault/.obsidian/plugins/tetromino/',
+        "/Users/frost/Library/Mobile Documents/iCloud~md~obsidian/Documents/nexus-vault/.obsidian/plugins/tetromino/",
     ];
     const sourceFiles = [
         'main.js',

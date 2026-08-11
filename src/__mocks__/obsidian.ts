@@ -92,6 +92,7 @@ export class PluginSettingTab<P extends Plugin = Plugin> {
 		this.containerEl = document.createElement("div");
 	}
 	display(): void {}
+	update(): void {}
 }
 
 type SettingCtor<T> = (component: T) => void;
