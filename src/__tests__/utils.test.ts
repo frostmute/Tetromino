@@ -70,6 +70,15 @@ describe("blockToMarkdown", () => {
 		expect(md).toContain("# Test Block");
 	});
 
+	it("sanitizes imported body content in legacy output", () => {
+		const md = blockToMarkdown(
+			makeBlock({ content: "<script>evil()</script>safe" }),
+			settings,
+		);
+		expect(md).not.toContain("<script>");
+		expect(md).toContain("safe");
+	});
+
 	it("preserves content for block classes beyond Text", () => {
 		const block = makeBlock({
 			class: "Embed",
@@ -326,6 +335,16 @@ describe("blockToMarkdown with templateEnabled", () => {
 		expect(md).not.toContain("<script>");
 		expect(md).toContain("safe");
 	});
+
+	it("preserves CRLF frontmatter while sanitizing its body", () => {
+		const tmpl = "---\r\ntitle: <style>keep this frontmatter</style>\r\n---\r\n\r\n{{content}}";
+		const s = { ...base, templateString: tmpl };
+		const block = makeBlock({ content: "<script>evil()</script>safe" });
+		const md = blockToMarkdown(block, s);
+		expect(md).toContain("title: <style>keep this frontmatter</style>");
+		expect(md).not.toContain("<script>");
+		expect(md).toContain("safe");
+	});
 });
 
 /* ------------------------------------------------------------------ */
@@ -427,6 +446,19 @@ describe("resolveImageUrl", () => {
 			},
 		});
 		expect(resolveImageUrl(block)).toBe("https://cdn.are.na/photo_thumb.jpg");
+	});
+
+	it("can prefer the original URL for downloads", () => {
+		const block = makeBlock({
+			class: "Image",
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+			},
+		});
+		expect(resolveImageUrl(block, "original-first")).toBe("https://cdn.are.na/photo.jpg");
 	});
 });
 

@@ -577,7 +577,7 @@ export class SyncEngine {
 			if (this.settings.imageHandling !== "download" || !block.image) {
 				return undefined;
 			}
-			url = block.image.original?.url || resolveImageUrl(block);
+			url = resolveImageUrl(block, "original-first");
 			fileName = block.image.filename;
 		}
 

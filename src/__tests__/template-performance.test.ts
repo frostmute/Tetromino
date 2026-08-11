@@ -1,7 +1,7 @@
 import { parseTemplate, renderTemplate } from "../templateUtils";
 
 describe("template rendering performance", () => {
-	const defaultTemplate = `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{#if image}}![{{title}}]({{image}}){{/if}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`;
+	const defaultTemplate = `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`;
 
 	it("caches parsed templates by string reference", () => {
 		const ast1 = parseTemplate(defaultTemplate);
@@ -17,8 +17,7 @@ describe("template rendering performance", () => {
 			class: "Image",
 			arena_url: "https://www.are.na/block/12345",
 			description: "A short description",
-			image: "https://cdn.are.na/image.jpg",
-			content: "Some body content here",
+		content: "Some body content here",
 		};
 
 		const start = Date.now();
