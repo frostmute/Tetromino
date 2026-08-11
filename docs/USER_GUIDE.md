@@ -293,8 +293,6 @@ arena_id: {{id}}
 
 # {{title}}
 
-{{#if image}}![{{title}}]({{image}}){{/if}}
-
 {{content}}
 ```
 {% endraw %}

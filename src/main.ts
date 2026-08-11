@@ -24,6 +24,10 @@ import type { SyncConflictActions } from "./modals";
 import { DEFAULT_SETTINGS, isNonNegativeFinite } from "./types";
 
 const ARENA_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="15" width="30" height="30" rx="4"/><rect x="55" y="15" width="30" height="30" rx="4"/><rect x="15" y="55" width="30" height="30" rx="4"/><rect x="55" y="55" width="30" height="30" rx="4"/><line x1="45" y1="30" x2="55" y2="30"/><line x1="30" y1="45" x2="30" y2="55"/><line x1="70" y1="45" x2="70" y2="55"/></svg>`;
+const LEGACY_DEFAULT_TEMPLATE = DEFAULT_SETTINGS.templateString.replace(
+  "\n\n{{content}}",
+  "\n\n{{#if image}}![{{title}}]({{image}}){{/if}}\n\n{{content}}",
+);
 
 export default class TetrominoPlugin extends Plugin {
   settings: ArenaSyncSettings = DEFAULT_SETTINGS;
@@ -162,7 +166,11 @@ export default class TetrominoPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Partial<ArenaSyncSettings>;
     this.settings = { ...DEFAULT_SETTINGS, ...data };
-    let changed = this.normalizeMappings();
+    const migratedTemplate = data.templateString === LEGACY_DEFAULT_TEMPLATE;
+    if (migratedTemplate) {
+      this.settings.templateString = DEFAULT_SETTINGS.templateString;
+    }
+    let changed = migratedTemplate || this.normalizeMappings();
     changed = this.ensureAttachmentBaseSnapshots() || changed;
     changed = this.sanitizeSyncInterval() || changed;
     if (changed) {

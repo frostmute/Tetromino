@@ -19,6 +19,7 @@ import {
 	resolveChannelFolder,
 	resolveAttachmentBaseFolder,
 	sanitiseFilename,
+	resolveImageUrl,
 } from "./utils";
 import { unifiedDiff } from "./diff";
 import { pMap } from "./utils";
@@ -576,7 +577,7 @@ export class SyncEngine {
 			if (this.settings.imageHandling !== "download" || !block.image) {
 				return undefined;
 			}
-			url = block.image.original.url;
+			url = block.image.original?.url || resolveImageUrl(block);
 			fileName = block.image.filename;
 		}
 

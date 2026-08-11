@@ -96,8 +96,6 @@ arena_url: "{{arena_url}}"
 
 # {{title}}
 
-{{#if image}}![{{title}}]({{image}}){{/if}}
-
 {{content}}
 
 {{#if description}}
