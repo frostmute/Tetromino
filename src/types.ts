@@ -23,9 +23,9 @@ export interface ArenaBlock {
 	image: {
 		filename: string;
 		content_type: string;
-		original: { url: string };
-		display: { url: string };
-		thumb: { url: string };
+		original?: { url: string };
+		display?: { url: string };
+		thumb?: { url: string };
 	} | null;
 	attachment: {
 		file_name: string;
@@ -272,5 +272,5 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	notifyOnSync: true,
 	debugLogging: false,
 	templateEnabled: false,
-	templateString: `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{#if image}}![{{title}}]({{image}}){{/if}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`
+	templateString: `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`
 };

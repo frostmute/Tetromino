@@ -40,35 +40,71 @@ function yamlQuote(value: string): string {
 	return JSON.stringify(value);
 }
 
-function resolveImageEmbedUrl(block: ArenaBlock): string | null {
-	if (!block.image) return null;
-	return (
-		block.image.display?.url ||
-		block.image.thumb?.url ||
-		block.image.original?.url ||
-		null
-	);
+export function resolveImageUrl(block: ArenaBlock): string | null {
+	return block.image?.display?.url || block.image?.thumb?.url || block.image?.original?.url || null;
 }
 
 function resolveBlockBannerUrlWithPriority(
 	block: ArenaBlock,
 	priority: "thumb-first" | "display-first",
 ): string | null {
-	if (!block.image) return null;
+	const image = block.image;
+	if (!image) return null;
 	if (priority === "display-first") {
-		return (
-			block.image.display?.url ||
-			block.image.thumb?.url ||
-			block.image.original?.url ||
-			null
-		);
+		return image.display?.url || image.thumb?.url || image.original?.url || null;
 	}
-	return (
-		block.image.thumb?.url ||
-		block.image.display?.url ||
-		block.image.original?.url ||
-		null
-	);
+	return image.thumb?.url || image.display?.url || image.original?.url || null;
+}
+
+/** Render the complete block body shared by legacy and template output. */
+function renderBlockContent(
+	block: ArenaBlock,
+	settings: ArenaSyncSettings,
+	context: MarkdownContext,
+): string {
+	const title = block.title ?? `Block ${block.id}`;
+	const body: string[] = [];
+	const content =
+		typeof block.content === "string" && block.content.trim()
+			? block.content
+			: null;
+	const source = block.source?.url ? normalizeArenaUrl(block.source.url) : null;
+	let representation = "";
+
+	if (block.class === "Image" && block.image) {
+		const imageUrl = resolveImageUrl(block);
+		if (settings.imageHandling === "download") {
+			const asset = context.assetPath || (imageUrl ? block.image.filename : null);
+			if (asset) representation = `![[${asset}]]`;
+		} else if (imageUrl && settings.imageHandling === "embed") {
+			representation = `![${title}](${imageUrl})`;
+		} else if (imageUrl) {
+			representation = `[${title}](${imageUrl})`;
+		}
+	} else if (block.class === "Link" && source) {
+		representation = `[${block.source?.title || source}](${source})`;
+	} else if ((block.class === "Media" || block.class === "Embed") && source) {
+		representation = `<${source}>`;
+	} else if (block.class === "Attachment" && block.attachment) {
+		const fileName = block.attachment.file_name;
+		if (context.assetPath && settings.attachmentHandling === "download") {
+			representation = settings.downloadedAttachmentLinkStyle === "embed"
+				? `![[${context.assetPath}]]`
+				: `[[${context.assetPath}|${fileName}]]`;
+		} else {
+			representation = `[${fileName}](${block.attachment.url})`;
+		}
+	} else if (block.class === "Channel" && source) {
+		representation = `[${block.source?.title || title}](${source})`;
+	}
+
+	if (context.bodyImageUrl && block.class !== "Image") {
+		body.push(`![${title}](${context.bodyImageUrl})`);
+	}
+	if (representation && block.class === "Image") body.push(representation);
+	if (content) body.push(content);
+	if (representation && block.class !== "Image") body.push(representation);
+	return body.join("\n\n");
 }
 
 export function normalizeArenaUrl(url: string): string {
@@ -112,41 +148,12 @@ export function blockToMarkdown(
 			channel_title: context.channelTitle || ""
 		};
 		
-		let contentPart = "";
-		switch (block.class) {
-			case "Text":
-				contentPart = block.content ?? "";
-				break;
-			case "Link":
-				if (block.source?.url) {
-					contentPart = `[${block.source.title || block.source.url}](${normalizeArenaUrl(block.source.url)})`;
-				}
-				break;
-			case "Media":
-				if (block.source?.url) {
-					contentPart = `<${normalizeArenaUrl(block.source.url)}>`;
-				}
-				break;
-			case "Attachment":
-				if (block.attachment) {
-					if (context.assetPath && settings.attachmentHandling === "download") {
-						if (settings.downloadedAttachmentLinkStyle === "embed") {
-							contentPart = `![[${context.assetPath}]]`;
-						} else {
-							contentPart = `[[${context.assetPath}|${block.attachment.file_name}]]`;
-						}
-					} else {
-						contentPart = `[${block.attachment.file_name}](${block.attachment.url})`;
-					}
-				}
-				break;
-		}
-		vars.content = contentPart;
+		vars.content = renderBlockContent(block, settings, context);
 		vars.comments = context.comments || [];
 		vars.connected_channels = context.connectedChannels || [];
 
 		if (block.class === "Image" && block.image) {
-			const embedUrl = resolveImageEmbedUrl(block);
+			const embedUrl = resolveImageUrl(block);
 			if (settings.imageHandling === "download" && context.assetPath) {
 				vars.image = context.assetPath;
 			} else if (settings.imageHandling === "embed" && embedUrl) {
@@ -218,58 +225,14 @@ export function blockToMarkdown(
 	parts.push(`# ${title}`);
 	parts.push("");
 
-	if (context.bodyImageUrl && block.class !== "Image") {
-		parts.push(`![${title}](${context.bodyImageUrl})`);
-		parts.push("");
+	const renderedBody = renderBlockContent(block, settings, context);
+	if (renderedBody) {
+		parts.push(renderedBody);
 	}
 
-	switch (block.class) {
-		case "Text":
-			parts.push(block.content ?? "");
-			break;
-		case "Image":
-			if (block.image) {
-				const embedUrl = resolveImageEmbedUrl(block);
-				if (settings.imageHandling === "download") {
-					const ref = context.assetPath ?? block.image.filename;
-					parts.push(`![[${ref}]]`);
-				} else if (settings.imageHandling === "embed") {
-					if (embedUrl) {
-						parts.push(`![${title}](${embedUrl})`);
-					}
-				} else if (embedUrl) {
-					parts.push(`[${title}](${embedUrl})`);
-				}
-			}
-			break;
-		case "Link":
-			if (block.source?.url) {
-				const source = normalizeArenaUrl(block.source.url);
-				parts.push(`[${block.source.title || source}](${source})`);
-			}
-			if (block.description) {
-				parts.push("");
-				parts.push(block.description);
-			}
-			break;
-		case "Media":
-			if (block.source?.url) {
-				parts.push(`<${normalizeArenaUrl(block.source.url)}>`);
-			}
-			break;
-		case "Attachment":
-			if (block.attachment) {
-				if (context.assetPath && settings.attachmentHandling === "download") {
-					if (settings.downloadedAttachmentLinkStyle === "embed") {
-						parts.push(`![[${context.assetPath}]]`);
-					} else {
-						parts.push(`[[${context.assetPath}|${block.attachment.file_name}]]`);
-					}
-				} else {
-					parts.push(`[${block.attachment.file_name}](${block.attachment.url})`);
-				}
-			}
-			break;
+	if (block.class === "Link" && block.description) {
+		parts.push("");
+		parts.push(block.description);
 	}
 
 	if (block.description && block.class !== "Link") {

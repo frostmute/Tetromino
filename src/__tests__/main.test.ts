@@ -1,6 +1,6 @@
 import { App, TFile, Vault } from "obsidian";
 import ArenaSyncPlugin from "../main";
-import { ChannelMapping, SyncResult } from "../types";
+import { ChannelMapping, DEFAULT_SETTINGS, SyncResult } from "../types";
 import { SyncEngine } from "../sync-engine";
 import { ArenaApi } from "../api";
 
@@ -126,6 +126,24 @@ describe("ArenaSyncPlugin", () => {
 			await plugin.loadSettings();
 			expect(plugin.settings.apiToken).toBe("secret");
 			expect(plugin.settings.channelMappings).toEqual([]);
+		});
+
+		it("migrates the saved default template without touching custom templates", async () => {
+			const oldDefault = DEFAULT_SETTINGS.templateString.replace(
+				"\n\n{{content}}",
+				"\n\n{{#if image}}![{{title}}]({{image}}){{/if}}\n\n{{content}}",
+			);
+			loadDataMock.mockResolvedValue({ templateString: oldDefault });
+			await plugin.loadSettings();
+
+			expect(plugin.settings.templateString).toBe(DEFAULT_SETTINGS.templateString);
+			expect(saveDataMock).toHaveBeenCalled();
+
+			saveDataMock.mockClear();
+			loadDataMock.mockResolvedValue({ templateString: "# custom" });
+			await plugin.loadSettings();
+			expect(plugin.settings.templateString).toBe("# custom");
+			expect(saveDataMock).not.toHaveBeenCalled();
 		});
 
 		it("normalizes legacy mappings", async () => {

@@ -134,6 +134,17 @@ describe("Integration tests with realistic fixtures", () => {
 			expect(mockVault.has("Are.na/mixed-channel/Related Channel.md")).toBe(true);
 			expect(mockVault.has("Are.na/mixed-channel/Unicode_ 你好世界 🌍 Émojis.md")).toBe(true);
 
+			// Body rendering must preserve text, media URLs, and downloaded image embeds.
+			expect(mockVault.content("Are.na/mixed-channel/Overview.md")).toContain(
+				"This channel contains mixed content types.",
+			);
+			expect(mockVault.content("Are.na/mixed-channel/Video Embed.md")).toContain(
+				"<https://youtube.com/watch?v=12345>",
+			);
+			expect(mockVault.content("Are.na/mixed-channel/Diagram.md")).toContain(
+				"![[Are.na/Attachments/2-diagram.jpg]]",
+			);
+
 			// Image block should have downloaded asset
 			expect(result.downloaded).toBeGreaterThanOrEqual(1);
 			expect(mockVault.has("Are.na/Attachments/2-diagram.jpg")).toBe(true);

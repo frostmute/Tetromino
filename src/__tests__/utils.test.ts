@@ -6,6 +6,7 @@ import {
 	normalizeArenaUrl,
 	resolveChannelFolder,
 	resolveAttachmentBaseFolder,
+	resolveImageUrl,
 	sanitiseFilename,
 	pMap,
 } from "../utils";
@@ -67,6 +68,24 @@ describe("blockToMarkdown", () => {
 		const md = blockToMarkdown(makeBlock(), s);
 		expect(md).not.toContain("---\narena_id");
 		expect(md).toContain("# Test Block");
+	});
+
+	it("preserves content for block classes beyond Text", () => {
+		const block = makeBlock({
+			class: "Embed",
+			content: "This content must not be dropped.",
+			source: { url: "https://example.com/embed", title: "Embed" },
+		});
+		const md = blockToMarkdown(block, settings);
+		const templated = blockToMarkdown(block, {
+			...settings,
+			templateEnabled: true,
+			templateString: "{{content}}",
+		});
+		expect(md).toContain("This content must not be dropped.");
+		expect(md).toContain("<https://example.com/embed>");
+		expect(templated).toContain("This content must not be dropped.");
+		expect(templated).toContain("<https://example.com/embed>");
 	});
 
 	it("handles a link block", () => {
@@ -247,6 +266,40 @@ describe("blockToMarkdown with templateEnabled", () => {
 		expect(blockToMarkdown(makeBlock({ description: null }), s)).toBe("");
 	});
 
+	it("default template renders downloaded images through content", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...DEFAULT_SETTINGS, templateEnabled: true };
+		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
+		expect(md).toContain("![[Are.na/Attachments/12345-photo.jpg]]");
+	});
+
+	it("template: image content is an Obsidian embed", () => {
+		const block = makeBlock({
+			class: "Image",
+			content: null,
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				original: { url: "https://cdn.are.na/photo.jpg" },
+				display: { url: "https://cdn.are.na/photo_display.jpg" },
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		const s = { ...base, templateString: "{{content}}", imageHandling: "download" as const };
+		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
+		expect(md).toBe("![[Are.na/Attachments/12345-photo.jpg]]");
+	});
+
 	it("template: image block sets image variable with download path", () => {
 		const block = makeBlock({
 			class: "Image",
@@ -360,6 +413,20 @@ describe("blockFileName", () => {
 
 	it("title-id scheme", () => {
 		expect(blockFileName(block, "title-id")).toBe("Test Block (12345).md");
+	});
+});
+
+describe("resolveImageUrl", () => {
+	it("falls back to an available image variant", () => {
+		const block = makeBlock({
+			class: "Image",
+			image: {
+				filename: "photo.jpg",
+				content_type: "image/jpeg",
+				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
+			},
+		});
+		expect(resolveImageUrl(block)).toBe("https://cdn.are.na/photo_thumb.jpg");
 	});
 });
 
