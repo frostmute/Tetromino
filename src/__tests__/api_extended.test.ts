@@ -1,5 +1,5 @@
 import * as obsidian from "obsidian";
-import { ArenaApi } from "../api";
+import { ArenaApi, RequestTimeoutError, withTimeout } from "../api";
 import { makeBlock } from "./fixtures";
 import type { ArenaBlock, ArenaChannelListItem } from "../types";
 
@@ -772,5 +772,60 @@ describe("ArenaApi listMyChannels", () => {
 		const channels = await api.listAllMyChannels();
 		expect(channels).toHaveLength(2);
 		expect(channels.map((c) => c.slug)).toEqual(["a", "b"]);
+	});
+});
+
+describe("ArenaApi request timeout", () => {
+	let requestUrlMock: jest.SpyInstance;
+
+	beforeEach(() => {
+		requestUrlMock = jest.spyOn(obsidian, "requestUrl");
+		// Real timers: the timeout wrapper relies on `setTimeout` firing at
+		// wall-clock time so the regression below would hang indefinitely
+		// under jest's fake-timer clock.
+		jest.useRealTimers();
+	});
+
+	afterEach(() => {
+		requestUrlMock.mockRestore();
+	});
+
+	it("withTimeout rejects with RequestTimeoutError when promise hangs", async () => {
+		const hanging = new Promise(() => {});
+		await expect(
+			withTimeout(hanging, 20, "https://test.are.na"),
+		).rejects.toBeInstanceOf(RequestTimeoutError);
+	});
+
+	it("withTimeout resolves with the inner value when promise settles first", async () => {
+		await expect(
+			withTimeout(Promise.resolve("ok"), 100, "https://test.are.na"),
+		).resolves.toBe("ok");
+	});
+
+	it("request() propagates RequestTimeoutError when requestUrl never resolves", async () => {
+		requestUrlMock.mockImplementation(() => new Promise(() => {}));
+
+		const api = new ArenaApi("token", false, {
+			requestTimeoutMs: 30,
+			maxRetries: 1,
+		});
+
+		await expect(api.getChannel("test-slug")).rejects.toBeInstanceOf(
+			RequestTimeoutError,
+		);
+	});
+
+	it("downloadBinary() propagates RequestTimeoutError when requestUrl never resolves", async () => {
+		requestUrlMock.mockImplementation(() => new Promise(() => {}));
+
+		const api = new ArenaApi("token", false, {
+			downloadTimeoutMs: 30,
+			maxRetries: 1,
+		});
+
+		await expect(
+			api.downloadBinary("https://example.com/file.jpg"),
+		).rejects.toBeInstanceOf(RequestTimeoutError);
 	});
 });

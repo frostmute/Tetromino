@@ -13,6 +13,8 @@ const MAX_RETRIES = 3;
 const RATE_LIMIT_STATUS = 429;
 const REQUEST_DELAY = 100;
 const JITTER = 50;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_DOWNLOAD_TIMEOUT_MS = 60_000;
 
 const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 
@@ -26,6 +28,44 @@ function withJitter(ms: number): number {
 
 function transientBackoffMs(attempts: number): number {
 	return Math.min(1000 * Math.pow(2, attempts), 10000) + Math.floor(Math.random() * JITTER);
+}
+
+/**
+ * Error thrown when a `requestUrl` call does not resolve within the configured
+ * timeout. Surfaced so callers (and tests) can distinguish a timeout from
+ * other transient errors.
+ */
+export class RequestTimeoutError extends Error {
+	readonly url: string;
+	readonly timeoutMs: number;
+	constructor(url: string, timeoutMs: number) {
+		super(`Are.na request to ${url} timed out after ${timeoutMs}ms`);
+		this.name = "RequestTimeoutError";
+		this.url = url;
+		this.timeoutMs = timeoutMs;
+	}
+}
+
+/**
+ * Race a promise against a timeout. If the timeout fires first the returned
+ * promise rejects with a `RequestTimeoutError`. The timer is always cleared
+ * on settle so a late-resolving inner promise does not keep a timer alive.
+ */
+export function withTimeout<T>(
+	promise: Promise<T>,
+	ms: number,
+	url: string,
+): Promise<T> {
+	let timer: number | undefined;
+	const timeout = new Promise<never>((_, reject) => {
+		timer = window.setTimeout(
+			() => reject(new RequestTimeoutError(url, ms)),
+			ms,
+		);
+	});
+	return Promise.race([promise, timeout]).finally(() => {
+		if (timer !== undefined) window.clearTimeout(timer);
+	});
 }
 
 function isRecord(val: unknown): val is Record<string, unknown> {
@@ -42,15 +82,33 @@ interface CacheEntry<T> {
 	expiry: number;
 }
 
+export interface ArenaApiOptions {
+	requestTimeoutMs?: number;
+	downloadTimeoutMs?: number;
+	maxRetries?: number;
+}
+
 export class ArenaApi {
 	private token: string;
 	private debug: boolean;
 	private cache = new Map<string, CacheEntry<unknown>>();
 	private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+	private readonly requestTimeoutMs: number;
+	private readonly downloadTimeoutMs: number;
+	private readonly maxRetries: number;
 
-	constructor(token: string, debug = false) {
+	constructor(
+		token: string,
+		debug = false,
+		options: ArenaApiOptions = {},
+	) {
 		this.token = token;
 		this.debug = debug;
+		this.requestTimeoutMs =
+			options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+		this.downloadTimeoutMs =
+			options.downloadTimeoutMs ?? DEFAULT_DOWNLOAD_TIMEOUT_MS;
+		this.maxRetries = options.maxRetries ?? MAX_RETRIES;
 	}
 
 	private getCached<T>(key: string): T | undefined {
@@ -95,7 +153,7 @@ export class ArenaApi {
 	): Promise<T> {
 		let attempts = 0;
 
-		while (attempts < MAX_RETRIES) {
+		while (attempts < this.maxRetries) {
 			const params: RequestUrlParam = {
 				url: this.buildApiUrl(path),
 				method,
@@ -109,10 +167,14 @@ export class ArenaApi {
 
 			let res;
 			try {
-				res = await requestUrl(params);
+				res = await withTimeout(
+					requestUrl(params),
+					this.requestTimeoutMs,
+					params.url,
+				);
 			} catch (err) {
 				attempts++;
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw err;
 				}
 				await delay(transientBackoffMs(attempts));
@@ -124,14 +186,14 @@ export class ArenaApi {
 				const retryAfter = this.readRetryAfterSeconds(res.headers);
 				attempts++;
 
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw new Error(this.getErrorMessage(RATE_LIMIT_STATUS));
 				}
 
 				this.log(
 					`Rate limited (429). ` +
 						`Retrying after ${retryAfter}s ` +
-						`(attempt ${attempts}/${MAX_RETRIES})`
+						`(attempt ${attempts}/${this.maxRetries})`
 				);
 
 				await delay(retryAfter * 1000);
@@ -141,7 +203,7 @@ export class ArenaApi {
 			// Handle transient server errors
 			if (TRANSIENT_STATUSES.has(res.status)) {
 				attempts++;
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw new Error(this.getErrorMessage(res.status));
 				}
 				await delay(transientBackoffMs(attempts));
@@ -489,17 +551,21 @@ export class ArenaApi {
 	async downloadBinary(url: string): Promise<ArrayBuffer> {
 		let attempts = 0;
 
-		while (attempts < MAX_RETRIES) {
+		while (attempts < this.maxRetries) {
 			let res;
 			try {
-				res = await requestUrl({
+				res = await withTimeout(
+					requestUrl({
+						url,
+						method: "GET",
+						headers: {},
+					}),
+					this.downloadTimeoutMs,
 					url,
-					method: "GET",
-					headers: {},
-				});
+				);
 			} catch (err) {
 				attempts++;
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw err;
 				}
 				await delay(transientBackoffMs(attempts));
@@ -511,7 +577,7 @@ export class ArenaApi {
 				const retryAfter = this.readRetryAfterSeconds(res.headers);
 				attempts++;
 
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw new Error(
 						`Asset download rate limited (429). ` +
 							`Try again in ${retryAfter} seconds.`,
@@ -521,7 +587,7 @@ export class ArenaApi {
 				this.log(
 					`Download rate limited. ` +
 						`Retrying after ${retryAfter}s ` +
-						`(attempt ${attempts}/${MAX_RETRIES})`
+						`(attempt ${attempts}/${this.maxRetries})`
 				);
 
 				await delay(retryAfter * 1000);
@@ -530,7 +596,7 @@ export class ArenaApi {
 
 			if (TRANSIENT_STATUSES.has(res.status)) {
 				attempts++;
-				if (attempts >= MAX_RETRIES) {
+				if (attempts >= this.maxRetries) {
 					throw new Error(
 						`Asset download temporary failure (${res.status}) for ${url}`,
 					);

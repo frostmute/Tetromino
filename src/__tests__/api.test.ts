@@ -220,22 +220,14 @@ describe("ArenaApi security", () => {
 		});
 
 		it("returns false when /me request fails after retries", async () => {
-			jest.useFakeTimers();
 			requestUrlMock.mockRejectedValue(new Error("Network Error"));
 
-			const api = new ArenaApi("token");
-			const resultPromise = api.verifyToken();
-
-			// Advance past all retry backoff delays
-			for (let i = 0; i < MAX_RETRIES; i++) {
-				await Promise.resolve();
-				jest.advanceTimersByTime(30000);
-			}
-
-			const isValid = await resultPromise;
+			// maxRetries: 1 so the first failure throws without a backoff
+			// delay; avoids needing fake timers to skip the (real) backoff.
+			const api = new ArenaApi("token", false, { maxRetries: 1 });
+			const isValid = await api.verifyToken();
 
 			expect(isValid).toBe(false);
-			jest.useRealTimers();
 		});
 	});
 });
