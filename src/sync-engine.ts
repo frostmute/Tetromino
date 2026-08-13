@@ -43,7 +43,10 @@ export class SyncEngine {
 	private channelPreviewCache = new Map<string, string | null>();
 	private folderCache = new Set<string>();
 	private ensureFolderMutex: Promise<void> = Promise.resolve();
-	private _timers = new Map<string, { start: number; durationMs?: number; callSite: string }>();
+	private _timers = new Map<
+		string,
+		{ start: number; durationMs?: number; callSite: string }
+	>();
 
 	private get debug(): boolean {
 		return this.settings.debugLogging === true;
@@ -75,7 +78,10 @@ export class SyncEngine {
 	 * sync operation. Production callers (the plugin UI) ignore this; tests
 	 * use it to assert that each labeled phase ran the expected number of times.
 	 */
-	getDebugTimings(): Map<string, { start: number; durationMs?: number; callSite: string }> {
+	getDebugTimings(): Map<
+		string,
+		{ start: number; durationMs?: number; callSite: string }
+	> {
 		return new Map(this._timers);
 	}
 
@@ -122,37 +128,41 @@ export class SyncEngine {
 			(m) => m.enabled,
 		);
 
-		const results = await pMap(enabledMappings, CONCURRENCY.CHANNEL_SYNC, async (mapping) => {
-			try {
-				return await this.syncChannel(mapping, options);
-			} catch (err) {
-				return {
-					created: 0,
-					updated: 0,
-					deleted: 0,
-					moved: 0,
-					skipped: 0,
-					downloaded: 0,
-					dryRun,
-					actions: [],
-					moves: [],
-					fileDiffs: [],
-					missingPaths: [],
-					errors: [
-						{
-							blockId: null,
-							channelSlug: mapping.channelSlug,
-							message:
-								err instanceof Error
-									? err.message
-									: String(err),
-							recoverable: false,
-						},
-					],
-					duration: 0,
-				};
-			}
-		});
+		const results = await pMap(
+			enabledMappings,
+			CONCURRENCY.CHANNEL_SYNC,
+			async (mapping) => {
+				try {
+					return await this.syncChannel(mapping, options);
+				} catch (err) {
+					return {
+						created: 0,
+						updated: 0,
+						deleted: 0,
+						moved: 0,
+						skipped: 0,
+						downloaded: 0,
+						dryRun,
+						actions: [],
+						moves: [],
+						fileDiffs: [],
+						missingPaths: [],
+						errors: [
+							{
+								blockId: null,
+								channelSlug: mapping.channelSlug,
+								message:
+									err instanceof Error
+										? err.message
+										: String(err),
+								recoverable: false,
+							},
+						],
+						duration: 0,
+					};
+				}
+			},
+		);
 
 		for (const result of results) {
 			aggregate.created += result.created;
@@ -275,37 +285,41 @@ export class SyncEngine {
 				})
 			: blocks;
 
-		await pMap(blocksToProcess, CONCURRENCY.BLOCK_PROCESS, async (block) => {
-			this.time(`arena-sync:block:${block.id}`);
-			try {
-				const path = await this.pullBlock(
-					block,
-					mapping,
-					channel,
-					channelFolder,
-					attachmentBaseFolder,
-					result,
-					dryRun,
-				);
-				importedPaths.push(path);
-			} catch (err) {
-				result.errors.push({
-					blockId: block.id,
-					channelSlug: mapping.channelSlug,
-					message: (err as Error).message,
-					recoverable: true,
-				});
-			} finally {
-				completed++;
-				this.timeEnd(`arena-sync:block:${block.id}`);
-				this.onProgress?.({
-					channelSlug: mapping.channelSlug,
-					phase: "blocks",
-					current: completed,
-					total: blocks.length,
-				});
-			}
-		});
+		await pMap(
+			blocksToProcess,
+			CONCURRENCY.BLOCK_PROCESS,
+			async (block) => {
+				this.time(`arena-sync:block:${block.id}`);
+				try {
+					const path = await this.pullBlock(
+						block,
+						mapping,
+						channel,
+						channelFolder,
+						attachmentBaseFolder,
+						result,
+						dryRun,
+					);
+					importedPaths.push(path);
+				} catch (err) {
+					result.errors.push({
+						blockId: block.id,
+						channelSlug: mapping.channelSlug,
+						message: (err as Error).message,
+						recoverable: true,
+					});
+				} finally {
+					completed++;
+					this.timeEnd(`arena-sync:block:${block.id}`);
+					this.onProgress?.({
+						channelSlug: mapping.channelSlug,
+						phase: "blocks",
+						current: completed,
+						total: blocks.length,
+					});
+				}
+			},
+		);
 
 		await this.updateChannelIndex(
 			mapping,
@@ -416,9 +430,7 @@ export class SyncEngine {
 			Boolean(record?.pendingConflict) && localHash !== remoteHash;
 		const shouldReportConflict =
 			localHash !== remoteHash &&
-			(unresolvedConflict ||
-				!record ||
-				(remoteChanged && localChanged));
+			(unresolvedConflict || !record || (remoteChanged && localChanged));
 
 		if (shouldReportConflict) {
 			const content = localContent ?? (await this.vault.read(existing));
@@ -517,7 +529,9 @@ export class SyncEngine {
 	): Promise<void> {
 		const record = this.findRecord(conflict.blockId, conflict.channelId);
 		if (!record) {
-			throw new Error(`Conflict record not found for ${conflict.localPath}`);
+			throw new Error(
+				`Conflict record not found for ${conflict.localPath}`,
+			);
 		}
 
 		if (resolution === "review-later") {
@@ -683,12 +697,10 @@ export class SyncEngine {
 	 */
 	private blockNeedsComments(block: ArenaBlock): boolean {
 		if (!this.settings.includeBlockComments) return false;
-		return (
-			"comment_count" in block &&
+		return "comment_count" in block &&
 			typeof block.comment_count === "number"
-				? block.comment_count > 0
-				: true
-		);
+			? block.comment_count > 0
+			: true;
 	}
 
 	private async updateChannelIndex(
@@ -1124,14 +1136,26 @@ export class SyncEngine {
 	}
 
 	private async ensureFolder(path: string): Promise<void> {
+		const normalized = normalizePath(path);
+
+		// ⚡ Bolt: Fast path - avoid acquiring the lock if the folder is already cached or exists in the vault.
+		// This prevents unnecessary serialization during concurrent block processing.
+		if (this.folderCache.has(normalized)) return;
+		if (this.vault.getAbstractFileByPath(normalized)) {
+			this.folderCache.add(normalized);
+			return;
+		}
+
 		let release!: () => void;
-		const next = new Promise<void>((r) => { release = r; });
+		const next = new Promise<void>((r) => {
+			release = r;
+		});
 		const prev = this.ensureFolderMutex;
 		this.ensureFolderMutex = next;
 		await prev;
 
 		try {
-			const normalized = normalizePath(path);
+			// Double-checked locking
 			if (this.folderCache.has(normalized)) return;
 			if (this.vault.getAbstractFileByPath(normalized)) {
 				this.folderCache.add(normalized);
@@ -1170,7 +1194,8 @@ export class SyncEngine {
 		);
 		if (missing.length === 0) return;
 		for (const record of missing) {
-			const detectedAt = record.remoteMissingAt ?? new Date().toISOString();
+			const detectedAt =
+				record.remoteMissingAt ?? new Date().toISOString();
 			if (!dryRun) {
 				record.remoteMissingAt = detectedAt;
 				record.pendingConflict = null;
