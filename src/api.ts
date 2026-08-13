@@ -260,17 +260,24 @@ export class ArenaApi {
 			: null;
 		const description =
 			typeof raw.description === "string" ? raw.description : null;
+		const counts = isRecord(raw.counts) ? raw.counts : {};
 		const length =
 			asNumber(raw.length) ??
+			asNumber(counts.contents) ??
+			asNumber(counts.blocks) ??
 			asNumber(raw.total_connections) ??
 			asNumber(raw.connections_count) ??
 			0;
+		const visibility = typeof raw.visibility === "string" ? raw.visibility : "";
+		const status: ArenaChannel["status"] =
+			visibility === "public" || visibility === "private" ? visibility : "closed";
 
 		return {
 			...(raw as unknown as ArenaChannel),
 			length,
 			description,
 			metadata,
+			status,
 		};
 	}
 

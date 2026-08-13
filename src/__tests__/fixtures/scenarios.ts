@@ -7,21 +7,17 @@ import { ArenaChannel, ArenaBlock, ArenaChannelListItem } from "../../types";
 export const testUser = {
 	id: 1,
 	slug: "testuser",
-	username: "testuser",
-	first_name: "Test",
-	last_name: "User",
+	name: "Test User",
 	avatar: "https://cdn.are.na/avatars/testuser.png",
-	channel_count: 5,
+	initials: "TU",
 };
 
 export const otherUser = {
 	id: 2,
 	slug: "otheruser",
-	username: "otheruser",
-	first_name: "Other",
-	last_name: "User",
+	name: "Other User",
 	avatar: "",
-	channel_count: 12,
+	initials: "OU",
 };
 
 /* ------------------------------------------------------------------ */
@@ -36,10 +32,12 @@ export function makeChannel(
 ): ArenaChannel {
 	return {
 		id,
+		type: "Channel",
 		slug,
 		title,
 		length: 0,
 		status: "public",
+		description: null,
 		created_at: "2026-01-01T00:00:00.000Z",
 		updated_at: "2026-01-01T00:00:00.000Z",
 		user: testUser,
@@ -96,19 +94,17 @@ export function makeBlock(
 ): ArenaBlock {
 	return {
 		id,
+		type: "Text",
+		base_type: "Block",
 		title: `Block ${id}`,
-		content: `Content for block ${id}`,
-		content_html: `<p>Content for block ${id}</p>`,
+		content: { markdown: `Content for block ${id}`, html: `<p>Content for block ${id}</p>`, plain: `Content for block ${id}` },
 		description: null,
-		description_html: null,
 		source: null,
 		image: null,
 		attachment: null,
-		class: "Text",
-		base_class: "Block",
+		embed: null,
 		created_at: "2026-01-01T00:00:00.000Z",
 		updated_at: "2026-01-01T00:00:00.000Z",
-		connected_at: "2026-01-01T00:00:00.000Z",
 		position: id,
 		user: testUser,
 		...overrides,
@@ -118,7 +114,11 @@ export function makeBlock(
 /* Standard block type factories */
 
 export function makeTextBlock(id: number, title: string, content: string): ArenaBlock {
-	return makeBlock(id, { title, content, content_html: `<p>${content}</p>`, class: "Text" });
+	return makeBlock(id, {
+		title,
+		type: "Text",
+		content: { markdown: content, html: `<p>${content}</p>`, plain: content },
+	});
 }
 
 export function makeImageBlock(
@@ -129,14 +129,15 @@ export function makeImageBlock(
 ): ArenaBlock {
 	return makeBlock(id, {
 		title,
+		type: "Image",
 		content: null,
-		class: "Image",
 		image: {
-			filename,
+			src: url,
 			content_type: "image/jpeg",
-			original: { url },
-			display: { url: url.replace(".jpg", "_display.jpg") },
-			thumb: { url: url.replace(".jpg", "_thumb.jpg") },
+			filename,
+			small: { src: url.replace(".jpg", "_small.jpg"), width: 200, height: 200 },
+			medium: { src: url.replace(".jpg", "_medium.jpg"), width: 600, height: 600 },
+			large: { src: url.replace(".jpg", "_large.jpg"), width: 1200, height: 1200 },
 		},
 	});
 }
@@ -149,10 +150,12 @@ export function makeLinkBlock(
 ): ArenaBlock {
 	return makeBlock(id, {
 		title,
+		type: "Link",
 		content: null,
-		class: "Link",
-		source: { url, title: title },
-		description: description ?? null,
+		source: { url, title },
+		description: description
+			? { markdown: description, html: `<p>${description}</p>`, plain: description }
+			: null,
 	});
 }
 
@@ -163,9 +166,10 @@ export function makeEmbedBlock(
 ): ArenaBlock {
 	return makeBlock(id, {
 		title,
+		type: "Embed",
 		content: null,
-		class: "Embed",
 		source: { url, title },
+		embed: { url, type: "link", title, source_url: url },
 	});
 }
 
@@ -175,17 +179,20 @@ export function makeMediaBlock(
 	url: string,
 	filename: string
 ): ArenaBlock {
+	// v3 merged "Media" into "Embed"; preserve the v2 test contract by
+	// mapping to a v3 Embed block with an attachment payload.
 	return makeBlock(id, {
 		title,
+		type: "Embed",
 		content: null,
-		class: "Media",
 		source: { url, title },
+		embed: { url, type: "video", title, source_url: url },
 		attachment: {
-			file_name: filename,
-			file_size: 1024 * 1024,
 			url,
+			filename,
+			file_size: 1024 * 1024,
 			content_type: "video/mp4",
-			extension: "mp4",
+			file_extension: "mp4",
 		},
 	});
 }
@@ -199,14 +206,14 @@ export function makeAttachmentBlock(
 ): ArenaBlock {
 	return makeBlock(id, {
 		title,
+		type: "Attachment",
 		content: null,
-		class: "Attachment",
 		attachment: {
-			file_name: filename,
-			file_size: 2048,
 			url,
+			filename,
+			file_size: 2048,
 			content_type: contentType,
-			extension: filename.split(".").pop() || "bin",
+			file_extension: filename.split(".").pop() || "bin",
 		},
 	});
 }
@@ -216,10 +223,12 @@ export function makeChannelBlock(
 	title: string,
 	slug: string
 ): ArenaBlock {
+	// v3 has no Channel block type; preserve the v2 test contract by mapping
+	// to a Link block whose source URL points at the channel.
 	return makeBlock(id, {
 		title,
+		type: "Link",
 		content: null,
-		class: "Channel",
 		source: { url: `https://www.are.na/channel/${slug}`, title },
 	});
 }
@@ -228,40 +237,52 @@ export function makeChannelBlock(
 /*  Edge-case blocks                                                    */
 /* ------------------------------------------------------------------ */
 
-export const nullTitleBlock = makeBlock(100, { title: null, content: "No title here" });
+export const nullTitleBlock = makeBlock(100, {
+	title: null,
+	type: "Text",
+	content: { markdown: "No title here", html: "<p>No title here</p>", plain: "No title here" },
+});
 
-export const emptyContentBlock = makeBlock(101, { title: "Empty Content", content: "" });
+export const emptyContentBlock = makeBlock(101, {
+	title: "Empty Content",
+	type: "Text",
+	content: { markdown: "", html: "", plain: "" },
+});
 
 export const specialCharsBlock = makeBlock(102, {
 	title: 'Special / Characters: & < > " Quotes',
-	content: "Content with <script>alert(1)</script> HTML tags",
+	type: "Text",
+	content: { markdown: "Content with <script>alert(1)</script> HTML tags", html: "<p>Content with <script>alert(1)</script> HTML tags</p>", plain: "Content with  HTML tags" },
 });
 
 export const veryLongTitleBlock = makeBlock(103, {
 	title: "A".repeat(200),
-	content: "Short content",
+	type: "Text",
+	content: { markdown: "Short content", html: "<p>Short content</p>", plain: "Short content" },
 });
 
 export const unicodeBlock = makeBlock(104, {
 	title: "Unicode: 你好世界 🌍 Émojis",
-	content: "Mixed scripts: العربية עברית 日本語",
+	type: "Text",
+	content: { markdown: "Mixed scripts: العربية עברית 日本語", html: "<p>Mixed scripts: العربية עברית 日本語</p>", plain: "Mixed scripts:    " },
 });
 
 export const deletedBlock = makeBlock(105, {
 	title: "Deleted Block",
-	content: "This block was later removed from the channel",
+	type: "Text",
+	content: { markdown: "This block was later removed from the channel", html: "<p>This block was later removed from the channel</p>", plain: "This block was later removed from the channel" },
 });
 
 export const nullDescriptionBlock = makeBlock(106, {
 	title: "With Description",
-	content: "Body",
-	description: "A helpful description",
-	description_html: "<p>A helpful description</p>",
+	type: "Text",
+	content: { markdown: "Body", html: "<p>Body</p>", plain: "Body" },
+	description: { markdown: "A helpful description", html: "<p>A helpful description</p>", plain: "A helpful description" },
 });
 
 export const noImageDataBlock = makeBlock(107, {
 	title: "Broken Image",
-	class: "Image",
+	type: "Image",
 	content: null,
 	image: null,
 });

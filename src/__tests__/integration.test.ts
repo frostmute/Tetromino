@@ -1,7 +1,7 @@
 import {} from "obsidian";
 import { SyncEngine } from "../sync-engine";
 import { ArenaApi } from "../api";
-import { DEFAULT_SETTINGS, ChannelMapping } from "../types";
+import { DEFAULT_SETTINGS, ChannelMapping, ArenaBlock } from "../types";
 import {
 	makeMockApp,
 	MockVault,
@@ -39,6 +39,36 @@ jest.mock("obsidian", () => ({
 }));
 
 jest.mock("../api");
+
+function textBlock(
+	id: number,
+	title: string,
+	content: string,
+	position = id
+): ArenaBlock {
+	return {
+		id,
+		type: "Text",
+		base_type: "Block",
+		title,
+		content: { markdown: content, html: `<p>${content}</p>`, plain: content },
+		description: null,
+		source: null,
+		image: null,
+		attachment: null,
+		embed: null,
+		created_at: "2026-01-01T00:00:00.000Z",
+		updated_at: "2026-01-01T00:00:00.000Z",
+		position,
+		user: {
+			id: 1,
+			slug: "testuser",
+			name: "Test User",
+			avatar: "",
+			initials: "TU",
+		},
+	};
+}
 
 function makeMapping(slug: string, folder = ""): ChannelMapping {
 	return {
@@ -200,40 +230,13 @@ describe("Integration tests with realistic fixtures", () => {
 	describe("conflict resolution with existing notes", () => {
 		it("updates changed notes, skips unchanged, and marks missing", async () => {
 			const channel = makeChannel(10, "existing-channel", "Existing Channel", { length: 3 });
-			const initialBlocks = [
-				{ id: 1, title: "Stable Note", content: "This note will not change." },
-				{ id: 2, title: "Changing Note", content: "Original remote content." },
-				{ id: 3, title: "Delete Me", content: "This note will be deleted." },
+			const initialBlocks: ArenaBlock[] = [
+				textBlock(1, "Stable Note", "This note will not change.", 1),
+				textBlock(2, "Changing Note", "Original remote content.", 2),
+				textBlock(3, "Delete Me", "This note will be deleted.", 3),
 			];
 			mockApi.getChannel.mockResolvedValue(channel);
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(
-				initialBlocks.map((b, i) => ({
-					id: b.id,
-					title: b.title,
-					content: b.content,
-					content_html: `<p>${b.content}</p>`,
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: i + 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				}))
-			);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(initialBlocks);
 
 			const mapping = makeMapping("existing-channel");
 			// First sync to establish sync records
@@ -243,39 +246,12 @@ describe("Integration tests with realistic fixtures", () => {
 			expect(mockVault.has("Are.na/existing-channel/Delete Me.md")).toBe(true);
 
 			// Now change remote: block 2 updated, block 3 removed, block 4 added
-			const updatedBlocks = [
-				{ id: 1, title: "Stable Note", content: "This note will not change." },
-				{ id: 2, title: "Changing Note", content: "Updated remote content." },
-				{ id: 4, title: "New Note", content: "Brand new block." },
+			const updatedBlocks: ArenaBlock[] = [
+				textBlock(1, "Stable Note", "This note will not change.", 1),
+				textBlock(2, "Changing Note", "Updated remote content.", 2),
+				textBlock(4, "New Note", "Brand new block.", 3),
 			];
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(
-				updatedBlocks.map((b, i) => ({
-					id: b.id,
-					title: b.title,
-					content: b.content,
-					content_html: `<p>${b.content}</p>`,
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: i + 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				}))
-			);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(updatedBlocks);
 
 			const result = await runSync(mapping);
 
@@ -296,36 +272,11 @@ describe("Integration tests with realistic fixtures", () => {
 	describe("special characters in block titles", () => {
 		it("sanitises filenames containing special characters", async () => {
 			const channel = makeChannel(6, "special-chars-channel", "Special Channel", { length: 2 });
-			const blocks = [
-				{
-					id: 1,
-					title: 'Special / Characters: & < > " Quotes',
-					content: "Body",
-					content_html: "<p>Body</p>",
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				},
+			const blocks: ArenaBlock[] = [
+				textBlock(1, 'Special / Characters: & < > " Quotes', "Body"),
 			];
 			mockApi.getChannel.mockResolvedValue(channel);
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks as any);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
 
 			const mapping = makeMapping("special-chars-channel");
 			const result = await runSync(mapping);
@@ -370,74 +321,24 @@ describe("Integration tests with realistic fixtures", () => {
 	describe("channel with deleted blocks", () => {
 		it("marks missing blocks after they are removed from channel", async () => {
 			const channel = makeChannel(8, "shrinking-channel", "Shrinking Channel", { length: 3 });
-			const initialBlocks = [
-				{ id: 1, title: "Keep 1", content: "Stay" },
-				{ id: 2, title: "Keep 2", content: "Stay" },
-				{ id: 3, title: "Delete Me", content: "Go away" },
+			const initialBlocks: ArenaBlock[] = [
+				textBlock(1, "Keep 1", "Stay", 1),
+				textBlock(2, "Keep 2", "Stay", 2),
+				textBlock(3, "Delete Me", "Go away", 3),
 			];
 			mockApi.getChannel.mockResolvedValue(channel);
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(
-				initialBlocks.map((b, i) => ({
-					id: b.id,
-					title: b.title,
-					content: b.content,
-					content_html: `<p>${b.content}</p>`,
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: i + 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				}))
-			);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(initialBlocks);
 
 			const mapping = makeMapping("shrinking-channel");
 			await runSync(mapping);
 			expect(mockVault.has("Are.na/shrinking-channel/Delete Me.md")).toBe(true);
 
 			// Now simulate deletion
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(
-				initialBlocks.slice(0, 2).map((b, i) => ({
-					id: b.id,
-					title: b.title,
-					content: b.content,
-					content_html: `<p>${b.content}</p>`,
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: i + 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				}))
-			);
+			const remaining: ArenaBlock[] = [
+				textBlock(1, "Keep 1", "Stay", 1),
+				textBlock(2, "Keep 2", "Stay", 2),
+			];
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(remaining);
 			const result = await runSync(mapping);
 
 			expect(result.deleted).toBe(0);
@@ -454,36 +355,11 @@ describe("Integration tests with realistic fixtures", () => {
 	describe("unicode and international characters", () => {
 		it("correctly handles unicode block titles and content", async () => {
 			const channel = makeChannel(9, "unicode-channel", "Unicode Channel", { length: 1 });
-			const blocks = [
-				{
-					id: 1,
-					title: "Unicode: 你好世界 🌍 Émojis",
-					content: "Mixed scripts: العربية עברית 日本語",
-					content_html: "<p>Mixed scripts</p>",
-					description: null,
-					description_html: null,
-					source: null,
-					image: null,
-					attachment: null,
-					class: "Text",
-					base_class: "Block",
-					created_at: "2026-01-01T00:00:00.000Z",
-					updated_at: "2026-01-01T00:00:00.000Z",
-					connected_at: "2026-01-01T00:00:00.000Z",
-					position: 1,
-					user: {
-						id: 1,
-						slug: "testuser",
-						username: "testuser",
-						first_name: "Test",
-						last_name: "User",
-						avatar: "",
-						channel_count: 1,
-					},
-				},
+			const blocks: ArenaBlock[] = [
+				textBlock(1, "Unicode: 你好世界 🌍 Émojis", "Mixed scripts: العربية עברית 日本語"),
 			];
 			mockApi.getChannel.mockResolvedValue(channel);
-			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks as any);
+			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
 
 			const mapping = makeMapping("unicode-channel");
 			const result = await runSync(mapping);

@@ -160,7 +160,7 @@ describe("SyncEngine extended coverage", () => {
 
 		it("produces identical output on repeated import", async () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
-			const blocks = [makeBlock(1, { title: "Hello", content: "Body" })];
+			const blocks = [makeBlock(1, { title: "Hello", content: { markdown: "Body", html: "<p>Body</p>", plain: "Body" } })];
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue(blocks);
 
@@ -199,7 +199,7 @@ describe("SyncEngine extended coverage", () => {
 	describe("conflict resolution", () => {
 		it("preserves a local edit when remote content also changes", async () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
-			const block = makeBlock(1, { title: "Note", content: "Remote" });
+			const block = makeBlock(1, { title: "Note", content: { markdown: "Remote", html: "<p>Remote</p>", plain: "Remote" } });
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
 
@@ -212,7 +212,7 @@ describe("SyncEngine extended coverage", () => {
 
 			// Re-sync with same block but changed remote content
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Note", content: "Remote changed" }),
+				makeBlock(1, { title: "Note", content: { markdown: "Remote changed", html: "<p>Remote changed</p>", plain: "Remote changed" } }),
 			]);
 			const result = await runSync(mapping);
 
@@ -239,7 +239,7 @@ describe("SyncEngine extended coverage", () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Note", content: "Remote one" }),
+				makeBlock(1, { title: "Note", content: { markdown: "Remote one", html: "<p>Remote one</p>", plain: "Remote one" } }),
 			]);
 			const mapping = makeMapping("test-channel");
 			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
@@ -248,7 +248,7 @@ describe("SyncEngine extended coverage", () => {
 			const file = mockVault.files.get("Are.na/test-channel/Note.md")!;
 			await mockVault.modify(file.file, "Local edit");
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Note", content: "Remote two" }),
+				makeBlock(1, { title: "Note", content: { markdown: "Remote two", html: "<p>Remote two</p>", plain: "Remote two" } }),
 			]);
 			const firstConflict = await engine.syncChannel(mapping);
 			expect(firstConflict.conflicts).toHaveLength(1);
@@ -265,7 +265,7 @@ describe("SyncEngine extended coverage", () => {
 			expect(mockVault.files.get("Are.na/test-channel/Note.md")?.content).toBe("Local edit");
 
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Note", content: "Remote three" }),
+				makeBlock(1, { title: "Note", content: { markdown: "Remote three", html: "<p>Remote three</p>", plain: "Remote three" } }),
 			]);
 			const laterConflict = await engine.syncChannel(mapping);
 			expect(laterConflict.conflicts).toHaveLength(1);
@@ -280,14 +280,13 @@ describe("SyncEngine extended coverage", () => {
 			defaultSettings.imageHandling = "download";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, {
-				class: "Image",
+				type: "Image",
 				title: "Pic",
 				image: {
 					filename: "test.png",
 					content_type: "image/png",
-					original: { url: "https://example.com/test.png" },
-					display: { url: "https://example.com/test-display.png" },
-					thumb: { url: "https://example.com/test-thumb.png" },
+					src: "https://example.com/test.png",
+					medium: { src: "https://example.com/test-display.png", width: 800, height: 600 },
 				},
 			});
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -308,12 +307,12 @@ describe("SyncEngine extended coverage", () => {
 			defaultSettings.imageHandling = "download";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, {
-				class: "Image",
+				type: "Image",
 				title: "Pic",
 				image: {
 					filename: "test.png",
 					content_type: "image/png",
-					display: { url: "https://example.com/test-display.png" },
+					medium: { src: "https://example.com/test-display.png", width: 800, height: 600 },
 				},
 			});
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -333,14 +332,13 @@ describe("SyncEngine extended coverage", () => {
 			defaultSettings.imageHandling = "download";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, {
-				class: "Image",
+				type: "Image",
 				title: "Pic",
 				image: {
 					filename: "test.png",
 					content_type: "image/png",
-					original: { url: "https://example.com/test.png" },
-					display: { url: "https://example.com/test-display.png" },
-					thumb: { url: "https://example.com/test-thumb.png" },
+					src: "https://example.com/test.png",
+					medium: { src: "https://example.com/test-display.png", width: 800, height: 600 },
 				},
 			});
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -359,14 +357,14 @@ describe("SyncEngine extended coverage", () => {
 			defaultSettings.downloadedAttachmentLinkStyle = "link";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, {
-				class: "Attachment",
+				type: "Attachment",
 				title: "Doc",
 				attachment: {
-					file_name: "report.pdf",
+					filename: "report.pdf",
 					file_size: 1024,
 					url: "https://example.com/report.pdf",
 					content_type: "application/pdf",
-					extension: "pdf",
+					file_extension: "pdf",
 				},
 			});
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -387,7 +385,7 @@ describe("SyncEngine extended coverage", () => {
 			defaultSettings.templateEnabled = true;
 			defaultSettings.templateString = "# {{title}}\n\nCustom: {{content}}\n";
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
-			const block = makeBlock(1, { title: "Templated", content: "Body text" });
+			const block = makeBlock(1, { title: "Templated", content: { markdown: "Body text", html: "<p>Body text</p>", plain: "Body text" } });
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([block]);
 
@@ -507,7 +505,7 @@ describe("SyncEngine extended coverage", () => {
 
 			defaultSettings.excludeClasses = ["Image"];
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Excluded later", class: "Image" }),
+				makeBlock(1, { title: "Excluded later", type: "Image" }),
 			]);
 			const result = await runSync(mapping);
 			expect(result.noLongerRemote).toHaveLength(0);
@@ -582,12 +580,12 @@ describe("SyncEngine extended coverage", () => {
 
 	describe("excluded classes", () => {
 		it("skips blocks with excluded classes", async () => {
-			defaultSettings.excludeClasses = ["Media"];
+			defaultSettings.excludeClasses = ["Embed"];
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			mockApi.getChannel.mockResolvedValue(channel);
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
 				makeBlock(1, { title: "Text" }),
-				makeBlock(2, { title: "MediaBlock", class: "Media" }),
+				makeBlock(2, { title: "EmbedBlock", type: "Embed" }),
 			]);
 
 			const mapping = makeMapping("test-channel");
@@ -595,7 +593,7 @@ describe("SyncEngine extended coverage", () => {
 
 			expect(result.skipped).toBe(1);
 			expect(mockVault.files.has("Are.na/test-channel/Text.md")).toBe(true);
-			expect(mockVault.files.has("Are.na/test-channel/MediaBlock.md")).toBe(false);
+			expect(mockVault.files.has("Are.na/test-channel/EmbedBlock.md")).toBe(false);
 		});
 	});
 
@@ -627,7 +625,7 @@ describe("SyncEngine extended coverage", () => {
 			const channel = makeChannel(1, "test-channel", "Test Channel") as ArenaChannel;
 			const block = makeBlock(1, {
 				title: "ChannelBlock",
-				class: "Channel",
+				type: "Link",
 				source: { url: "https://www.are.na/channel/other-channel", title: "" },
 			});
 			mockApi.getChannel.mockResolvedValue(channel);
@@ -635,13 +633,12 @@ describe("SyncEngine extended coverage", () => {
 			mockApi.getChannelContents.mockResolvedValue({
 				contents: [
 					makeBlock(99, {
-						class: "Image",
+						type: "Image",
 						image: {
 							filename: "preview.jpg",
 							content_type: "image/jpeg",
-							original: { url: "https://example.com/preview.jpg" },
-							display: { url: "https://example.com/preview.jpg" },
-							thumb: { url: "https://example.com/preview.jpg" },
+							src: "https://example.com/preview.jpg",
+							medium: { src: "https://example.com/preview.jpg", width: 800, height: 600 },
 						},
 					}),
 				],
@@ -715,7 +712,7 @@ describe("SyncEngine extended coverage", () => {
 			await runSync(mapping);
 
 			mockApi.getAllChannelBlocksWithProgress.mockResolvedValue([
-				makeBlock(1, { title: "Stable", content: "Changed" }),
+				makeBlock(1, { title: "Stable", content: { markdown: "Changed", html: "<p>Changed</p>", plain: "Changed" } }),
 			]);
 
 			const readSpy = jest.spyOn(mockVault, "read");

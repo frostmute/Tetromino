@@ -573,7 +573,7 @@ export class SyncEngine {
 		let url: string | null = null;
 		let fileName: string | null = null;
 
-		if (block.class === "Image") {
+		if (block.type === "Image") {
 			if (this.settings.imageHandling !== "download" || !block.image) {
 				return undefined;
 			}
@@ -581,7 +581,7 @@ export class SyncEngine {
 			fileName = block.image.filename;
 		}
 
-		if (block.class === "Attachment") {
+		if (block.type === "Attachment") {
 			if (
 				this.settings.attachmentHandling !== "download" ||
 				!block.attachment
@@ -589,7 +589,7 @@ export class SyncEngine {
 				return undefined;
 			}
 			url = block.attachment.url;
-			fileName = block.attachment.file_name;
+			fileName = block.attachment.filename;
 		}
 
 		if (!url || !fileName) return undefined;
@@ -629,7 +629,7 @@ export class SyncEngine {
 
 		const channelSlugsToFetch = new Set<string>();
 		for (const block of blocks) {
-			if (block.class === "Channel" && !this.shouldExclude(block)) {
+			if (this.isChannelBlock(block) && !this.shouldExclude(block)) {
 				const slug = this.extractChannelSlugFromBlock(block);
 				if (slug && !this.channelPreviewCache.has(slug)) {
 					channelSlugsToFetch.add(slug);
@@ -706,8 +706,7 @@ export class SyncEngine {
 			channel.description?.trim() ||
 			"";
 		const appearsInChannels = this.extractChannelAppearsIn(channel);
-		const followerCount =
-			channel.follower_count ?? channel.followers_count ?? null;
+		const followerCount = channel.counts?.followers ?? null;
 		const lines: string[] = [`# ${channel.title}`, "", "## Info", ""];
 		if (channelDescription) {
 			lines.push(channelDescription);
@@ -832,7 +831,18 @@ export class SyncEngine {
 	}
 
 	private shouldExclude(block: ArenaBlock): boolean {
-		return this.settings.excludeClasses.includes(block.class);
+		return this.settings.excludeClasses.includes(block.type);
+	}
+
+	private isChannelBlock(block: ArenaBlock): boolean {
+		const sourceUrl = block.source?.url;
+		if (!sourceUrl) return false;
+		try {
+			const url = new URL(sourceUrl);
+			return url.hostname === "www.are.na" && /^\/channel\/[^/]+/.test(url.pathname);
+		} catch {
+			return /are\.na\/channel\/[^/?#]+/.test(sourceUrl);
+		}
 	}
 
 	private channelIndexPath(mapping: ChannelMapping): string {
@@ -899,7 +909,7 @@ export class SyncEngine {
 
 		if (
 			this.settings.includeChannelBlockPreviewImage &&
-			block.class === "Channel"
+			this.isChannelBlock(block)
 		) {
 			const slug = this.extractChannelSlugFromBlock(block);
 			if (slug) {
@@ -1055,12 +1065,8 @@ export class SyncEngine {
 		try {
 			const page = await this.api.getChannelContents(slug, 1);
 			for (const block of page.contents) {
-				if (block.class !== "Image" || !block.image) continue;
-				const url =
-					block.image.display?.url ||
-					block.image.thumb?.url ||
-					block.image.original?.url ||
-					null;
+				if (block.type !== "Image" || !block.image) continue;
+				const url = resolveImageUrl(block, "display-first");
 				if (url) {
 					this.channelPreviewCache.set(slug, url);
 					return url;

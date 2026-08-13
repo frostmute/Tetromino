@@ -1,64 +1,129 @@
 /**
- * Are.na API type definitions
+ * Are.na API type definitions (v3 shape)
  */
 
 export interface ArenaUser {
 	id: number;
 	slug: string;
-	username: string;
-	first_name: string;
-	last_name: string;
+	name: string;
 	avatar: string;
-	channel_count: number;
+	initials: string;
 }
+
+/** Rich-text body used by `block.content` and `block.description` in v3. */
+export interface ArenaMarkdownContent {
+	markdown: string;
+	html: string;
+	plain?: string | null;
+}
+
+export interface ArenaImageVariant {
+	src: string;
+	src_2x?: string | null;
+	width: number;
+	height: number;
+}
+
+export interface ArenaBlockImage {
+	src: string;
+	content_type: string;
+	filename: string;
+	alt_text?: string | null;
+	blurhash?: string | null;
+	width?: number | null;
+	height?: number | null;
+	aspect_ratio?: number | null;
+	file_size?: number | null;
+	updated_at?: string | null;
+	small?: ArenaImageVariant | null;
+	medium?: ArenaImageVariant | null;
+	large?: ArenaImageVariant | null;
+	square?: ArenaImageVariant | null;
+}
+
+export interface ArenaBlockAttachment {
+	url: string;
+	filename: string;
+	file_size?: number | null;
+	content_type?: string | null;
+	file_extension?: string | null;
+	updated_at?: string | null;
+}
+
+export interface ArenaBlockEmbed {
+	url: string | null;
+	type: string | null;
+	title?: string | null;
+	author_name?: string | null;
+	author_url?: string | null;
+	source_url?: string | null;
+	width?: number | null;
+	height?: number | null;
+	html?: string | null;
+	thumbnail_url?: string | null;
+}
+
+export interface ArenaBlockCounts {
+	blocks?: number;
+	channels?: number;
+	contents?: number;
+	collaborators?: number;
+	followers?: number;
+	following?: number;
+}
+
+export interface ArenaSource {
+	url: string;
+	title: string | null;
+	provider?: { name: string | null; url: string | null } | null;
+}
+
+export type ArenaBlockType = "Text" | "Image" | "Link" | "Attachment" | "Embed";
+export type ArenaChannelVisibility = "public" | "closed" | "private";
 
 export interface ArenaBlock {
 	id: number;
+	type: ArenaBlockType;
+	base_type: "Block";
 	title: string | null;
-	content: string | null;
-	content_html: string | null;
-	description: string | null;
-	description_html: string | null;
-	source: { url: string; title: string } | null;
-	image: {
-		filename: string;
-		content_type: string;
-		original?: { url: string };
-		display?: { url: string };
-		thumb?: { url: string };
-	} | null;
-	attachment: {
-		file_name: string;
-		file_size: number;
-		url: string;
-		content_type: string;
-		extension: string;
-	} | null;
-	class: string;
-	base_class: "Block";
+	content: ArenaMarkdownContent | null;
+	description: ArenaMarkdownContent | null;
+	source: ArenaSource | null;
+	image: ArenaBlockImage | null;
+	attachment: ArenaBlockAttachment | null;
+	embed: ArenaBlockEmbed | null;
 	created_at: string;
 	updated_at: string;
-	connected_at: string;
+	state?: string | null;
+	visibility?: ArenaChannelVisibility | null;
+	comment_count?: number;
+	can?: Record<string, boolean> | null;
+	metadata?: Record<string, unknown> | null;
+	_links?: Record<string, { href: string }> | null;
 	position?: number;
 	user: ArenaUser;
 }
 
 export interface ArenaChannel {
 	id: number;
-	title: string;
+	type: "Channel";
 	slug: string;
+	title: string;
 	length: number;
-	follower_count?: number;
-	followers_count?: number;
-	description?: string | null;
-	status: "closed" | "public" | "private";
-	user: ArenaUser;
+	status: ArenaChannelVisibility;
+	description: string | null;
 	contents?: ArenaBlock[];
 	created_at: string;
 	updated_at: string;
+	user: ArenaUser;
+	owner?: ArenaUser | null;
+	counts?: ArenaBlockCounts | null;
+	state?: string | null;
+	visibility?: ArenaChannelVisibility | null;
 	metadata?: {
 		description: string | null;
 	} | null;
+	_links?: Record<string, { href: string }> | null;
 }
 
 export interface ArenaChannelListItem {
@@ -272,5 +337,5 @@ export const DEFAULT_SETTINGS: ArenaSyncSettings = {
 	notifyOnSync: true,
 	debugLogging: false,
 	templateEnabled: false,
-	templateString: `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_class: {{class}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`
+	templateString: `---\ntitle: "{{title}}"\narena_id: {{id}}\narena_type: {{type}}\narena_url: "{{arena_url}}"\n{{#if description}}description: "{{description}}"{{/if}}\n---\n\n# {{title}}\n\n{{content}}\n\n{{#if description}}\n## Description\n{{description}}\n{{/if}}`
 };

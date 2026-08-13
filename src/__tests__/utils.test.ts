@@ -10,38 +10,69 @@ import {
 	sanitiseFilename,
 	pMap,
 } from "../utils";
-import type {ArenaBlock, ArenaSyncSettings} from "../types";
+import type {
+	ArenaBlock,
+	ArenaBlockAttachment,
+	ArenaBlockImage,
+	ArenaMarkdownContent,
+	ArenaSyncSettings,
+} from "../types";
 import {DEFAULT_SETTINGS} from "../types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
+function mkMd(text: string): ArenaMarkdownContent {
+	return { markdown: text, html: `<p>${text}</p>`, plain: text };
+}
+
+function makeImage(overrides: Partial<ArenaBlockImage> = {}): ArenaBlockImage {
+	return {
+		src: "https://cdn.are.na/photo.jpg",
+		content_type: "image/jpeg",
+		filename: "photo.jpg",
+		small: { src: "https://cdn.are.na/photo_thumb.jpg", width: 100, height: 100 },
+		medium: { src: "https://cdn.are.na/photo_display.jpg", width: 800, height: 600 },
+		large: { src: "https://cdn.are.na/photo_large.jpg", width: 1600, height: 1200 },
+		...overrides,
+	};
+}
+
+function makeAttachment(
+	overrides: Partial<ArenaBlockAttachment> = {}
+): ArenaBlockAttachment {
+	return {
+		url: "https://cdn.are.na/notes.pdf",
+		filename: "notes.pdf",
+		file_size: 1024,
+		content_type: "application/pdf",
+		file_extension: "pdf",
+		...overrides,
+	};
+}
+
 function makeBlock(overrides: Partial<ArenaBlock> = {}): ArenaBlock {
 	return {
 		id: 12345,
+		type: "Text",
+		base_type: "Block",
 		title: "Test Block",
-		content: "Hello world",
-		content_html: "<p>Hello world</p>",
+		content: mkMd("Hello world"),
 		description: null,
-		description_html: null,
 		source: null,
 		image: null,
 		attachment: null,
-		class: "Text",
-		base_class: "Block",
+		embed: null,
 		created_at: "2026-01-15T10:00:00.000Z",
 		updated_at: "2026-01-16T12:00:00.000Z",
-		connected_at: "2026-01-15T10:00:00.000Z",
 		position: 1,
 		user: {
 			id: 1,
 			slug: "testuser",
-			username: "testuser",
-			first_name: "Test",
-			last_name: "User",
+			name: "Test User",
 			avatar: "",
-			channel_count: 5,
+			initials: "TU",
 		},
 		...overrides,
 	};
@@ -58,7 +89,7 @@ describe("blockToMarkdown", () => {
 		const md = blockToMarkdown(makeBlock(), settings);
 		expect(md).toContain("---");
 		expect(md).toContain("arena_id: 12345");
-		expect(md).toContain('arena_class: "Text"');
+		expect(md).toContain('arena_type: "Text"');
 		expect(md).toContain("# Test Block");
 		expect(md).toContain("Hello world");
 	});
@@ -72,17 +103,17 @@ describe("blockToMarkdown", () => {
 
 	it("sanitizes imported body content in legacy output", () => {
 		const md = blockToMarkdown(
-			makeBlock({ content: "<script>evil()</script>safe" }),
+			makeBlock({ content: mkMd("<script>evil()</script>safe") }),
 			settings,
 		);
 		expect(md).not.toContain("<script>");
 		expect(md).toContain("safe");
 	});
 
-	it("preserves content for block classes beyond Text", () => {
+	it("preserves content for block types beyond Text", () => {
 		const block = makeBlock({
-			class: "Embed",
-			content: "This content must not be dropped.",
+			type: "Embed",
+			content: mkMd("This content must not be dropped."),
 			source: { url: "https://example.com/embed", title: "Embed" },
 		});
 		const md = blockToMarkdown(block, settings);
@@ -99,10 +130,10 @@ describe("blockToMarkdown", () => {
 
 	it("handles a link block", () => {
 		const block = makeBlock({
-			class: "Link",
+			type: "Link",
 			content: null,
 			source: { url: "https://example.com", title: "Example" },
-			description: "A description",
+			description: mkMd("A description"),
 		});
 		const md = blockToMarkdown(block, settings);
 		expect(md).toContain("[Example](https://example.com)");
@@ -111,15 +142,9 @@ describe("blockToMarkdown", () => {
 
 	it("handles an image block with external link", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...settings, imageHandling: "link" as const };
 		const md = blockToMarkdown(block, s);
@@ -128,15 +153,9 @@ describe("blockToMarkdown", () => {
 
 	it("embeds image blocks using Are.na display image in embed mode", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...settings, imageHandling: "embed" as const };
 		const md = blockToMarkdown(block, s);
@@ -145,15 +164,9 @@ describe("blockToMarkdown", () => {
 
 	it("handles an attachment block", () => {
 		const block = makeBlock({
-			class: "Attachment",
+			type: "Attachment",
 			content: null,
-			attachment: {
-				file_name: "notes.pdf",
-				file_size: 1024,
-				url: "https://cdn.are.na/notes.pdf",
-				content_type: "application/pdf",
-				extension: "pdf",
-			},
+			attachment: makeAttachment(),
 		});
 		const md = blockToMarkdown(block, settings);
 		expect(md).toContain("[notes.pdf](https://cdn.are.na/notes.pdf)");
@@ -167,15 +180,9 @@ describe("blockToMarkdown", () => {
 
 	it("adds optional banner frontmatter field when enabled", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = {
 			...settings,
@@ -187,7 +194,7 @@ describe("blockToMarkdown", () => {
 	});
 
 	it("can include block description in frontmatter", () => {
-		const block = makeBlock({ description: "Short summary" });
+		const block = makeBlock({ description: mkMd("Short summary") });
 		const s = {
 			...settings,
 			includeBlockDescriptionFrontmatter: true,
@@ -198,15 +205,9 @@ describe("blockToMarkdown", () => {
 
 	it("supports display-first banner priority", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = {
 			...settings,
@@ -219,7 +220,7 @@ describe("blockToMarkdown", () => {
 	});
 
 	it("renders comments and connected channels sections from context", () => {
-		const block = makeBlock({ class: "Channel", content: null });
+		const block = makeBlock({ type: "Link", content: null });
 		const md = blockToMarkdown(block, settings, {
 			bodyImageUrl: "https://cdn.are.na/channel-preview.jpg",
 			connectedChannels: [
@@ -254,7 +255,7 @@ describe("blockToMarkdown with templateEnabled", () => {
 	};
 
 	it("renders via template when templateEnabled is true", () => {
-		const block = makeBlock({ title: "My Block", content: "Hello" });
+		const block = makeBlock({ title: "My Block", content: mkMd("Hello") });
 		const md = blockToMarkdown(block, base);
 		expect(md).toContain("title: My Block");
 		expect(md).toContain("arena_id: 12345");
@@ -271,21 +272,15 @@ describe("blockToMarkdown with templateEnabled", () => {
 	it("template: #if guard works for optional description", () => {
 		const tmpl = "{{#if description}}desc: {{description}}{{/if}}";
 		const s = { ...base, templateString: tmpl };
-		expect(blockToMarkdown(makeBlock({ description: "Cool" }), s)).toContain("desc: Cool");
+		expect(blockToMarkdown(makeBlock({ description: mkMd("Cool") }), s)).toContain("desc: Cool");
 		expect(blockToMarkdown(makeBlock({ description: null }), s)).toBe("");
 	});
 
 	it("default template renders downloaded images through content", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...DEFAULT_SETTINGS, templateEnabled: true };
 		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
@@ -294,15 +289,9 @@ describe("blockToMarkdown with templateEnabled", () => {
 
 	it("template: image content is an Obsidian embed", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...base, templateString: "{{content}}", imageHandling: "download" as const };
 		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
@@ -311,15 +300,9 @@ describe("blockToMarkdown with templateEnabled", () => {
 
 	it("template: image block sets image variable with download path", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...base, templateString: "{{image}}", imageHandling: "download" as const };
 		const md = blockToMarkdown(block, s, { assetPath: "Are.na/Attachments/12345-photo.jpg" });
@@ -329,7 +312,7 @@ describe("blockToMarkdown with templateEnabled", () => {
 	it("template: preserves YAML frontmatter and sanitizes body", () => {
 		const tmpl = "---\ntitle: {{title}}\n---\n\n{{content}}";
 		const s = { ...base, templateString: tmpl };
-		const block = makeBlock({ content: "<script>evil()</script>safe" });
+		const block = makeBlock({ content: mkMd("<script>evil()</script>safe") });
 		const md = blockToMarkdown(block, s);
 		expect(md).toContain("title: Test Block");
 		expect(md).not.toContain("<script>");
@@ -339,7 +322,7 @@ describe("blockToMarkdown with templateEnabled", () => {
 	it("preserves CRLF frontmatter while sanitizing its body", () => {
 		const tmpl = "---\r\ntitle: <style>keep this frontmatter</style>\r\n---\r\n\r\n{{content}}";
 		const s = { ...base, templateString: tmpl };
-		const block = makeBlock({ content: "<script>evil()</script>safe" });
+		const block = makeBlock({ content: mkMd("<script>evil()</script>safe") });
 		const md = blockToMarkdown(block, s);
 		expect(md).toContain("title: <style>keep this frontmatter</style>");
 		expect(md).not.toContain("<script>");
@@ -438,25 +421,16 @@ describe("blockFileName", () => {
 describe("resolveImageUrl", () => {
 	it("falls back to an available image variant", () => {
 		const block = makeBlock({
-			class: "Image",
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			type: "Image",
+			image: makeImage({ medium: null, large: null }),
 		});
 		expect(resolveImageUrl(block)).toBe("https://cdn.are.na/photo_thumb.jpg");
 	});
 
 	it("can prefer the original URL for downloads", () => {
 		const block = makeBlock({
-			class: "Image",
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-			},
+			type: "Image",
+			image: makeImage({ medium: null, large: null }),
 		});
 		expect(resolveImageUrl(block, "original-first")).toBe("https://cdn.are.na/photo.jpg");
 	});
@@ -683,9 +657,9 @@ describe("normalizeArenaUrl edge cases", () => {
 describe("blockToMarkdown legacy uncovered branches", () => {
 	const settings: ArenaSyncSettings = { ...DEFAULT_SETTINGS };
 
-	it("renders Media block with source URL", () => {
+	it("renders Embed block with source URL", () => {
 		const block = makeBlock({
-			class: "Media",
+			type: "Embed",
 			content: null,
 			source: { url: "https://youtube.com/watch?v=123", title: "Video" },
 		});
@@ -695,7 +669,7 @@ describe("blockToMarkdown legacy uncovered branches", () => {
 
 	it("renders Link block without source title", () => {
 		const block = makeBlock({
-			class: "Link",
+			type: "Link",
 			content: null,
 			source: { url: "https://example.com", title: "" },
 		});
@@ -705,7 +679,7 @@ describe("blockToMarkdown legacy uncovered branches", () => {
 
 	it("renders Link block without description", () => {
 		const block = makeBlock({
-			class: "Link",
+			type: "Link",
 			content: null,
 			source: { url: "https://example.com", title: "Example" },
 			description: null,
@@ -716,7 +690,7 @@ describe("blockToMarkdown legacy uncovered branches", () => {
 	});
 
 	it("renders connected channel without slug", () => {
-		const block = makeBlock({ class: "Channel", content: null });
+		const block = makeBlock({ type: "Link", content: null });
 		const md = blockToMarkdown(block, settings, {
 			connectedChannels: [{ title: "No Slug Channel", slug: undefined }],
 		});
@@ -734,22 +708,16 @@ describe("blockToMarkdown legacy uncovered branches", () => {
 	});
 
 	it("renders Image block with no image data", () => {
-		const block = makeBlock({ class: "Image", content: null, image: null });
+		const block = makeBlock({ type: "Image", content: null, image: null });
 		const md = blockToMarkdown(block, settings);
 		expect(md).not.toContain("![");
 	});
 
 	it("renders Image block download with missing assetPath", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...settings, imageHandling: "download" as const };
 		const md = blockToMarkdown(block, s);
@@ -758,15 +726,9 @@ describe("blockToMarkdown legacy uncovered branches", () => {
 
 	it("renders Attachment block download with embed style", () => {
 		const block = makeBlock({
-			class: "Attachment",
+			type: "Attachment",
 			content: null,
-			attachment: {
-				file_name: "notes.pdf",
-				file_size: 1024,
-				url: "https://cdn.are.na/notes.pdf",
-				content_type: "application/pdf",
-				extension: "pdf",
-			},
+			attachment: makeAttachment(),
 		});
 		const s = {
 			...settings,
@@ -790,7 +752,7 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: Link block renders markdown link", () => {
 		const block = makeBlock({
-			class: "Link",
+			type: "Link",
 			content: null,
 			source: { url: "https://example.com", title: "Example" },
 		});
@@ -799,9 +761,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 		expect(md).toContain("[Example](https://example.com)");
 	});
 
-	it("template: Media block renders raw URL", () => {
+	it("template: Embed block renders raw URL", () => {
 		const block = makeBlock({
-			class: "Media",
+			type: "Embed",
 			content: null,
 			source: { url: "https://vimeo.com/123", title: "Video" },
 		});
@@ -812,15 +774,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: Attachment block with download embed style", () => {
 		const block = makeBlock({
-			class: "Attachment",
+			type: "Attachment",
 			content: null,
-			attachment: {
-				file_name: "notes.pdf",
-				file_size: 1024,
-				url: "https://cdn.are.na/notes.pdf",
-				content_type: "application/pdf",
-				extension: "pdf",
-			},
+			attachment: makeAttachment(),
 		});
 		const s = {
 			...base,
@@ -834,15 +790,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: Attachment block with download link style", () => {
 		const block = makeBlock({
-			class: "Attachment",
+			type: "Attachment",
 			content: null,
-			attachment: {
-				file_name: "notes.pdf",
-				file_size: 1024,
-				url: "https://cdn.are.na/notes.pdf",
-				content_type: "application/pdf",
-				extension: "pdf",
-			},
+			attachment: makeAttachment(),
 		});
 		const s = {
 			...base,
@@ -856,15 +806,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: Attachment block without download falls back to URL", () => {
 		const block = makeBlock({
-			class: "Attachment",
+			type: "Attachment",
 			content: null,
-			attachment: {
-				file_name: "notes.pdf",
-				file_size: 1024,
-				url: "https://cdn.are.na/notes.pdf",
-				content_type: "application/pdf",
-				extension: "pdf",
-			},
+			attachment: makeAttachment(),
 		});
 		const s = {
 			...base,
@@ -877,15 +821,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: Image block with embed uses display URL", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = { ...base, templateString: "{{image}}", imageHandling: "embed" as const };
 		const md = blockToMarkdown(block, s);
@@ -893,7 +831,7 @@ describe("blockToMarkdown template uncovered branches", () => {
 	});
 
 	it("template: bodyImageUrl on non-Image block sets image var", () => {
-		const block = makeBlock({ class: "Text", content: "Hello" });
+		const block = makeBlock({ type: "Text", content: mkMd("Hello") });
 		const s = { ...base, templateString: "{{image}}" };
 		const md = blockToMarkdown(block, s, { bodyImageUrl: "https://cdn.are.na/preview.jpg" });
 		expect(md).toBe("https://cdn.are.na/preview.jpg");
@@ -901,15 +839,9 @@ describe("blockToMarkdown template uncovered branches", () => {
 
 	it("template: banner field enabled with custom name", () => {
 		const block = makeBlock({
-			class: "Image",
+			type: "Image",
 			content: null,
-			image: {
-				filename: "photo.jpg",
-				content_type: "image/jpeg",
-				original: { url: "https://cdn.are.na/photo.jpg" },
-				display: { url: "https://cdn.are.na/photo_display.jpg" },
-				thumb: { url: "https://cdn.are.na/photo_thumb.jpg" },
-			},
+			image: makeImage(),
 		});
 		const s = {
 			...base,
@@ -924,7 +856,7 @@ describe("blockToMarkdown template uncovered branches", () => {
 	it("template: preserves frontmatter values that look dangerous (regression)", () => {
 		const tmpl = "---\ntitle: {{title}}\nstyle_value: <style>body{color:red}</style>\n---\n\n{{content}}";
 		const s = { ...base, templateString: tmpl };
-		const block = makeBlock({ title: "Test", content: "<script>evil()</script>" });
+		const block = makeBlock({ title: "Test", content: mkMd("<script>evil()</script>") });
 		const md = blockToMarkdown(block, s);
 		// Frontmatter should preserve literal tags; body should be sanitized
 		expect(md).toContain("style_value: <style>body{color:red}</style>");

@@ -41,12 +41,12 @@ function yamlQuote(value: string): string {
 }
 
 type ImageUrlPriority = "thumb-first" | "display-first" | "original-first";
-type ImageVariant = "thumb" | "display" | "original";
+type ImageVariant = "small" | "medium" | "large" | "src";
 
 const IMAGE_URL_ORDER: Record<ImageUrlPriority, ImageVariant[]> = {
-	"thumb-first": ["thumb", "display", "original"],
-	"display-first": ["display", "thumb", "original"],
-	"original-first": ["original", "display", "thumb"],
+	"thumb-first": ["small", "medium", "src", "large"],
+	"display-first": ["medium", "large", "small", "src"],
+	"original-first": ["src", "large", "medium", "small"],
 };
 
 export function resolveImageUrl(
@@ -57,7 +57,7 @@ export function resolveImageUrl(
 	if (!image) return null;
 
 	for (const variant of IMAGE_URL_ORDER[priority]) {
-		const url = image[variant]?.url;
+		const url = variant === "src" ? image.src : image[variant]?.src;
 		if (url) return url;
 	}
 	return null;
@@ -71,6 +71,10 @@ function sanitizeMarkdownOutput(markdown: string): string {
 	return sanitizeMarkdownContent(markdown);
 }
 
+function descriptionMarkdown(block: ArenaBlock): string {
+	return block.description?.markdown?.trim() ?? "";
+}
+
 /** Render the complete block body shared by legacy and template output. */
 function renderBlockContent(
 	block: ArenaBlock,
@@ -80,13 +84,16 @@ function renderBlockContent(
 	const title = block.title ?? `Block ${block.id}`;
 	const body: string[] = [];
 	const content =
-		typeof block.content === "string" && block.content.trim()
-			? block.content
+		typeof block.content === "object" &&
+		block.content &&
+		typeof block.content.markdown === "string" &&
+		block.content.markdown.trim()
+			? block.content.markdown.trim()
 			: null;
 	const source = block.source?.url ? normalizeArenaUrl(block.source.url) : null;
 	let representation = "";
 
-	if (block.class === "Image" && block.image) {
+	if (block.type === "Image" && block.image) {
 		const imageUrl = resolveImageUrl(block);
 		if (settings.imageHandling === "download") {
 			const asset = context.assetPath || (imageUrl ? block.image.filename : null);
@@ -96,12 +103,15 @@ function renderBlockContent(
 		} else if (imageUrl) {
 			representation = `[${title}](${imageUrl})`;
 		}
-	} else if (block.class === "Link" && source) {
+	} else if (block.type === "Link" && source) {
 		representation = `[${block.source?.title || source}](${source})`;
-	} else if ((block.class === "Media" || block.class === "Embed") && source) {
-		representation = `<${source}>`;
-	} else if (block.class === "Attachment" && block.attachment) {
-		const fileName = block.attachment.file_name;
+	} else if (block.type === "Embed") {
+		const embedUrl = block.embed?.url ?? source;
+		if (embedUrl) {
+			representation = `<${embedUrl}>`;
+		}
+	} else if (block.type === "Attachment" && block.attachment) {
+		const fileName = block.attachment.filename;
 		if (context.assetPath && settings.attachmentHandling === "download") {
 			representation = settings.downloadedAttachmentLinkStyle === "embed"
 				? `![[${context.assetPath}]]`
@@ -109,16 +119,14 @@ function renderBlockContent(
 		} else {
 			representation = `[${fileName}](${block.attachment.url})`;
 		}
-	} else if (block.class === "Channel" && source) {
-		representation = `[${block.source?.title || title}](${source})`;
 	}
 
-	if (context.bodyImageUrl && block.class !== "Image") {
+	if (context.bodyImageUrl && block.type !== "Image") {
 		body.push(`![${title}](${context.bodyImageUrl})`);
 	}
-	if (representation && block.class === "Image") body.push(representation);
+	if (representation && block.type === "Image") body.push(representation);
 	if (content) body.push(content);
-	if (representation && block.class !== "Image") body.push(representation);
+	if (representation && block.type !== "Image") body.push(representation);
 	return body.join("\n\n");
 }
 
@@ -148,26 +156,28 @@ export function blockToMarkdown(
 	settings: ArenaSyncSettings,
 	context: MarkdownContext = {}
 ): string {
+	const descriptionString = descriptionMarkdown(block);
+
 	if (settings.templateEnabled && settings.templateString) {
 		const ast = parseTemplate(settings.templateString);
 		const vars: Record<string, unknown> = {
 			id: block.id,
 			title: block.title ?? `Block ${block.id}`,
-			class: block.class,
+			type: block.type,
 			arena_url: `https://www.are.na/block/${block.id}`,
-			description: block.description || "",
+			description: descriptionString,
 			created_at: block.created_at,
 			updated_at: block.updated_at,
 			source_url: block.source?.url ? normalizeArenaUrl(block.source.url) : "",
 			channel_slug: context.channelSlug || "",
 			channel_title: context.channelTitle || ""
 		};
-		
+
 		vars.content = renderBlockContent(block, settings, context);
 		vars.comments = context.comments || [];
 		vars.connected_channels = context.connectedChannels || [];
 
-		if (block.class === "Image" && block.image) {
+		if (block.type === "Image" && block.image) {
 			const embedUrl = resolveImageUrl(block);
 			if (settings.imageHandling === "download" && context.assetPath) {
 				vars.image = context.assetPath;
@@ -198,7 +208,7 @@ export function blockToMarkdown(
 		parts.push("---");
 		parts.push(`arena_id: ${block.id}`);
 		parts.push(`arena_url: ${yamlQuote(`https://www.are.na/block/${block.id}`)}`);
-		parts.push(`arena_class: ${yamlQuote(block.class)}`);
+		parts.push(`arena_type: ${yamlQuote(block.type)}`);
 		parts.push(`arena_created_at: ${yamlQuote(block.created_at)}`);
 		parts.push(`arena_updated_at: ${yamlQuote(block.updated_at)}`);
 		if (context.channelSlug) {
@@ -210,8 +220,8 @@ export function blockToMarkdown(
 		if (block.source?.url) {
 			parts.push(`arena_source_url: ${yamlQuote(normalizeArenaUrl(block.source.url))}`);
 		}
-		if (settings.includeBlockDescriptionFrontmatter && block.description) {
-			parts.push(`arena_description: ${yamlQuote(block.description)}`);
+		if (settings.includeBlockDescriptionFrontmatter && descriptionString) {
+			parts.push(`arena_description: ${yamlQuote(descriptionString)}`);
 		}
 		if (settings.bannerFieldEnabled) {
 			const bannerValue =
@@ -235,16 +245,16 @@ export function blockToMarkdown(
 		parts.push(renderedBody);
 	}
 
-	if (block.class === "Link" && block.description) {
+	if (block.type === "Link" && descriptionString) {
 		parts.push("");
-		parts.push(block.description);
+		parts.push(descriptionString);
 	}
 
-	if (block.description && block.class !== "Link") {
+	if (descriptionString && block.type !== "Link") {
 		parts.push("");
 		parts.push("---");
 		parts.push("");
-		parts.push(block.description);
+		parts.push(descriptionString);
 	}
 
 	if (context.connectedChannels && context.connectedChannels.length > 0) {
