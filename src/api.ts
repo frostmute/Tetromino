@@ -512,14 +512,65 @@ export class ArenaApi {
 		});
 	}
 
+	private async getCurrentUserSlug(): Promise<string> {
+		const cacheKey = "user:me";
+		const cached = this.getCached<{ slug?: unknown }>(cacheKey);
+		const cachedSlug =
+			cached && typeof cached.slug === "string" ? cached.slug : null;
+		if (cachedSlug) return cachedSlug;
+		const payload = await this.request<unknown>("GET", "/me");
+		const raw = this.unwrapData<unknown>(payload);
+		if (!isRecord(raw) || typeof raw.slug !== "string" || raw.slug === "") {
+			throw new Error("Are.na /me response missing slug");
+		}
+		this.setCached(cacheKey, raw);
+		return raw.slug;
+	}
+
+	private normalizeChannelListItem(raw: unknown): ArenaChannelListItem {
+		if (!isRecord(raw)) {
+			throw new Error("Unexpected Are.na channel list item");
+		}
+		const id = asNumber(raw.id) ?? 0;
+		const slug = typeof raw.slug === "string" ? raw.slug : "";
+		const title = typeof raw.title === "string" ? raw.title : "";
+		const length =
+			asNumber(raw.length) ??
+			(isRecord(raw.counts) ? asNumber(raw.counts.contents) : null) ??
+			(isRecord(raw.counts) ? asNumber(raw.counts.blocks) : null) ??
+			0;
+		const visibility = typeof raw.visibility === "string" ? raw.visibility : "";
+		const status: ArenaChannelListItem["status"] =
+			visibility === "public" || visibility === "private"
+				? visibility
+				: "closed";
+		const updatedAt =
+			typeof raw.updated_at === "string" ? raw.updated_at : "";
+		return {
+			id,
+			title,
+			slug,
+			length,
+			status,
+			updated_at: updatedAt,
+		};
+	}
+
 	async listMyChannels(
 		page = 1,
 	): Promise<ArenaPaginatedResponse<ArenaChannelListItem>> {
+		const slug = await this.getCurrentUserSlug();
 		const payload = await this.request<unknown>(
 			"GET",
-			`/me/channels?page=${page}&per=${PER_PAGE}`,
+			`/users/${slug}/contents?type=Channel&page=${page}&per=${PER_PAGE}`,
 		);
-		return this.normalizePaginatedResponse<ArenaChannelListItem>(payload);
+		const paginated = this.normalizePaginatedResponse<unknown>(payload);
+		return {
+			...paginated,
+			contents: paginated.contents.map((c) =>
+				this.normalizeChannelListItem(c),
+			),
+		};
 	}
 
 	async listAllMyChannels(): Promise<ArenaChannelListItem[]> {

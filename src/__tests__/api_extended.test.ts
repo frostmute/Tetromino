@@ -656,6 +656,65 @@ describe("ArenaApi block types", () => {
 	});
 });
 
+function makeMeResponse(slug: string) {
+	return {
+		status: 200,
+		headers: {},
+		json: {
+			id: 576556,
+			type: "User",
+			slug,
+			name: "Test User",
+		},
+		arrayBuffer: new ArrayBuffer(0),
+	};
+}
+
+function makeChannelListResponse(
+	pageNum: number,
+	channels: unknown[],
+	totalPages: number,
+) {
+	return {
+		status: 200,
+		headers: {},
+		json: {
+			data: channels,
+			meta: {
+				current_page: pageNum,
+				per_page: 100,
+				total_pages: totalPages,
+				total_count: channels.length,
+			},
+		},
+		arrayBuffer: new ArrayBuffer(0),
+	};
+}
+
+function makeV3Channel(overrides: {
+	id: number;
+	slug: string;
+	title: string;
+	visibility?: "public" | "closed" | "private";
+	length?: number;
+	updated_at?: string;
+}) {
+	return {
+		id: overrides.id,
+		type: "Channel",
+		slug: overrides.slug,
+		title: overrides.title,
+		visibility: overrides.visibility ?? "public",
+		updated_at: overrides.updated_at ?? "2026-01-01T00:00:00.000Z",
+		counts: {
+			blocks: 0,
+			channels: 0,
+			contents: overrides.length ?? 0,
+			collaborators: 0,
+		},
+	};
+}
+
 describe("ArenaApi listMyChannels", () => {
 	let requestUrlMock: jest.SpyInstance;
 
@@ -667,57 +726,35 @@ describe("ArenaApi listMyChannels", () => {
 		requestUrlMock.mockRestore();
 	});
 
-	function makeChannelResponse(
-		pageNum: number,
-		channels: ArenaChannelListItem[],
-		totalPages: number,
-	) {
-		return {
-			status: 200,
-			headers: {},
-			json: {
-				data: channels,
-				meta: {
-					current_page: pageNum,
-					per_page: 100,
-					total_pages: totalPages,
-					total_count: channels.length,
-				},
-			},
-			arrayBuffer: new ArrayBuffer(0),
-		};
-	}
-
-	it("lists channels with pagination", async () => {
+	it("lists channels with pagination via /v3/users/{slug}/contents?type=Channel", async () => {
 		requestUrlMock
+			.mockResolvedValueOnce(makeMeResponse("deepspace-ghost"))
 			.mockResolvedValueOnce(
-				makeChannelResponse(
+				makeChannelListResponse(
 					1,
 					[
-						{
+						makeV3Channel({
 							id: 1,
-							title: "Channel 1",
 							slug: "ch-1",
+							title: "Channel 1",
+							visibility: "public",
 							length: 5,
-							status: "public",
-							updated_at: "2026-01-01T00:00:00.000Z",
-						},
+						}),
 					],
 					2,
 				),
 			)
 			.mockResolvedValueOnce(
-				makeChannelResponse(
+				makeChannelListResponse(
 					2,
 					[
-						{
+						makeV3Channel({
 							id: 2,
-							title: "Channel 2",
 							slug: "ch-2",
+							title: "Channel 2",
+							visibility: "closed",
 							length: 3,
-							status: "public",
-							updated_at: "2026-01-01T00:00:00.000Z",
-						},
+						}),
 					],
 					2,
 				),
@@ -728,41 +765,41 @@ describe("ArenaApi listMyChannels", () => {
 		expect(page.contents).toHaveLength(1);
 		expect(page.total_pages).toBe(2);
 		expect(page.contents[0].slug).toBe("ch-1");
+		expect(page.contents[0].status).toBe("public");
+		expect(page.contents[0].length).toBe(5);
 
 		const page2 = await api.listMyChannels(2);
 		expect(page2.contents[0].slug).toBe("ch-2");
+		expect(page2.contents[0].status).toBe("closed");
 	});
 
-	it("lists all my channels", async () => {
+	it("lists all my channels by paginating until total_pages", async () => {
 		requestUrlMock
+			.mockResolvedValueOnce(makeMeResponse("deepspace-ghost"))
 			.mockResolvedValueOnce(
-				makeChannelResponse(
+				makeChannelListResponse(
 					1,
 					[
-						{
+						makeV3Channel({
 							id: 1,
-							title: "A",
 							slug: "a",
+							title: "A",
 							length: 1,
-							status: "public",
-							updated_at: "2026-01-01T00:00:00.000Z",
-						},
+						}),
 					],
 					2,
 				),
 			)
 			.mockResolvedValueOnce(
-				makeChannelResponse(
+				makeChannelListResponse(
 					2,
 					[
-						{
+						makeV3Channel({
 							id: 2,
-							title: "B",
 							slug: "b",
+							title: "B",
 							length: 2,
-							status: "public",
-							updated_at: "2026-01-01T00:00:00.000Z",
-						},
+						}),
 					],
 					2,
 				),
@@ -772,6 +809,69 @@ describe("ArenaApi listMyChannels", () => {
 		const channels = await api.listAllMyChannels();
 		expect(channels).toHaveLength(2);
 		expect(channels.map((c) => c.slug)).toEqual(["a", "b"]);
+	});
+
+	it("calls /v3/me only once across multiple listMyChannels invocations", async () => {
+		requestUrlMock
+			.mockResolvedValueOnce(makeMeResponse("deepspace-ghost"))
+			.mockResolvedValueOnce(
+				makeChannelListResponse(
+					1,
+					[
+						makeV3Channel({
+							id: 1,
+							slug: "a",
+							title: "A",
+						}),
+					],
+					1,
+				),
+			)
+			.mockResolvedValueOnce(
+				makeChannelListResponse(
+					1,
+					[
+						makeV3Channel({
+							id: 2,
+							slug: "b",
+							title: "B",
+						}),
+					],
+					1,
+				),
+			);
+
+		const api = new ArenaApi("token");
+		await api.listMyChannels(1);
+		await api.listMyChannels(1);
+
+		const meCalls = requestUrlMock.mock.calls.filter((c) =>
+			String(c[0]?.url ?? "").endsWith("/v3/me"),
+		);
+		expect(meCalls).toHaveLength(1);
+	});
+
+	it("maps visibility to status for public, private, and closed channels", async () => {
+		requestUrlMock
+			.mockResolvedValueOnce(makeMeResponse("u"))
+			.mockResolvedValueOnce(
+				makeChannelListResponse(
+					1,
+					[
+						makeV3Channel({ id: 1, slug: "pub", title: "Pub", visibility: "public" }),
+						makeV3Channel({ id: 2, slug: "priv", title: "Priv", visibility: "private" }),
+						makeV3Channel({ id: 3, slug: "cl", title: "Cl", visibility: "closed" }),
+					],
+					1,
+				),
+			);
+
+		const api = new ArenaApi("token");
+		const page = await api.listMyChannels(1);
+		const bySlug = new Map(page.contents.map((c) => [c.slug, c.status]));
+		expect(bySlug.get("pub")).toBe("public");
+		expect(bySlug.get("priv")).toBe("private");
+		expect(bySlug.get("cl")).toBe("closed");
 	});
 });
 
