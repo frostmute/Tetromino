@@ -1,0 +1,3 @@
+## 2024-05-18 - Global Mutex Bottleneck in ensureFolder
+**Learning:** The `SyncEngine.ensureFolder` implementation uses a single, global Promise chain (`this.ensureFolderMutex`) to serialize all folder creation checks. Because block processing runs concurrently (`pMap`), hundreds of blocks checking for asset folders simultaneously all queue up on this single mutex, even if the folder is already in `this.folderCache`. This causes unnecessary serialization of concurrent I/O operations.
+**Action:** Always implement a synchronous fast-path (double-checked locking) before taking a global mutex for operations that hit an in-memory cache, especially when called from within highly concurrent loops.
