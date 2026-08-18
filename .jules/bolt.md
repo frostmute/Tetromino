@@ -1,0 +1,3 @@
+## 2025-02-20 - Double-Checked Locking for Async Mutexes
+**Learning:** When using a Promise-based mutex (like `ensureFolderMutex` in SyncEngine) inside highly concurrent mapping operations (like `pMap` processing blocks), acquiring the lock unconditionally creates a severe synchronization bottleneck, effectively serializing operations that could be parallelized.
+**Action:** Use a "double-checked locking" pattern: perform a synchronous, fast-path check against an in-memory cache *before* awaiting the mutex, and check it again inside the mutex block. This ensures that cache hits do not block other concurrent tasks.
