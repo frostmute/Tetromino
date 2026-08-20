@@ -1,0 +1,1 @@
+## 2024-05-24 - Ensure Folder Fast Path\n**Learning:** The Ensure Folder mutex creates a bottleneck because reading the cache state inside the mutex requires awaiting the promise queue, causing a stall for concurrent operations.\n**Action:** Add a fast-path cache check before waiting on the mutex. This ensures cached checks return immediately and bypass the mutex entirely.
