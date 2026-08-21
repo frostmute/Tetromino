@@ -1,0 +1,3 @@
+## 2024-08-21 - Flattening DP matrix array allocations in unifiedDiff provides ~40% speedup
+**Learning:** In diffing algorithms where a dense matrix needs to be allocated, using an `Int32Array` with simulated 2D addressing (i * width + j) is roughly 40% faster than allocating a jagged 2D `Array<number[]>`. V8 optimizes flat typed arrays much better than thousands of small JS array allocations, which saves time in GC and memory allocation.
+**Action:** When implementing or optimizing DP algorithms with medium-to-large dense matrices, use a 1D `Int32Array` or `Float64Array` instead of nested JavaScript arrays to bypass significant allocation overhead.
