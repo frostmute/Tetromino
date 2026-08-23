@@ -1,0 +1,3 @@
+## 2024-10-18 - Optimize Diff Generation with 1D Array
+**Learning:** The unifiedDiff function in `src/diff.ts` used a nested 2D array (`Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0))`) for dynamic programming when calculating the longest common subsequence. This leads to excessive memory allocations and slower performance due to garbage collection overhead, especially for larger arrays. Using a 1D `Int32Array` with simulated 2D indexing (`i * width + j`) drastically reduces memory overhead and improves performance.
+**Action:** Replaced the 2D array in `src/diff.ts` with a 1D `Int32Array`.
