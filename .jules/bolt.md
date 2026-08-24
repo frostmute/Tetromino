@@ -1,0 +1,3 @@
+## 2024-08-24 - Double-Checked Locking for Promise Mutexes
+**Learning:** In a heavily concurrent application, using a simple queue-based Promise mutex (e.g., `let next = new Promise... await prev`) for repeated I/O checks like `ensureFolder` can become a severe bottleneck. Every concurrent caller queues up, even if the directory was already created by the first caller, leading to thousands of microtask delays.
+**Action:** When implementing Promise-based mutexes for I/O operations, use a Double-Checked Locking pattern. Always do a synchronous fast-path check against an in-memory cache (or fast synchronous API) before awaiting the global mutex queue. Only those that fail the fast-path check should enter the queue and re-check after acquiring the lock.

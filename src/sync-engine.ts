@@ -1130,6 +1130,15 @@ export class SyncEngine {
 	}
 
 	private async ensureFolder(path: string): Promise<void> {
+		// Fast-path synchronous check (Double-Checked Locking)
+		// Avoids bottleneck of queuing promises on the global mutex for existing directories
+		const normalized = normalizePath(path);
+		if (this.folderCache.has(normalized)) return;
+		if (this.vault.getAbstractFileByPath(normalized)) {
+			this.folderCache.add(normalized);
+			return;
+		}
+
 		let release!: () => void;
 		const next = new Promise<void>((r) => { release = r; });
 		const prev = this.ensureFolderMutex;
@@ -1137,7 +1146,6 @@ export class SyncEngine {
 		await prev;
 
 		try {
-			const normalized = normalizePath(path);
 			if (this.folderCache.has(normalized)) return;
 			if (this.vault.getAbstractFileByPath(normalized)) {
 				this.folderCache.add(normalized);
