@@ -1,0 +1,3 @@
+## 2024-05-18 - [Optimize Dynamic Programming Matrix Allocation]
+**Learning:** For dynamic programming algorithms requiring dense matrices (like the LCS implementation in `src/diff.ts`), using a 1D `Int32Array` or `Float64Array` with simulated 2D indexing (`i * width + j`) instead of nested JavaScript arrays (`number[][]`) optimizes memory allocation and garbage collection. This drastically improves performance, avoids garbage collection pauses, and extends the size of inputs before triggering V8 Out-Of-Memory exceptions.
+**Action:** Always prefer 1D typed arrays over nested 2D arrays for algorithmic memory matrices in JavaScript/TypeScript.
