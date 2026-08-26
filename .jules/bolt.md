@@ -1,0 +1,3 @@
+## 2025-02-23 - [Double-Checked Locking Pattern for EnsureFolder in SyncEngine]
+**Learning:** [SyncEngine's `ensureFolder` method caused significant locking due to joining the `ensureFolderMutex` Promise chain for every check, which caused a severe bottleneck for concurrent writes. Because `pMap` scales concurrency for folder checks, every block was bottlenecking at this Promise queue even if the folder was already cached in memory.]
+**Action:** [Implemented a double-checked locking pattern in `ensureFolder` by doing a synchronous fast-path memory check against `this.folderCache` before joining the promise queue. Keep an eye out for missing fast-path synchronous exits before async mutex queues in high-concurrency loops.]
