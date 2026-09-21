@@ -1,0 +1,3 @@
+## 2025-02-13 - [Avoid 2D Array Allocation in JS for Dense DP Matrices]
+**Learning:** In JavaScript, allocating an "array of arrays" (`number[][]`) via `Array.from` for large Dynamic Programming matrices causes severe memory fragmentation, GC overhead, and poor cache locality. For example, diffing two 400-line strings previously allocated 401 individual sub-arrays, slowing down the algorithm.
+**Action:** When implementing DP algorithms requiring dense 2D matrices (like LCS), always use a single flat typed array (e.g., `Int32Array`) with simulated 2D indexing (`i * cols + j`) to optimize memory allocation, avoid GC pressure, and significantly improve execution speed.
