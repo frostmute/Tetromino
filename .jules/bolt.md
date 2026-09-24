@@ -1,0 +1,3 @@
+## 2024-09-24 - [Promise Mutex Bottlenecks]
+**Learning:** Awaiting a Promise-based mutex before checking an in-memory cache causes severe bottlenecks under high concurrency, as it forces serialization even for fast-path cache hits.
+**Action:** When implementing Promise-based mutexes for I/O operations (e.g., ensureFolder), use a Double-Checked Locking pattern with a synchronous fast-path check against the cache *before* awaiting the global mutex queue.
