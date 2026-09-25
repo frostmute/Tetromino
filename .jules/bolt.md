@@ -1,0 +1,3 @@
+## 2024-05-24 - [Int32Array over Array of Arrays for DP matrices]
+**Learning:** Using a dense 1D `Int32Array` with simulated 2D indexing (`i * cols + j`) instead of `number[][]` (`Array.from({length}, () => new Array(length).fill(0))`) significantly speeds up dynamic programming algorithms, especially the LCS diffing implementation. It avoids excessive memory allocation overhead and reduces GC pressure, cutting execution time for diff generation on large inputs and tests.
+**Action:** Use 1D typed arrays like `Int32Array` for algorithms requiring large matrices instead of nested standard arrays to optimize allocation, traversal speed, and garbage collection.
