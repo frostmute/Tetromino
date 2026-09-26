@@ -14,16 +14,16 @@ function buildDiffLines(before: string[], after: string[]): DiffLine[] {
 		return lines;
 	}
 
-	const dp: number[][] = Array.from({ length: m + 1 }, () =>
-		new Array<number>(n + 1).fill(0),
-	);
+	// Using a 1D Int32Array for better memory layout and GC performance
+	const cols = n + 1;
+	const dp = new Int32Array((m + 1) * cols);
 
 	for (let i = m - 1; i >= 0; i--) {
 		for (let j = n - 1; j >= 0; j--) {
 			if (before[i] === after[j]) {
-				dp[i][j] = dp[i + 1][j + 1] + 1;
+				dp[i * cols + j] = dp[(i + 1) * cols + (j + 1)] + 1;
 			} else {
-				dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+				dp[i * cols + j] = Math.max(dp[(i + 1) * cols + j], dp[i * cols + (j + 1)]);
 			}
 		}
 	}
@@ -38,7 +38,7 @@ function buildDiffLines(before: string[], after: string[]): DiffLine[] {
 			j++;
 			continue;
 		}
-		if (dp[i + 1][j] >= dp[i][j + 1]) {
+		if (dp[(i + 1) * cols + j] >= dp[i * cols + (j + 1)]) {
 			lines.push({ type: "del", text: before[i] });
 			i++;
 		} else {
