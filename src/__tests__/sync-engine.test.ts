@@ -373,4 +373,19 @@ describe("SyncEngine", () => {
 			ensureFolderSpy.mockRestore();
 		});
 	});
+
+	describe("ensureFolder", () => {
+		it("returns immediately for cached folders without awaiting the mutex", async () => {
+			const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+			(engine as any).folderCache.add("cached/folder");
+			// Never-resolving mutex: hang if the fast-path is skipped
+			(engine as any).ensureFolderMutex = new Promise<void>(() => {});
+
+			await expect(
+				(engine as any).ensureFolder("cached/folder"),
+			).resolves.toBeUndefined();
+			expect(mockVault.createFolder).not.toHaveBeenCalled();
+			expect(mockVault.getAbstractFileByPath).not.toHaveBeenCalled();
+		});
+	});
 });
