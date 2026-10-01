@@ -29,3 +29,6 @@ data.json
 /conversation-export.md
 .specstory/statistics.json
 .freebuff/
+
+# Local agent tooling
+.jules/
