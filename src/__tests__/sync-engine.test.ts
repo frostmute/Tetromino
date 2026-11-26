@@ -64,6 +64,17 @@ describe("SyncEngine", () => {
 		expect(engine).toBeInstanceOf(SyncEngine);
 	});
 
+	it("skips the mutex and vault for normalized cached folders", async () => {
+		const engine = new SyncEngine(mockApp, mockApi, defaultSettings);
+		(engine as any).folderCache.add("cached/folder");
+		(engine as any).ensureFolderMutex = new Promise<void>(() => {});
+
+		await (engine as any).ensureFolder("cached\\folder");
+
+		expect(mockVault.getAbstractFileByPath).not.toHaveBeenCalled();
+		expect(mockVault.createFolder).not.toHaveBeenCalled();
+	}, 500);
+
 	describe("syncAll", () => {
 		it("should skip disabled channels", async () => {
 			defaultSettings.channelMappings = [

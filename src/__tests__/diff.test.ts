@@ -29,6 +29,10 @@ describe("unifiedDiff", () => {
 		expect(result).toBe("--- before\n+++ after\n line1\n-line2\n+line2.5\n line3");
 	});
 
+	it("prefers deletion when LCS choices are tied", () => {
+		expect(unifiedDiff("a\nb", "b\na")).toBe("--- before\n+++ after\n-a\n b\n+a");
+	});
+
 	it("should use custom labels", () => {
 		const before = "a";
 		const after = "b";
